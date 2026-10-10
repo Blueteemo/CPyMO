@@ -1,6 +1,15 @@
 name: Nintendo DS
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'codex/nds-*'
+    paths:
+      - 'cpymo/**'
+      - 'cpymo-backends/include/**'
+      - 'cpymo-backends/nds/**'
+      - 'cpymo-tool/nds-converter/**'
+      - '.github/workflows/nds.yml'
   pull_request:
     paths:
       - 'cpymo/**'
