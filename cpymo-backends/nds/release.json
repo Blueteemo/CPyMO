@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0-rc.1",
+  "cache_format": 1,
+  "video_policy": "omit-and-skip",
+  "baseline": "0.5.6.3-test",
+  "core_commit": "5a746bc72a4a8c127e0aee7deb20bf415c385ae2"
+}
