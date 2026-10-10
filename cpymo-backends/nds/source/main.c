@@ -219,7 +219,17 @@ void cpymo_backend_text_draw(cpymo_backend_text text,float x,float baseline,cpym
  float start_x=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10){x=start_x;baseline+=(font_nominal(mode)+3)*scale;continue;}int g=text_glyph(mode,cp);if(g<0){missing_glyph(cp);g=text_glyph(mode,'?');}
  if(g>=0)for(int y=0;y<h;y++)for(int xx=0;xx<w;xx++){unsigned gy=(unsigned)(y/scale),gx=(unsigned)(xx/scale);if(gy<gh&&gx<gw&&(text_row(mode,g,gy)&(1<<gx)))pixel((int)x+xx,(int)(baseline-gb*scale)+y,c,alpha);}x+=(g>=0?text_advance(mode,g):font_nominal(mode))*scale;}
 }
-cpymo_input cpymo_input_snapshot(){int k=keysHeld();touchPosition t={0};if(k&KEY_TOUCH){touchRead(&t);presentation_state[8]++;}cpymo_input in={0};in.ok=k&KEY_A;in.cancel=k&(cpymo_ui_enabled(&engine)?KEY_B:KEY_X);in.up=k&KEY_UP;in.down=k&KEY_DOWN;in.left=k&KEY_LEFT;in.right=k&KEY_RIGHT;in.skip=k&KEY_R;in.hide_window=!cpymo_ui_enabled(&engine)&&(k&KEY_B);in.mouse_button=!nds_touch_blocked&&(k&KEY_TOUCH);in.mouse_position_useable=in.mouse_button;in.mouse_x=(t.px-display_x())/display_scale();in.mouse_y=(t.py-display_y())/display_scale();return in;}
+cpymo_input cpymo_input_snapshot(){
+ int k=keysHeld();touchPosition t={0};if(k&KEY_TOUCH){touchRead(&t);presentation_state[8]++;}
+ bool ui=cpymo_ui_enabled(&engine);
+ // Script menus use the core cancel rule; save-enabled story choices keep X for the menu.
+ bool script_menu=engine.select_img.selections&&!engine.select_img.save_enabled;
+ cpymo_input in={0};in.ok=k&KEY_A;in.cancel=k&((ui||script_menu)?KEY_B:KEY_X);
+ in.up=k&KEY_UP;in.down=k&KEY_DOWN;in.left=k&KEY_LEFT;in.right=k&KEY_RIGHT;in.skip=k&KEY_R;
+ in.hide_window=!ui&&!engine.select_img.selections&&(k&KEY_B);
+ in.mouse_button=!nds_touch_blocked&&(k&KEY_TOUCH);in.mouse_position_useable=in.mouse_button;
+ in.mouse_x=(t.px-display_x())/display_scale();in.mouse_y=(t.py-display_y())/display_scale();return in;
+}
 static FILE* savefile(const char* dir,const char* name,const char* mode){char path[512];snprintf(path,sizeof path,"%s/save/%s",dir,name);return fopen(path,mode);}
 FILE* cpymo_backend_read_save(const char* dir,const char* name){return savefile(dir,name,"rb");}
 FILE* cpymo_backend_write_save(const char* dir,const char* name){return savefile(dir,name,"wb");}
