@@ -1,0 +1,141 @@
+"""CPyMO NDS conversion assistant backend. MIT. NDS port: 千岚之夏.
+
+Input archives and game scripts are read-only. Each conversion gets a new job
+directory; only a selected game's files are extracted, never the whole bundle.
+"""
+from pathlib import Path, PurePosixPath
+import argparse, contextlib, hashlib, json, os, shutil, stat, sys, tempfile
+import zipfile
+import convert
+
+MAX_FILES = 30000
+MAX_BYTES = 8 * 1024**3
+ROOT = Path(__file__).resolve().parent
+
+def checked_name(name):
+    name=name.replace('\\','/')
+    path=PurePosixPath(name)
+    if not name or path.is_absolute() or '..' in path.parts or ':' in name or '\0' in name:
+        raise ValueError('压缩包含不安全的文件路径，已停止。')
+    return path.as_posix()
+
+def archive_entries(archive):
+    entries=archive.infolist()
+    if len(entries)>MAX_FILES or sum(i.file_size for i in entries)>MAX_BYTES:
+        raise ValueError('压缩包过大，超出本工具的安全处理范围。')
+    for entry in entries:
+        checked_name(entry.filename)
+        if stat.S_ISLNK(entry.external_attr>>16):
+            raise ValueError('压缩包含符号链接，已停止。')
+    return entries
+
+def configuration(data):
+    if len(data)>65536:raise ValueError('游戏配置文件异常过大。')
+    values={}
+    for line in data.decode('utf-8-sig').splitlines():
+        key,sep,value=line.partition(',')
+        if sep:values[key.strip().lower()]=value.strip()
+    return values
+
+def discover(source,temp):
+    source=Path(source).resolve();temp=Path(temp).resolve();candidates=[]
+    if source.is_dir():
+        count=0
+        for folder,dirs,files in os.walk(source,followlinks=False):
+            dirs[:]=sorted(d for d in dirs if d not in ('save','nds-cache','.git') and not (Path(folder)/d).is_symlink())
+            count+=len(files)
+            if count>MAX_FILES:raise ValueError('选择的目录文件太多，请直接选择游戏数据目录。')
+            if 'gameconfig.txt' in files:
+                p=Path(folder)/'gameconfig.txt';c=configuration(p.read_bytes())
+                candidates.append({'chain':[],'root':str(Path(folder).resolve()),'title':c.get('gametitle',Path(folder).name).replace('\\n',' / '),'platform':c.get('platform','未知'),'kind':'folder'})
+    elif source.suffix.casefold() in ('.zip','.apk'):
+        def scan(path,chain,depth):
+            with zipfile.ZipFile(path) as archive:
+                entries=archive_entries(archive)
+                for entry in entries:
+                    name=checked_name(entry.filename)
+                    if PurePosixPath(name).name=='gameconfig.txt' and not entry.is_dir():
+                        c=configuration(archive.read(entry));root=name[:-len('gameconfig.txt')]
+                        candidates.append({'chain':chain,'root':root,'title':c.get('gametitle',PurePosixPath(root).name or source.stem).replace('\\n',' / '),'platform':c.get('platform','未知'),'kind':'archive','archive':str(path)})
+                if depth<2:
+                    nested=sorted((e for e in entries if Path(e.filename).suffix.casefold() in ('.zip','.apk') and not e.is_dir()),key=lambda e:e.filename.casefold())
+                    if len(nested)>12:raise ValueError('嵌套游戏包太多，请单独选择要转换的游戏包。')
+                    for entry in nested:
+                        name=checked_name(entry.filename);next_path=temp/(hashlib.sha256(('/'.join(chain+[name])).encode()).hexdigest()+'.zip')
+                        with archive.open(entry) as inp,next_path.open('wb') as out:shutil.copyfileobj(inp,out,1024*1024)
+                        scan(next_path,chain+[name],depth+1)
+        scan(source,[],0)
+    else:raise ValueError('请选择游戏文件夹，或 ZIP / APK 压缩包。')
+    rank={'s60v3':0,'symbian':0,'s60v5':1,'android':2,'pygame':3}
+    candidates.sort(key=lambda c:(rank.get(c['platform'].casefold(),9),c['title'],c['chain'],c['root']))
+    for index,candidate in enumerate(candidates):candidate['id']=index
+    if not candidates:raise ValueError('没有找到 gameconfig.txt。请选 PyMO 游戏数据包；加密脚本或其他引擎的游戏暂不支持。')
+    return candidates
+
+def extract_game(candidate,destination):
+    destination.mkdir(parents=True)
+    with zipfile.ZipFile(candidate['archive']) as archive:
+        for entry in archive_entries(archive):
+            name=checked_name(entry.filename)
+            if not name.startswith(candidate['root']):continue
+            rel=PurePosixPath(name[len(candidate['root']):])
+            if not rel.parts or any(p in ('save','nds-cache') for p in rel.parts):continue
+            target=destination.joinpath(*rel.parts)
+            if not target.resolve().is_relative_to(destination.resolve()):raise ValueError('解压路径异常。')
+            if entry.is_dir():target.mkdir(parents=True,exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True,exist_ok=True)
+                with archive.open(entry) as inp,target.open('xb') as out:shutil.copyfileobj(inp,out,1024*1024)
+    return destination
+
+def public_candidates(candidates):
+    return [{k:v for k,v in c.items() if k!='archive'} for c in candidates]
+
+def run_job(job):
+    """Jobs are also used by the frozen EXE tests; no external Python required."""
+    source=Path(job['source']).resolve();result=Path(job['result']).resolve()
+    if source.is_dir() and result.parent.is_relative_to(source):
+        raise ValueError('诊断位置不能放在原游戏目录内部，请选其他文件夹。')
+    result.parent.mkdir(parents=True,exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix='inspect-',dir=result.parent) as temporary:
+            candidates=discover(source,Path(temporary))
+            if job['action']=='inspect':
+                report={'ok':True,'candidates':public_candidates(candidates)}
+            else:
+                index=int(job.get('candidate',0))
+                if not 0<=index<len(candidates):raise ValueError('所选游戏已改变，请重新选择游戏包。')
+                candidate=candidates[index];output=Path(job['output']).resolve()
+                if output.exists():raise ValueError('目标目录已经存在，请使用新目录。原目录不会被覆盖。')
+                if source.is_dir() and output.is_relative_to(source):raise ValueError('输出目录不能放在原游戏目录内部。')
+                extracted=Path(temporary)/'selected-game'
+                game_source=Path(candidate['root']) if candidate['kind']=='folder' else extract_game(candidate,extracted)
+                print('已识别：'+candidate['title']+' / '+candidate['platform'],flush=True)
+                config=convert.inspect_source(game_source)
+                name=Path(candidate['root'].rstrip('/\\')).name or 'Game'
+                name=''.join(c for c in name if c.isascii() and (c.isalnum() or c in '_-')) or 'Game'
+                destination=output/'pymo/games'/name
+                ffmpeg=ROOT/'ffmpeg.exe'
+                if not ffmpeg.is_file():
+                    ffmpeg=Path(job.get('ffmpeg') or shutil.which('ffmpeg') or '')
+                if not ffmpeg.is_file():raise ValueError('缺少自带的音频转换组件，请完整解压转换助手，不要只移动 EXE。')
+                print('正在转换图片、音频和字体，游戏较大时需要等待……',flush=True)
+                convert.convert(argparse.Namespace(source=game_source,destination=destination,ffmpeg=str(ffmpeg),font=None,jobs=4,missing_glyph_policy=job.get('missing_policy','box')))
+                manifest=json.loads((destination/'nds-cache/manifest.json').read_text(encoding='utf8'))
+                warnings=[];audit=manifest['audit']
+                for label,key in [('未知脚本指令','unknown_commands'),('缺失资源引用','missing_resource_references'),('需运行检查的指令','commands_requiring_game_runtime_check')]:
+                    if audit[key]:warnings.append(f'{label}：{len(audit[key])}项')
+                boxed=sorted(set(c for font in manifest.get('pixel_fonts',[]) for c in font.get('boxed_codepoints',[])))
+                if boxed:warnings.append('字库缺字以□显示，原脚本未改：'+', '.join(boxed))
+                rom=ROOT/'cpymo-nds.nds'
+                if rom.is_file():shutil.copy2(rom,output/'cpymo-nds.nds')
+                report={'ok':True,'status':'已转换，仍需实际运行确认' if warnings else '转换和完整性检查通过，仍需实际运行确认','game':candidate['title'],'platform':candidate['platform'],'game_directory':str(destination),'output':str(output),'original_files_checked':len(manifest.get('source_files',manifest['original_files'])),'cache_files_checked':len(manifest['cache_files']),'warnings':warnings,'compatibility_certified':False,'video_policy':'默认不带视频；引擎安全跳过','missing_policy':job.get('missing_policy','box'),'source_modified':False}
+                report.update(release_version=convert.VERSION,cache_format=manifest['format'],rom_sha256=hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None)
+                instructions='安装：先备份TF卡上同一游戏的save。将本目录中的cpymo-nds.nds和pymo文件夹复制到TF根目录，保留R4内核。不要用本包空save覆盖自己的存档。\n原游戏包、脚本和汉化内容未修改。视频默认省略。转换通过不等于已经验证所有剧情及R4兼容。\nNDS平台移植：千岚之夏；CPyMO/PyMO与依赖的原署名和许可证保留。\n'+('\n注意：\n'+'\n'.join(warnings) if warnings else '')
+                (output/'安装必读.txt').write_text(instructions,encoding='utf-8-sig')
+                (output/'转换结果.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
+    except Exception as error:
+        report={'ok':False,'error':str(error),'source_modified':False,'partial_output_may_remain':True}
+        import traceback;traceback.print_exc()
+    result.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
+    return report
