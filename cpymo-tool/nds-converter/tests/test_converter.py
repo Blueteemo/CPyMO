@@ -90,4 +90,34 @@ class ConverterTests(unittest.TestCase):
             self.assertEqual(helper_core.configuration((dest/'gameconfig.txt').read_bytes())['platform'],'s60v3')
             self.assertFalse((dest/'save').exists())
 
+    @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),'FFmpeg required')
+    def test_uppercase_packed_and_loose_symbian_masks(self):
+        ffmpeg=os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')
+        with tempfile.TemporaryDirectory() as tmp:
+            for packed in [True,False]:
+                with self.subTest(packed=packed):
+                    base=Path(tmp)/str(packed);src=base/'src';fixture(src,'s60v3')
+                    (src/'chara').mkdir()
+                    pic=io.BytesIO();Image.new('RGB',(10,10),'red').save(pic,format='PNG')
+                    mask=Image.new('L',(10,10),255)
+                    for y in range(10):
+                        for x in range(4):mask.putpixel((x,y),0)
+                    buf=io.BytesIO();mask.save(buf,format='PNG')
+                    if packed:
+                        data=[(b'HERO',pic.getvalue()),(b'HERO_MASK',buf.getvalue())]
+                        index=bytearray(struct.pack('<I',2));offset=84
+                        for name,payload in data:index+=struct.pack('<32sII',name,offset,len(payload));offset+=len(payload)
+                        (src/'chara/chara.pak').write_bytes(index+b''.join(p for _,p in data))
+                    else:
+                        (src/'chara/HERO.png').write_bytes(pic.getvalue());(src/'chara/HERO_MASK.png').write_bytes(buf.getvalue())
+                    dst=base/'out'
+                    convert.convert(argparse.Namespace(source=src,destination=dst,ffmpeg=ffmpeg,font=None,jobs=1,missing_glyph_policy='box'))
+                    raw=(dst/'nds-cache/chara'/(convert.key('HERO')+'.npi')).read_bytes()
+                    magic,lw,lh,w,h,alpha=struct.unpack('<4sHHHHI',raw[:16])
+                    self.assertEqual((magic,lw,lh,w,h,alpha),(b'NPI1',10,10,8,8,1))
+                    opacity=raw[16+w*h*2:]
+                    self.assertEqual(opacity[0],0);self.assertEqual(opacity[-1],255)
+                    self.assertFalse((dst/'nds-cache/chara'/(convert.key('HERO_MASK')+'.npi')).exists())
+                    convert.verify(dst)
+
 if __name__=='__main__':unittest.main()

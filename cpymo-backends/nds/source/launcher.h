@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 #include <strings.h>
 #include "app-icon.h"
-typedef struct {char path[256],title[256],platform[8];unsigned status;u16 width,height;bool title_ok,meta_ok,icon_ok;char intro[2][128];unsigned char title_bits[350],meta_bits[1050];u16 icon[24*24];} LauncherGame;
+typedef struct {char path[256],title[256],platform[8];unsigned status;u16 width,height;bool title_ok,meta_ok,icon_ok,list_title_ok;char intro[2][128];unsigned char title_bits[350],meta_bits[1050],list_title_bits[400];u16 icon[24*24];} LauncherGame;
 static LauncherGame launcher_games[64];
 /* magic, visible, count, selected, launches, scan truncated, last init error */
 volatile unsigned launcher_state[7]={0x4c41554e};
@@ -87,6 +87,29 @@ static void launcher_video_init(void){
 static void launcher_video_show(void){swiWaitForVBlank();setBrightness(3,0);}
 static bool launcher_title_bitmap(const LauncherGame* game,int x,int y,u16 color){
  if(!game->title_ok)return false;for(unsigned yy=0;yy<14;yy++)for(unsigned xx=0;xx<200;xx++)if(game->title_bits[yy*25+xx/8]&(1u<<(xx%8)))launcher_rect(x+xx,y+yy,1,1,color);return true;
+}
+static void launcher_list_title(LauncherGame* game,int x,int y,u16 color){
+ /* Use the exact native 12px dialogue font, including its full glyph grid.
+    Older on-card title/meta bitmaps may still contain a pre-pixel-font style.
+    Generate once from this game's own subset, never the selected game's. */
+ if(!game->list_title_ok){
+  PixelFont own={0};
+  if(read_pixel_font(&own,game->path,"small",12)){
+   memset(game->list_title_bits,0,sizeof game->list_title_bits);const char* p=game->title;unsigned pen=0;
+   while(*p){unsigned cp=decode(&p);int lo=0,hi=own.count-1,found=-1;
+    while(lo<=hi){int mid=(lo+hi)/2;if(own.data[mid].code==cp){found=mid;break;}if(own.data[mid].code<cp)lo=mid+1;else hi=mid-1;}
+    int fallback=found<0?ui_fallback_glyph(cp):-1;
+    if(found<0&&fallback<0){fallback=ui_fallback_glyph('?');if(fallback<0)continue;}
+    unsigned advance=found>=0?own.data[found].advance:ui_fallback_advances[fallback];if(pen+advance>200)break;
+    for(unsigned yy=0;yy<16;yy++){unsigned bits=found>=0?own.data[found].rows[yy]:ui_fallback_rows[fallback][yy];
+     for(unsigned xx=0;xx<16&&pen+xx<200;xx++)if(bits&(1u<<xx))game->list_title_bits[yy*25+(pen+xx)/8]|=1u<<((pen+xx)%8);}
+    pen+=advance;
+   }
+   free(own.data);game->list_title_ok=true;
+  }
+ }
+ if(game->list_title_ok){for(unsigned yy=0;yy<16;yy++)for(unsigned xx=0;xx<200;xx++)if(game->list_title_bits[yy*25+xx/8]&(1u<<(xx%8)))launcher_rect(x+xx,y+yy,1,1,color);}
+ else if(!launcher_title_bitmap(game,x,y,color))launcher_text_mode(game->title,x,y,color,244,0);
 }
 /* Fit complete UTF-8 glyphs on one line, reserving dots when text overflows. */
 static void launcher_line(const char* text,int x,int y,u16 color,int max_x,unsigned mode){
@@ -172,7 +195,7 @@ static void launcher_draw(const char* message){
  else {unsigned first=launcher_selected/4*4;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
- launcher_title(game,40,y+5,game->status==1?white:muted,244);}
+ launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_text(message&&*message?message:"A 启动 · 上下选择 · SELECT 刷新",7,160,accent,250);launcher_text("轻触两次启动 · B 关于与许可",7,178,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}

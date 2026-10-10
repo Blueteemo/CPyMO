@@ -1,11 +1,11 @@
-# 1.0.0-rc.1 validation
+# NDS 1.0.0 validation
 
-This candidate is based on upstream core 5a746bc72a4a8c127e0aee7deb20bf415c385ae2
+This release is based on upstream core 5a746bc72a4a8c127e0aee7deb20bf415c385ae2
 and the user-accepted 0.5.6.3 NDS baseline. No platform tier is assigned here.
 
 Local build: devkitARM r68 / GCC16.1, Calico1.2.0, libnds2.0.2,
 libfat-nds2.1.0-4 (libdvm), Maxmod2.1.0, ndstool2.3.1.
-The ROM is 708608 bytes. The portable helper embeds the identical ROM and
+The ROM is 710656 bytes. The portable helper embeds the identical ROM and
 release metadata; output copies are checked by SHA-256.
 An independent complete source snapshot built in a different directory with
 the same SDK produces the identical ROM SHA-256 after source-path normalization.
@@ -42,11 +42,16 @@ python -m unittest discover -s cpymo-tool/nds-converter/tests -v
 FFmpeg must be on PATH, or set NDS_TEST_FFMPEG to the audio-only executable.
 Tests verify all three input platforms, packed S60v3 backgrounds, nested ZIP/APK
 selection, unsafe-path rejection, video omission, source/script preservation,
-and detection of corrupted generated audio.
+detection of corrupted generated audio, and packed/loose uppercase Symbian
+_MASK transparency. Four synthetic unit tests are provided.
 
-The preceding baseline was accepted by the user on ordinary R4 hardware.
-**This candidate still needs its own physical-card acceptance.** Lid mute/resume
-was tested on hardware during baseline development; historical automated lid
+The user gave final acceptance on an R4 with Wood kernel on 2026-10-11.
+The accepted pre-release was listfont-r3 (SHA256
+`e453644899cf6020f3098e7c229f1cf2f3b874494553a83e5715261fb012b262`).
+Version 1.0.0 promotes the same engine implementation with release metadata
+updated; the labelled binary is separately software-tested, not claimed to
+have been separately retested on hardware. Lid mute/resume was tested on
+hardware during baseline development; historical automated lid
 tests used a separately documented emulator scheduling fix. Stock melonDS
 checks must not be presented as new hardware or stock-emulator lid certification.
 
@@ -54,3 +59,14 @@ Known first-release limit: 22050Hz mono PCM16 and retained original non-video
 media increase installed game size. Video, compression and DSi enhancements
 remain separate later work. Conversion audits are not compatibility guarantees.
 The root README and upstream all-platform version are unchanged.
+
+## Final pre-release fixes
+
+List rows use each game own native Fusion Pixel 12px dialogue glyphs and
+advances, ignoring stale title bitmap styles. Actual-card metadata/fonts
+reproduced the older Narcissu title style; list and title-as-dialogue pixels
+match exactly for three games across selection, refresh and About return.
+Global character-effects OFF and cross-game/reboot persistence have separate
+synthetic coverage. The portable EXE also verifies uppercase packed/loose
+mask alpha pixels and input preservation. User feedback includes Narcissu1/2
+and Haruka play checks; it is not a new all-route certification.

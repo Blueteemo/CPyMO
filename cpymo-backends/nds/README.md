@@ -1,4 +1,4 @@
-# CPyMO for Nintendo DS — 1.0.0-rc.1
+# CPyMO for Nintendo DS — 1.0.0
 
 NDS platform port: 千岚之夏. CPyMO: Seng Jik and contributors.
 PyMO: chen_xin_ming and contributors. Engine/backend: AGPL-3.0-or-later;
@@ -63,16 +63,29 @@ does not certify every flashcart/card/kernel combination.
 
 When the hidden auxiliary screen is the touch screen, the first touch wakes it
 without advancing. Font size and read-text dimming are independent per game.
-Library titles use native 16px text; descriptions use native 12px. The embedded
+The selected game's upper title uses native 16px text; descriptions use native
+12px. Lower list titles use the exact native 12px dialogue font, including
+its complete 16-row storage grid and original advances. Each row builds its
+own in-memory bitmap from its game's small font; selecting a game with a
+different subset cannot remove its glyphs. Older on-card title/meta bitmaps
+may contain the earlier rasterized font and do not control this list's style.
+Game data need no reconversion.
+The in-game settings include a global character-effects switch, enabled by
+default and saved in /pymo/nds-global.cfg. Disabling it finishes character
+fade/movement/clear transitions immediately across games; background effects
+and image transparency remain enabled. It does not remove asset-loading time.
+The embedded
 pixel startup screen covers FAT/library loading without a minimum hold. Bitmap
 VRAM is cleared before reveal; FAT failure shows an error.
 
 ## Validation and limits
 
-The preceding 0.5.6.3 baseline was accepted on the user's ordinary R4 setup.
-The 1.0.0 candidate has separate devkitARM and stock melonDS 1.1 DS/4MiB
-checks. Candidate physical-card confirmation is still a release acceptance
-step. These tests do not certify all chapters, games or flashcarts.
+The final pre-release engine (listfont-r3) was accepted by the user on an
+ordinary R4 with Wood kernel on 2026-10-11. Version 1.0.0 promotes that tested
+engine with release-version metadata updated; it has separate devkitARM and
+stock melonDS 1.1 DS/4MiB checks. The exact 1.0.0-labelled binary is not claimed
+to have been separately tested on hardware. These checks do not certify all
+chapters, games or flashcarts.
 Historical lid tests use a separately documented emulator scheduling fix;
 they are not stock-melonDS sleep certification.
 

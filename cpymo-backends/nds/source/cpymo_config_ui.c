@@ -8,9 +8,11 @@
 #include <assert.h>
 #include <math.h>
 
-#define CONFIG_ITEMS 7
+#define CONFIG_ITEMS 8
 extern int nds_read_gray_get(void);
 extern void nds_read_gray_set(int);
+extern int nds_chara_effects_get(void);
+extern void nds_chara_effects_set(int);
 #ifdef __NDS__
 extern int nds_font_choices_available(void);
 extern int nds_font_choice_get(void);
@@ -41,6 +43,7 @@ typedef struct {
 #define ITEM_FONT_SIZE 4
 #define ITEM_SKIP_ALREADY_READ_ONLY 5
 #define ITEM_READ_GRAY 6
+#define ITEM_CHARA_EFFECTS 7
 
 const static float side_padding = 16;
 
@@ -357,6 +360,7 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 		false);
 
 	INIT_ITEM(ITEM_READ_GRAY, "已读变灰", 0, 1, nds_read_gray_get(), false);
+	INIT_ITEM(ITEM_CHARA_EFFECTS, "立绘特效(全局)", 0, 1, nds_chara_effects_get(), false);
 	#undef INIT_ITEM
 }
 
@@ -373,6 +377,7 @@ static void cpymo_config_ui_extract_setting_title(cpymo_engine *e, int item_id)
 	case ITEM_TEXT_SPEED: p = l->config_sayspeed; break;
 	case ITEM_SKIP_ALREADY_READ_ONLY: p = l->config_skip_mode; break;
 	case ITEM_READ_GRAY: p = "已读变灰"; break;
+	case ITEM_CHARA_EFFECTS: p = "立绘特效(全局)"; break;
 	default: assert(false);
 	}
 
@@ -400,7 +405,8 @@ static error_t cpymo_config_ui_set_value(
 	char val_str_buf[8];
 	const char *val_str = val_str_buf;
 	switch (item_index) {
-	case ITEM_READ_GRAY: val_str = val ? "开" : "关"; break;
+	case ITEM_READ_GRAY:
+	case ITEM_CHARA_EFFECTS: val_str = val ? "开" : "关"; break;
 	case ITEM_BGM_VOL:
 	case ITEM_SE_VOL:
 	case ITEM_VO_VOL:
@@ -448,6 +454,7 @@ static error_t cpymo_config_ui_set_value(
 JUST_REFRESH:
 	switch (item_index) {
 	case ITEM_READ_GRAY: nds_read_gray_set(val); break;
+	case ITEM_CHARA_EFFECTS: nds_chara_effects_set(val); break;
 	case ITEM_BGM_VOL:
 		cpymo_audio_set_channel_volume(CPYMO_AUDIO_CHANNEL_BGM, &e->audio, (float)val / 10.0f);
 		break;

@@ -40,6 +40,7 @@ UI_CODEPOINTS = (
     36716,36731,36733,36807,36816,36820,36827,36864,36873,36895,36914,36938,36984,37096,37197,37325,37327,38291,
     38388,38543,38544,38577,38656,38899,38917,39033,39057,65292,65306,65311,
 )
+UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)'))))
 
 def sha(path):
     h = hashlib.sha256()
@@ -254,7 +255,7 @@ def convert(args):
         folders[kind]=assets(src/kind,ext)
         if kind=='chara' and not (src/kind/(kind+'.pak')).is_file():
             masks=assets(src/kind,config.get('charamaskformat',ext))
-            folders[kind].update({k:v for k,v in masks.items() if k.endswith('_mask')})
+            folders[kind].update({k:v for k,v in masks.items() if k.lower().endswith('_mask')})
     # Some legacy packers included Windows Thumbs.db in image packages.
     # Recognize both its name and OLE signature; never hide corrupt game images.
     ignored=[]
@@ -271,11 +272,14 @@ def convert(args):
         return cache/kind/(hashed+suffix)
     for kind in ('bg','chara','system'):
         entries=folders[kind]
+        # Legacy Symbian packers may uppercase names, including the mask suffix.
+        # The runtime asset/cache identity is already ASCII case-insensitive.
+        by_lower={name.lower():asset for name,asset in entries.items()}
         for name,asset in entries.items():
-            if kind!='bg' and name.endswith('_mask') and name[:-5] in entries: continue
+            if kind!='bg' and name.lower().endswith('_mask') and name[:-5].lower() in by_lower: continue
             variants=('system0','system1') if kind=='system' else (kind,)
             for variant in variants:
-                mask=entries.get(name+'_mask') if variant in ('chara','system1') and config.get('platform','').lower() in ('s60v3','s60v5','symbian') else None
+                mask=by_lower.get((name+'_mask').lower()) if variant in ('chara','system1') and config.get('platform','').lower() in ('s60v3','s60v5','symbian') else None
                 meta=image_cache(asset,target(variant,name,'.npi'),scale,mask,kind=='bg')
                 images.append({'kind':variant,'name':name,**meta})
     for name,asset in folders['system'].items():

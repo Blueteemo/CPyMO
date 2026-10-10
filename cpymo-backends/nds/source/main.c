@@ -274,11 +274,21 @@ static void nds_power_event(void* user,PmEvent event){
 
 /* Standard NDS release intentionally skips video, including optional caches. */
 error_t __wrap_cpymo_movie_play(cpymo_engine* e,const char* name){(void)e;(void)name;engine_state[45]++;return CPYMO_ERR_SUCC;}
+extern void __real_cpymo_charas_wait(cpymo_engine*);
+extern void cpymo_charas_gc(cpymo_charas*,bool);
+void __wrap_cpymo_charas_wait(cpymo_engine* e){
+ if(nds_chara_effects_get()){__real_cpymo_charas_wait(e);return;}
+ /* Finish one complete character command before drawing its final state.
+    Image masks remain active; only timed character interpolation is skipped. */
+ for(struct cpymo_chara* c=e->charas.chara;c;c=c->next){cpymo_tween_finish(&c->pos_x);cpymo_tween_finish(&c->pos_y);cpymo_tween_finish(&c->alpha);}
+ cpymo_charas_gc(&e->charas,false);chara_effect_state[2]++;cpymo_engine_request_redraw(e);
+}
 
 int main(int argc,char** argv){
  pmAddEventHandler(&sleep_cookie,nds_power_event,NULL);
  debug_trace=false;filter_console_output();launcher_video_init();launcher_show_splash();
  if(!fatInitDefault()){launcher_failure_hint("FAT failed",CPYMO_ERR_CAN_NOT_OPEN_FILE,"Check TF card, then restart.");launcher_video_show();while(1){nds_power_poll();swiWaitForVBlank();}}
+ nds_global_preferences_load();
  const char* hint=argc>1?argv[1]:NULL;
  for(;;){
  debug_trace=false;filter_console_output();
