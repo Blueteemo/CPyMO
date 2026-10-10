@@ -5,8 +5,10 @@ and the user-accepted 0.5.6.3 NDS baseline. No platform tier is assigned here.
 
 Local build: devkitARM r68 / GCC16.1, Calico1.2.0, libnds2.0.2,
 libfat-nds2.1.0-4 (libdvm), Maxmod2.1.0, ndstool2.3.1.
-The ROM is 711680 bytes. The portable helper embeds the identical ROM and
+The ROM is 708608 bytes. The portable helper embeds the identical ROM and
 release metadata; output copies are checked by SHA-256.
+An independent complete source snapshot built in a different directory with
+the same SDK produces the identical ROM SHA-256 after source-path normalization.
 
 The local headless frontend uses the unmodified official melonDS1.1 core,
 direct boot, DLDI-patched FAT storage, and DS MainRAMMask=0x3fffff (4MiB).

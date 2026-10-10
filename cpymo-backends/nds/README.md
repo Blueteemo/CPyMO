@@ -24,6 +24,8 @@ Python 3.10+ is required for building, not for playing.
 Validated SDK: devkitARM r68/GCC 16.1, Calico 1.2.0, libnds 2.0.2,
 libfat 2.1.0, Maxmod 2.1.0, ndstool 2.3.1. Output: engine.nds.
 build-records/ records compiler commands and diagnostics.
+Source/SDK paths are normalized in compiler-emitted strings so relocating the
+source tree does not embed private paths or change the ROM with the same SDK.
 The installed libfat-nds 2.1.0-4 package provides the modern libdvm FAT
 compatibility API; this port does not assume an older libfat implementation.
 
