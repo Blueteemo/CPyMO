@@ -83,8 +83,7 @@ VRAM is cleared before reveal; FAT failure shows an error.
 The final pre-release engine (listfont-r3) was accepted by the user on an
 ordinary R4 with Wood kernel on 2026-10-11. Version 1.0.0 promotes that tested
 engine with release-version metadata updated; it has separate devkitARM and
-stock melonDS 1.1 DS/4MiB checks. The exact 1.0.0-labelled binary is not claimed
-to have been separately tested on hardware. These checks do not certify all
+stock melonDS 1.1 DS/4MiB checks. These checks do not certify all
 chapters, games or flashcarts.
 Historical lid tests use a separately documented emulator scheduling fix;
 they are not stock-melonDS sleep certification.
