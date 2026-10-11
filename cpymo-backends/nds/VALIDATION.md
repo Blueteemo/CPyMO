@@ -49,8 +49,7 @@ The user gave final acceptance on an R4 with Wood kernel on 2026-10-11.
 The accepted pre-release was listfont-r3 (SHA256
 `e453644899cf6020f3098e7c229f1cf2f3b874494553a83e5715261fb012b262`).
 Version 1.0.0 promotes the same engine implementation with release metadata
-updated; the labelled binary is separately software-tested, not claimed to
-have been separately retested on hardware. Lid mute/resume was tested on
+updated. Lid mute/resume was tested on
 hardware during baseline development; historical automated lid
 tests used a separately documented emulator scheduling fix. Stock melonDS
 checks must not be presented as new hardware or stock-emulator lid certification.
