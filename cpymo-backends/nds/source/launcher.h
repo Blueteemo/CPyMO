@@ -10,6 +10,16 @@ volatile unsigned launcher_state[7]={0x4c41554e};
 static unsigned launcher_count,launcher_selected;
 static u16* launcher_sub;
 static bool launcher_about,launcher_restored,launcher_language_menu;
+/* Runtime CPU mode is distinct from console model and memory link layout.
+ * An NTR binary does not gain 16 MiB merely because it runs on a DSi. */
+static const char* nds_runtime_mode_label(void){
+ if(!isDSiMode())return "NTR / DS mode · 4 MiB";
+#ifdef CPYMO_DSI_MEMORY_LAYOUT
+ return "TWL / DSi mode · 16 MiB";
+#else
+ return "TWL detected · DS layout";
+#endif
+}
 static unsigned launcher_language_cursor;
 static char launcher_font_path[256],launcher_icon_path[256];
 static u16 selected_icon[48*48];static bool selected_icon_ok;
@@ -140,7 +150,7 @@ static void launcher_show_splash(void){
  for(unsigned y=0;y<32;y++)for(unsigned x=0;x<32;x++){u16 c=app_icon[y*32+x];if(c)launcher_rect(96+x*2,38+y*2,2,2,c);}
  launcher_splash_text("CPyMO for NDS",121,true,RGB15(31,31,31));launcher_publish(vram);
  launcher_background();launcher_splash_text(nds_ui("正在读取游戏列表..."),88,false,RGB15(28,29,31));
- launcher_splash_text("DS / DS Lite · 4 MiB",166,false,RGB15(19,22,25));launcher_publish(launcher_sub);
+ launcher_splash_text(nds_runtime_mode_label(),166,false,RGB15(19,22,25));launcher_publish(launcher_sub);
  /* Both planes are complete already. No timer, key wait or extra VBlank. */
  setBrightness(3,0);splash_state[1]=1;splash_state[2]++;
 }
@@ -252,7 +262,7 @@ static void launcher_draw(const char* message){
  const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,245);
  launcher_text(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),12,175,accent,245);}
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
- if(!launcher_count||launcher_about)launcher_text(nds_ui("DS / DS Lite · 4 MiB"),12,177,muted,245);launcher_publish(vram);
+ if(!launcher_count||launcher_about)launcher_text(nds_ui(nds_runtime_mode_label()),12,177,muted,245);launcher_publish(vram);
  launcher_background();
  if(!launcher_about&&!launcher_language_menu){
   launcher_rect(0,0,256,28,RGB15(5,10,16));
