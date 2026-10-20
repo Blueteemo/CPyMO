@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <strings.h>
+#include <unistd.h>
 #include "app-icon.h"
 typedef struct {char path[256],title[256],platform[8];unsigned status;u16 width,height;bool title_ok,meta_ok,icon_ok,list_title_ok;char intro[2][128];unsigned char title_bits[350],meta_bits[1050],list_title_bits[400];u16 icon[24*24];} LauncherGame;
 static LauncherGame launcher_games[64];
@@ -34,8 +35,16 @@ static void launcher_remember(void){
  frontend_state[5]++;if(!ok)frontend_state[6]++;
 }
 static bool launcher_file(const char* dir,const char* suffix){char path[512];struct stat s;snprintf(path,sizeof path,"%s/%s",dir,suffix);return !stat(path,&s)&&S_ISREG(s.st_mode);}
+/* Explicit device-prefixed paths let the unmodified CPyMO asset loader,
+ * config and save code operate on either mounted FAT volume. Never rewrite
+ * one game's source paths or redirect its save files. */
+static bool launcher_valid_game_path(const char* dir){
+ return dir && (dir[0]=='/' ||
+                 !strncasecmp(dir,"fat:/",5) ||
+                 !strncasecmp(dir,"sd:/",4));
+}
 static void launcher_add(const char* dir){
- if(!dir||dir[0]!='/'||strlen(dir)>=256||!launcher_file(dir,"gameconfig.txt"))return;
+ if(!launcher_valid_game_path(dir)||strlen(dir)>=256||!launcher_file(dir,"gameconfig.txt"))return;
  for(unsigned i=0;i<launcher_count;i++)if(!strcasecmp(launcher_games[i].path,dir))return;
  if(launcher_count==64){launcher_state[5]=1;return;}
  LauncherGame* game=&launcher_games[launcher_count++];memset(game,0,sizeof *game);snprintf(game->path,sizeof game->path,"%s",dir);
@@ -64,13 +73,31 @@ static void launcher_add(const char* dir){
 }
 static void launcher_scan_dir(const char* root){
  DIR* d=opendir(root);if(!d)return;struct dirent* entry;char path[256];unsigned scanned=0;
- while((entry=readdir(d))&&scanned++<1024){if(entry->d_name[0]=='.')continue;int n=snprintf(path,sizeof path,"%s%s%s",root,!strcmp(root,"/")?"":"/",entry->d_name);if(n>0&&n<(int)sizeof path)launcher_add(path);}
+ while((entry=readdir(d))&&scanned++<1024){if(entry->d_name[0]=='.')continue;int n=snprintf(path,sizeof path,"%s%s%s",root,root[strlen(root)-1]=='/'?"":"/",entry->d_name);if(n>0&&n<(int)sizeof path)launcher_add(path);}
  if(scanned>=1024)launcher_state[5]=1;closedir(d);
+}
+/* libfat's fatInitDefault mounts both "sd:" and "fat:" where available,
+ * then chooses the running executable's device as cwd. Preserve the current
+ * /pymo/games scan and scan only the *other* device to avoid duplicates.
+ * DS/DS Lite never attempts DSi-SD discovery. No additional card writes. */
+static void launcher_scan_other_card(void){
+ if(!isDSiMode())return;
+ char cwd[256];
+ if(!getcwd(cwd,sizeof cwd))return;
+ const char* other=NULL;
+ if(!strncasecmp(cwd,"fat:",4))other="sd:";
+ else if(!strncasecmp(cwd,"sd:",3))other="fat:";
+ if(!other)return;
+ char path[32];
+ snprintf(path,sizeof path,"%s/pymo/games",other);
+ launcher_scan_dir(path);
+ snprintf(path,sizeof path,"%s/",other);
+ launcher_scan_dir(path);
 }
 static int launcher_compare(const void* a,const void* b){return strcasecmp(((const LauncherGame*)a)->path,((const LauncherGame*)b)->path);}
 static void launcher_scan(const char* hint){
  char previous[256]={0};if(launcher_count)snprintf(previous,sizeof previous,"%s",launcher_games[launcher_selected].path);
- launcher_count=0;launcher_state[5]=0;launcher_scan_dir("/pymo/games");launcher_scan_dir("/");launcher_add(hint);
+ launcher_count=0;launcher_state[5]=0;launcher_scan_dir("/pymo/games");launcher_scan_dir("/");launcher_scan_other_card();launcher_add(hint);
  const char* configs[]={"/cpymo-nds/cache-game-path.txt","/cpymo-nds/game-path.txt"};
  for(unsigned i=0;i<2;i++){FILE* f=fopen(configs[i],"rb");if(f){char path[256];if(fgets(path,sizeof path,f)){path[strcspn(path,"\r\n")]=0;launcher_add(path);}fclose(f);}}
  qsort(launcher_games,launcher_count,sizeof *launcher_games,launcher_compare);if(launcher_selected>=launcher_count)launcher_selected=0;launcher_state[2]=launcher_count;
@@ -259,7 +286,9 @@ static void launcher_draw(const char* message){
  else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,46,accent,245);
  launcher_title(game,12,90,white,245);
  launcher_intro(game,1,12,114,RGB15(26,27,29));launcher_intro(game,2,12,132,RGB15(26,27,29));
- const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,245);
+ const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,215);
+ if(!strncasecmp(game->path,"sd:/",4))launcher_text("SD",220,153,accent,248);
+ else if(!strncasecmp(game->path,"fat:/",5))launcher_text("TF",220,153,accent,248);
  launcher_text(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),12,175,accent,245);}
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
  if(!launcher_count||launcher_about){char heap_line[64];nds_runtime_heap_label(heap_line,sizeof heap_line);launcher_text(heap_line,12,177,muted,245);}launcher_publish(vram);
