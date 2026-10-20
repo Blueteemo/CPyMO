@@ -1,0 +1,55 @@
+name: NDS Dual-Card Playable Test Game
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/nds-dsi-dual-card-library
+    paths:
+      - cpymo-tool/nds-converter/tests/make_dual_card_game.py
+      - .github/workflows/nds-dual-card-fixture.yml
+permissions:
+  contents: read
+jobs:
+  playable-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install official converter prerequisites
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements.txt
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Generate original PyMO source game (not ROM)
+        run: python cpymo-tool/nds-converter/tests/make_dual_card_game.py /tmp/dualsrc
+      - name: Convert using actual CPyMO NDS 1.1.0 pipeline
+        run: |
+          mkdir -p pymo/games
+          python cpymo-tool/nds-converter/convert.py convert /tmp/dualsrc pymo/games/dualcard_echo_30m --ffmpeg ffmpeg --cache-only --audio-lossless voice --missing-glyph-policy box --cache-layout sharded
+          python cpymo-tool/nds-converter/convert.py verify pymo/games/dualcard_echo_30m
+      - name: Inspect size and resource integrity
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('pymo/games/dualcard_echo_30m')
+          manifest = json.loads((root/'nds-cache/manifest.json').read_text())
+          files = [p for p in root.rglob('*') if p.is_file()]
+          total = sum(p.stat().st_size for p in files)
+          audio = sum(p.stat().st_size for p in files if p.suffix in ('.pcm','.nar'))
+          print(json.dumps({'files':len(files),'total_bytes':total,'MiB':round(total/2**20,3),'audio_bytes':audio,
+              'images':len(manifest['images']),'audio_files':len(manifest['audio']),'cache_format':manifest['cache_layout'],
+              'missing_references':manifest['audit']['missing_resource_references'],
+              'unknown_commands':manifest['audit']['unknown_commands']},ensure_ascii=False,indent=2))
+          assert 28_000_000 <= total <= 34_000_000, f'Not approximately 30MB: {total}'
+          assert not manifest['audit']['missing_resource_references'], 'Missing game asset references'
+          assert not manifest['audit']['unknown_commands'], 'Unknown PyMO commands'
+          assert (root/'script/START.txt').is_file()
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: PyMO-Dual-Card-30MB-NDS-Converted-Game
+          path: pymo/games/dualcard_echo_30m/
+          if-no-files-found: error
+          retention-days: 30
