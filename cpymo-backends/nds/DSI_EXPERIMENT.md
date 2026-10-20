@@ -1,6 +1,6 @@
 # CPyMO for NDS/DSi · Experimental development record
 
-This document records verified facts separately from hypotheses. It applies only to branch `codex/nds-dsi-runtime-experiment`; the published `nds-v1.1.0` release remains unchanged.
+This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library` and `codex/nds-dsi-library-scrollbar`. The published `nds-v1.1.0` release remains unchanged.
 
 ## Hardware confirmation (2026-10-21)
 
@@ -17,6 +17,14 @@ This document records verified facts separately from hypotheses. It applies only
 - Replace hardcoded `DS / DS Lite · 4 MiB` splash/about text with runtime NTR/TWL indication and heap address range.
 - Keep a separate experimental DSi ROM output and CI artifact without modifying the published 1.1.0 release.
 - Retain the original 384 KiB recent-sprite cache in NTR. Raise its **maximum budget** to 2 MiB only when `isDSiMode()` is true and the runtime heap window spans at least 8 MiB; the cache continues to hold at most six recent images. This change does not rewrite the heap allocator or force CPU frequency. Hardware performance impact is not yet measured.
+
+## Dual-card hardware acceptance and library UX (2026-10-21)
+
+- R3 builds on the TWL-capable loader and scans the current storage plus the other device's `sd:/pymo/games` or `fat:/pymo/games` and card root, using *absolute per-device* game paths. Game configs, scripts, caches, and saves remain together on their own card.
+- Actual user test: original DSi with DSpico/AKMenu-Next and separate **128 MB console SD**. The converted original PyMO synthetic game `dualcard_echo_30m` occupied **31,035,615 bytes** (29.60 MiB); game data was generated through the **1.1.0 official NDS converter**, 12 scenes, 4 characters, 8 BGM tracks, 0 missing references or unknown commands. The user reports R3's cross-card game test **passed**. This verifies the basic dual-card discovery/play route; do not claim all chapter, save/load, or full-game scenarios individually tested without additional evidence.
+- Follow-on R4 library polish: show a proportional right-edge scrollbar **only with more than four games**; replace four-item page jumps with a four-row rolling viewport that follows D-pad navigation, works with touch selection, and also handles library refresh, selection restore, and wraparound. With five games, selecting the fifth displays games **2–5**, not the fifth alone.
+- Normal DS/R4 retains its single-card path and the 384 KiB image-cache budget; TWL with a suitable heap window may use a bounded 2 MiB recent-image budget. No shared CPyMO script, save or interpreter formats are modified.
+- R4 is code/CI validated; the newly added scrollbar interaction still needs a user's 5-game real-device confirmation.
 
 ## Next functional milestone: video
 
