@@ -123,6 +123,14 @@ static void prepare_opaque(Image* im){
 
 /* Bounded recent character-image cache: owns one reference, never changes pixels. */
 #define RECENT_LIMIT (384u*1024u)
+#define RECENT_LIMIT_TWL (2048u*1024u)
+/* Keep the original DS budget except on a genuine TWL runtime with >=8 MiB
+ * of heap address space. No direct clock, SCFG, or heap-bound changes. */
+static unsigned nds_recent_image_budget(void){
+ if(!isDSiMode())return RECENT_LIMIT;
+ const uintptr_t lo=(uintptr_t)getHeapStart(),hi=(uintptr_t)getHeapLimit();
+ return hi>lo && hi-lo>=(8u*1024u*1024u)?RECENT_LIMIT_TWL:RECENT_LIMIT;
+}
 typedef struct {char path[512];Image* image;unsigned bytes,age;} RecentImage;
 static RecentImage recent_images[6];static unsigned recent_bytes,recent_age,recent_limit=RECENT_LIMIT;
 static void recent_remove(unsigned i){if(recent_images[i].image){recent_bytes-=recent_images[i].bytes;cpymo_backend_image_free(recent_images[i].image);}memset(&recent_images[i],0,sizeof recent_images[i]);}
@@ -652,7 +660,8 @@ int main(int argc,char** argv){
  char game_dir[256];launcher_choose(game_dir,sizeof game_dir,hint);
  render_bits=3;{FILE* policy=savefile(game_dir,"nds-render-policy.txt","rb");if(policy){int value=fgetc(policy);fclose(policy);if(value>='0'&&value<='3')render_bits=value-'0';}}render_policy[1]=render_bits;
  FILE* debug_flag=savefile(game_dir,"nds-debug.flag","rb");debug_trace=debug_flag!=NULL;if(debug_flag)fclose(debug_flag);diagnostic_state[1]=debug_trace;diagnostic_state[2]=diagnostic_state[3]=0;
- recent_clear();memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
+ recent_clear();recent_limit=nds_recent_image_budget();
+ memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
