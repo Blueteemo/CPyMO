@@ -620,7 +620,15 @@ static void nds_engine_draw(const cpymo_engine* e){
  cpymo_floating_hint_draw(&e->floating_hint);cpymo_flash_draw(e);cpymo_bg_draw_transform_effect(e);cpymo_fade_draw(e);cpymo_text_draw(e);cpymo_say_draw(e);
 }
 
+/* Read-only runtime telemetry for hardware acceptance tests.
+ * [1] actual TWL runtime (not simply DSi console), [2] linked-memory profile.
+ * This deliberately does not modify CPU clock, SCFG or heap bounds. */
+volatile unsigned nds_runtime_state[3]={0x43505457,0,0};
 int main(int argc,char** argv){
+ nds_runtime_state[1]=isDSiMode()?1u:0u;
+#ifdef CPYMO_DSI_MEMORY_LAYOUT
+ nds_runtime_state[2]=1u;
+#endif
  pmAddEventHandler(&sleep_cookie,nds_power_event,NULL);
  /* Start Calico's lazy tick service through its public thread API before
     the launcher uses tickGetCount(); audio used to initialize it later. */
