@@ -623,11 +623,21 @@ static void nds_engine_draw(const cpymo_engine* e){
 /* Read-only runtime telemetry for hardware acceptance tests.
  * [1] actual TWL runtime (not simply DSi console), [2] linked-memory profile.
  * This deliberately does not modify CPU clock, SCFG or heap bounds. */
-volatile unsigned nds_runtime_state[3]={0x43505457,0,0};
+volatile unsigned nds_runtime_state[5]={0x43505457,0,0,0,0};
+#ifdef CPYMO_DSI_MEMORY_LAYOUT
+/* Nonzero TWL section makes the experimental ROM DSi-capable.
+ * Touch it only after hardware confirms TWL mode. */
+static volatile u32 nds_twl_probe_slot[256] TWL_BSS __attribute__((used));
+#endif
 int main(int argc,char** argv){
  nds_runtime_state[1]=isDSiMode()?1u:0u;
+ nds_runtime_state[3]=(unsigned)getHeapStart();
+ nds_runtime_state[4]=(unsigned)getHeapLimit();
 #ifdef CPYMO_DSI_MEMORY_LAYOUT
- nds_runtime_state[2]=1u;
+ if(nds_runtime_state[1]){
+  nds_twl_probe_slot[0]=0x44534931u;
+  nds_runtime_state[2]=nds_twl_probe_slot[0]==0x44534931u?1u:2u;
+ }
 #endif
  pmAddEventHandler(&sleep_cookie,nds_power_event,NULL);
  /* Start Calico's lazy tick service through its public thread API before
