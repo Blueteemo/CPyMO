@@ -1,57 +1,57 @@
-# Nintendo DS game conversion assistant
+# CPyMO NDS 转换助手 1.1.0
 
-NDS port: 千岚之夏. Standalone converter and GUI code: MIT. Fonts and bundled
-dependencies retain their own licenses. The engine is AGPL-3.0-or-later.
+NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；字体与依赖保留各自许可。
 
-The DS/DS Lite backend requires offline caches. Input can be a PyMO game folder,
-ZIP or APK with UTF-8 text scripts and `gameconfig.txt`; nested ZIPs are supported.
-S60v3, S60v5 and Android describe the **input game data**, not the host OS.
-Packed/encrypted scripts and other engines are not supported.
+## 给玩家
 
-The Windows portable distribution includes Python, Pillow and an audio-only
-FFmpeg executable. Players do not install them separately. Select the original
-game package, select a new output location, then click conversion. The output
-contains `cpymo-nds.nds`, `pymo/games/<game>` and an installation note.
+完整解压 Windows Starter，双击“启动转换器.bat”，或运行“转换器/Converter.exe”。
+无需安装 Python、FFmpeg 或编译器。选择游戏 ZIP/APK 或含 gameconfig.txt 的文件夹，
+支持嵌套 ZIP 与 S60v3 / S60v5 / 安卓 PyMO 数据（指输入数据平台，非电脑系统）。
+同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
 
-Original inputs and scripts are not edited. Existing saves are not imported or
-overwritten. Images become DS-sized RGB555 caches and audio becomes 22050 Hz
-mono PCM16. The current format favors playback speed over storage size.
-Original non-video media are also retained; reducing that duplication and audio
-cache size is future work. Static conversion success does not certify an entire
-game, every script command or all flashcarts.
+把输出的 cpymo-nds.nds 和 pymo 文件夹复制到 TF 根目录。路径应为
+`pymo/games/<游戏目录>/gameconfig.txt`，旁边有 script、nds-cache 和 save。
+保留 R4 内核。已有同名游戏先保留自己的 save，不要用新输出的空 save 覆盖。
+转换助手在电脑使用，不需要复制进 TF。本包不附游戏。
 
-Video assets under movie/video directories or with recognized video extensions
-are omitted from new output. Scripts retain their movie commands, which the
-standard NDS build safely skips. `nds-cache/manifest.json` records omissions,
-tool versions, hashes, missing resources and other compatibility warnings.
-Missing audio is recorded and may play silently; finalized text is unchanged.
+默认精简已有缓存的重复原媒体，无损压缩语音与适合的图片；BGM/音效保持 PCM，兼顾读取和存储。
+无损针对 NDS 缓存：图像先缩放为 DS 尺寸 RGB555，音频先转为 22050 Hz 单声道 PCM16。
+缓存压缩不会在此基础上继续降低像素或采样质量；不承诺比所有原版平台包更小。
+可选择不压缩缓存作对照；全部音频压缩是实验项，不属于默认性能基线。
+启用缓存压缩会同时精简重复媒体。输出专用于 NDS，保留原包供其他平台使用。
 
-## Developer usage
+视频资源省略，脚本中的视频指令保留并由引擎安全略过。原始包、脚本和定稿汉化不修改，源存档不导入。
+转换通过不等于全剧情或全部烧录卡认证。缺资源、未知指令和缺字策略记录在
+`nds-cache/manifest.json` 及转换结果中。GUI 默认缺字显示 □ 并记录，脚本文字不改。
+加密/打包脚本和其他游戏引擎不支持。
 
-Python 3.10+, `pip install -r requirements.txt`, and FFmpeg are needed when
-running from source. The portable Windows app has been tested; native portable
-macOS/Linux distributions are not provided. The CLI is available for those hosts.
+## 从源码运行与构建
+
+Python 3.10+，安装 requirements.txt，另备 FFmpeg；完整仓库内运行 `python app.py`。
+Windows 提供免安装包，macOS/Linux 可运行源码 CLI，不提供原生免安装包。
 
 ```sh
-python convert.py convert /path/to/game /path/to/new-output --ffmpeg /path/to/ffmpeg --missing-glyph-policy box
-python convert.py verify /path/to/new-output
-python app.py
+python -m pip install -r cpymo-tool/nds-converter/requirements.txt
+python cpymo-tool/nds-converter/convert.py convert /path/to/game /path/to/new-output --ffmpeg /path/to/ffmpeg --missing-glyph-policy box --cache-only --audio-lossless voice --compress-images
+python cpymo-tool/nds-converter/convert.py verify /path/to/new-output
 ```
 
-The default CLI missing-glyph policy is `error`; the explicit `box` option keeps
-the original script and uses a visible replacement glyph, with an audit record.
-The GUI defaults to this documented box policy. Keep the supplied `fonts/` and
-their licenses with the source. Source version metadata is read from
-`cpymo-backends/nds/release.json`; do not copy only this directory out of the repo.
+CLI 默认缺字报错且保留便于对照的原媒体/未压缩缓存；上述参数与 GUI 推荐路径一致。
+缓存格式6按哈希前两位分目录，兼容引擎旧格式1～5；`--cache-layout flat` 用于对照测试。
+图像/音频去重不改脚本资源名称。保留 fonts/ 的字体文件和全部许可，不要只拷单个 Python 文件。
+版本从 cpymo-backends/nds/release.json 读取。
 
-Build the NDS ROM first. On Windows, install `requirements-build.txt`, then:
+构建 Windows 包：先构建 ROM，安装 requirements-build.txt，使用可信 Windows x86_64 C 编译器构建加速库：
 
 ```sh
+python build_native.py --cc /path/to/x86_64-w64-mingw32-gcc.exe
 python build_portable.py --ffmpeg /path/to/ffmpeg.exe --output /path/to/new-portable
 ```
 
-It embeds the same ROM and release metadata as the output root and verifies
-their hashes. Add player docs/licenses and complete corresponding source before
-publication. FFmpeg runs as a separate process; it is not linked into the MIT
-converter. A minimal FFmpeg build script is under `tools/`; its official source,
-configuration, toolchain and runtime notices must accompany binary releases.
+加速库可选，源码模式缺失时使用 Python 实现；公开 Windows 包包含该库。
+打包脚本嵌入并检查同一 ROM 与版本元数据。发布时还需附玩家必读、第三方许可和完整对应源码。
+FFmpeg 独立进程运行，不链接进 MIT 转换器；tools/ 提供音频专用构建脚本。
+发行页 Sources.zip 包含相应 FFmpeg 官方源码、构建配置及工具链许可。
+
+回归：`python -m unittest discover -s cpymo-tool/nds-converter/tests -v`，可用 NDS_TEST_FFMPEG 指定程序。
+app.py 的 `--self-test JSON` 通过真实 GUI 与工作进程完成转换，未指定压缩字段时使用实际界面默认值。

@@ -276,6 +276,13 @@ static mm_word _mmStreamGetPosition(mm_word mask)
 	return coarse + fine;
 }
 
+volatile unsigned stream_diag[8]={0x53545244};
+static unsigned diag_last_pos;static bool diag_primed;
+void nds_stream_diag_reset(void){for(unsigned i=1;i<8;i++)stream_diag[i]=0;diag_last_pos=mmStreamGetPosition();diag_primed=true;}
+/* R15: distinguish no newly consumed samples from initial/full-wrap prefill. */
+volatile unsigned refill_diag[16]={0x52464c31};
+static bool refill_guard;
+void nds_stream_guard_policy(bool enabled){refill_guard=enabled;refill_diag[1]=enabled;}
 void mmStreamUpdate(void)
 {
 	if (!s_mmStreamState.task.fn) {
@@ -286,8 +293,12 @@ void mmStreamUpdate(void)
 		return;
 	}
 
-	s_mmStreamState.read_pos = _mmStreamGetPosition(1) &~ 3; // only allow 4-sample increments
-	_mmStreamRefill();
+	unsigned absolute=mmStreamGetPosition();unsigned elapsed_samples=diag_primed?absolute-diag_last_pos:0;if(diag_primed){unsigned elapsed=absolute-diag_last_pos;if(elapsed>stream_diag[2])stream_diag[2]=elapsed;if(elapsed>=s_mmStreamState.page_len*2)stream_diag[3]++;}diag_last_pos=absolute;diag_primed=true;stream_diag[1]++;
+ s_mmStreamState.read_pos = _mmStreamGetPosition(1) &~ 3; // only allow 4-sample increments
+	bool equal=s_mmStreamState.read_pos==s_mmStreamState.write_pos;
+ if(equal){refill_diag[2]++;if(elapsed_samples<s_mmStreamState.page_len*2){refill_diag[3]++;if(refill_guard){refill_diag[4]++;return;}}else refill_diag[5]++;}
+ refill_diag[6]++;
+ u64 diag_begin=tickGetCount();_mmStreamRefill();unsigned diag_us=(tickGetCount()-diag_begin)*1000000/TICK_FREQ;if(diag_us>stream_diag[4])stream_diag[4]=diag_us;
 }
 
 void mmStreamClose(void)

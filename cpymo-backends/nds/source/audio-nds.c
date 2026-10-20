@@ -18,16 +18,29 @@
 extern volatile unsigned engine_state[46];
 extern volatile unsigned vblank_count;
 typedef struct {struct mad_stream stream;struct mad_frame frame;struct mad_synth synth;unsigned char input[8192+MAD_BUFFER_GUARD];unsigned used;bool padded;} MP3;
-typedef struct {FILE* file;bool loop;int volume;char name[64];s16 cache[1152];unsigned pos,count;unsigned offset,length,remaining,rate,phase;MP3* mp3;} Channel;
-typedef struct {Channel ch[3];} Audio;
+#include "nar-reader.h"
+typedef struct {unsigned total,left;bool modern;unsigned char input[2048];} NAR;
+volatile unsigned audio_state[12]={0x4e415235};
+volatile unsigned audio_bench[12]={0x4e415235};
+typedef struct {NAR* nar;FILE* file;bool loop;int volume;char name[64];s16 cache[1152];unsigned pos,count;unsigned offset,length,remaining,rate,phase;MP3* mp3;} Channel;
+typedef struct {Channel ch[3];int nar_policy;unsigned char* aliases;unsigned alias_count;bool alias_checked;error_t alias_error;} Audio;
 static Audio* active;
+#include "audio-aliases.h"
+/* Optional delivered-PCM verification, disabled in normal/performance runs. */
+volatile unsigned movie_audio_check[8]={0x4d414331};static bool movie_verify;
+void nds_movie_audio_verify(bool enabled){movie_verify=enabled;for(unsigned i=1;i<8;i++)movie_audio_check[i]=0;movie_audio_check[2]=1;}
+extern volatile unsigned movie_state[24];static FILE* movie_audio;static unsigned movie_remaining;static Channel* movie_channel;
+
+/* In-memory diagnostic ring, no filesystem writes from the audio service. */
+volatile unsigned audio_trace[4+128*8]={0x47545237};
+static unsigned last_service_us,last_service_pc;
 static u64 last_audio_tick;
 static unsigned last_audio_vblank;
 static bool audio_suspended;
 extern volatile unsigned sleep_state[12];
 extern void nds_mm_stream_suspend(void);
 extern void nds_mm_stream_resume(void);
-static void stop(Channel* c){if(c->file)fclose(c->file);if(c->mp3){mad_synth_finish(&c->mp3->synth);mad_frame_finish(&c->mp3->frame);mad_stream_finish(&c->mp3->stream);free(c->mp3);}c->mp3=NULL;c->file=NULL;c->pos=c->count=0;c->name[0]=0;}
+static void stop(Channel* c){free(c->nar);c->nar=NULL;if(c->file)fclose(c->file);if(c->mp3){mad_synth_finish(&c->mp3->synth);mad_frame_finish(&c->mp3->frame);mad_stream_finish(&c->mp3->stream);free(c->mp3);}c->mp3=NULL;c->file=NULL;c->pos=c->count=0;c->name[0]=0;}
 static bool refill_mp3(Channel* c){
  MP3* d=c->mp3;unsigned keep=0;
  if(d->stream.next_frame&&d->stream.next_frame>=d->input&&d->stream.next_frame<=d->input+d->used){keep=d->input+d->used-d->stream.next_frame;memmove(d->input,d->stream.next_frame,keep);}
@@ -60,6 +73,19 @@ static bool decode_mp3(Channel* c){
  }
  engine_state[19]++;return false;
 }
+static unsigned refill_pcm(Channel* c){
+ if(!c->nar)return fread(c->cache,sizeof(s16),1024,c->file);
+ NAR* d=c->nar;
+ if(!d->left){if(!c->loop||!d->total)return 0;if(fseek(c->file,16,SEEK_SET))goto bad;d->left=d->total;audio_state[9]++;}
+ unsigned char h[12];u64 start=tickGetCount();if(fread(h,1,12,c->file)!=12)goto bad;
+ unsigned size=h[0]|(h[1]<<8),n=h[2]|(h[3]<<8),order=h[4],k=h[5];uint32_t check=h[8]|((uint32_t)h[9]<<8)|((uint32_t)h[10]<<16)|((uint32_t)h[11]<<24);
+ if(n!=(d->left>1024?1024:d->left)||!size||size>n*2||h[6]||h[7]||fread(d->input,1,size,c->file)!=size)goto bad;
+ audio_state[2]+=(tickGetCount()-start)*1000000/TICK_FREQ;start=tickGetCount();
+ if((!d->modern&&order>=16&&order!=255)||!nar_decode(d->input,size,c->cache,n,order,k)||nar_checksum((unsigned char*)c->cache,n*2)!=check)goto bad;
+ unsigned us=(tickGetCount()-start)*1000000/TICK_FREQ;audio_state[1]++;audio_state[3]+=us;if(us>audio_state[4])audio_state[4]=us;audio_state[5]+=size+12;audio_state[6]+=n*2;
+ d->left-=n;if(!d->left&&!c->loop)audio_state[10]++;if(!d->left&&(fgetc(c->file)!=EOF||ferror(c->file)))goto bad;return n;
+bad:audio_state[7]++;engine_state[19]++;return 0;
+}
 static int next(Channel* c){
  if(!c->file)return 0;
  if(c->mp3){
@@ -69,25 +95,69 @@ static int next(Channel* c){
   return sample;
  }
  if(c->pos==c->count){
-  c->count=fread(c->cache,sizeof(s16),1024,c->file);c->pos=0;
-  if(!c->count&&c->loop){rewind(c->file);c->count=fread(c->cache,sizeof(s16),1024,c->file);}
+  c->count=refill_pcm(c);c->pos=0;
+  if(!c->count&&c->loop&&!c->nar){rewind(c->file);c->count=fread(c->cache,sizeof(s16),1024,c->file);}
   if(!c->count){if(ferror(c->file))engine_state[19]++;stop(c);return 0;}
  }
  return c->cache[c->pos++]*c->volume/256;
 }
 static mm_word refill(mm_word length,mm_addr dest,mm_stream_formats format){
  (void)format;s16* out=dest;engine_state[17]++;
- for(unsigned i=0;i<length;++i){int sample=0;if(active)for(unsigned c=0;c<3;++c)sample+=next(&active->ch[c]);if(sample>32767)sample=32767;if(sample< -32768)sample=-32768;out[i]=(s16)sample;if(sample)engine_state[18]++;}
- return length;
+ if(movie_audio){unsigned want=length;if(want>movie_remaining)want=movie_remaining;unsigned got=0;
+  if(movie_channel){while(got<want){Channel* c=movie_channel;if(c->pos==c->count){c->count=refill_pcm(c);c->pos=0;if(!c->count)break;}unsigned n=c->count-c->pos;if(n>want-got)n=want-got;memcpy(out+got,c->cache+c->pos,n*2);c->pos+=n;got+=n;}}
+  else got=fread(out,2,want,movie_audio);if(movie_verify&&got){unsigned c=nar_checksum((unsigned char*)out,got*2),a=movie_audio_check[2],b=movie_audio_check[3];movie_audio_check[1]+=got;movie_audio_check[2]=(a+(c&65535)-1)%65521;movie_audio_check[3]=(b+(c>>16)+got*2*(a-1))%65521;}
+ if(got!=want){movie_state[7]++;movie_audio_check[4]++;movie_remaining=0;}else movie_remaining-=got;for(unsigned i=0;i<got;i++)if(out[i]){engine_state[18]++;movie_state[14]++;}if(got<length)memset(out+got,0,(length-got)*2);movie_state[13]++;return length;}
+
+ bool pcm_only=active!=NULL;
+ if(active)for(unsigned c=0;c<3;c++)if(active->ch[c].mp3)pcm_only=false;
+ if(!pcm_only){
+  for(unsigned i=0;i<length;++i){int sample=0;if(active)for(unsigned c=0;c<3;++c)sample+=next(&active->ch[c]);if(sample>32767)sample=32767;if(sample< -32768)sample=-32768;out[i]=(s16)sample;if(sample)engine_state[18]++;}
+  return length;
+ }
+ for(unsigned done=0;done<length;){
+  unsigned batch=length-done;if(batch>64)batch=64;int mixed[64]={0};
+  for(unsigned channel=0;channel<3;channel++){
+   Channel* c=&active->ch[channel];unsigned pos=0;
+   while(pos<batch&&c->file){
+    if(c->pos==c->count){c->count=refill_pcm(c);c->pos=0;
+     if(!c->count&&c->loop&&!c->nar){rewind(c->file);c->count=fread(c->cache,sizeof(s16),1024,c->file);}
+     if(!c->count){if(ferror(c->file))engine_state[19]++;stop(c);break;}
+    }
+    unsigned count=c->count-c->pos;if(count>batch-pos)count=batch-pos;
+    for(unsigned i=0;i<count;i++)mixed[pos+i]+=c->cache[c->pos+i]*c->volume/256;
+    c->pos+=count;pos+=count;
+   }
+  }
+  for(unsigned i=0;i<batch;i++){int sample=mixed[i];if(sample>32767)sample=32767;if(sample< -32768)sample=-32768;out[done+i]=(s16)sample;if(sample)engine_state[18]++;}
+  done+=batch;
+ }return length;
 }
+
+static void movie_stream(unsigned size){mm_stream stream={0};stream.sampling_rate=22050;stream.buffer_length=size;stream.callback=refill;stream.format=MM_STREAM_16BIT_MONO;stream.timer=MM_TIMER0;stream.manual=true;mmStreamOpen(&stream);last_audio_tick=tickGetCount();last_audio_vblank=vblank_count;}
+static bool movie_audio_begin(const char* path,unsigned offset,unsigned samples,bool compressed){
+ FILE* f=fopen(path,"rb");if(!f)return false;
+ if(compressed&&setvbuf(f,NULL,_IOFBF,2048)){fclose(f);return false;}
+ if(fseek(f,offset,SEEK_SET)){fclose(f);return false;}
+ Channel* c=NULL;
+ if(compressed){
+  unsigned char h[16];if(fread(h,1,16,f)!=16||memcmp(h,"NAR2",4)||h[8]!=0x22||h[9]!=0x56||h[10]||h[11]||h[12]||h[13]||h[14]||h[15]||(h[4]|((unsigned)h[5]<<8)|((unsigned)h[6]<<16)|((unsigned)h[7]<<24))!=samples){fclose(f);return false;}
+  c=calloc(1,sizeof *c);if(!c){fclose(f);return false;}c->nar=calloc(1,sizeof *c->nar);if(!c->nar){free(c);fclose(f);return false;}
+  c->file=f;c->nar->total=c->nar->left=samples;c->nar->modern=true;
+ }
+ movie_audio_check[5]=compressed;mmStreamClose();movie_channel=c;movie_audio=f;movie_remaining=samples;movie_stream(4096);return true;
+}
+bool nds_movie_audio_begin(const char* path,unsigned offset,unsigned samples){return movie_audio_begin(path,offset,samples,false);}
+bool nds_movie_audio_begin_nar(const char* path,unsigned offset,unsigned samples){return movie_audio_begin(path,offset,samples,true);}
+unsigned nds_movie_audio_position(void){return mmStreamGetPosition();}
+void nds_movie_audio_end(void){if(!movie_audio)return;mmStreamClose();if(movie_channel){stop(movie_channel);free(movie_channel);movie_channel=NULL;}else fclose(movie_audio);movie_audio=NULL;movie_stream(nds_cache_enabled?4096:2048);}
 void cpymo_audio_init(cpymo_audio_system* s){
- Audio* a=calloc(1,sizeof *a);*s=a;active=a;last_audio_tick=tickGetCount();if(!a)return;
+ Audio* a=calloc(1,sizeof *a);*s=a;active=a;if(a)a->nar_policy=-2;last_audio_tick=tickGetCount();if(!a)return;
  for(unsigned c=0;c<3;++c)a->ch[c].volume=256;
  mm_ds_system sys={0};mmInit(&sys);
- mm_stream stream={0};stream.sampling_rate=22050;stream.buffer_length=nds_cache_enabled?16384:2048;stream.callback=refill;stream.format=MM_STREAM_16BIT_MONO;stream.timer=MM_TIMER0;stream.manual=true;
+ mm_stream stream={0};stream.sampling_rate=22050;stream.buffer_length=nds_cache_enabled?4096:2048;stream.callback=refill;stream.format=MM_STREAM_16BIT_MONO;stream.timer=MM_TIMER0;stream.manual=true;
  mmStreamOpen(&stream);engine_state[15]=1;
 }
-void nds_audio_update(void){if(active&&!audio_suspended){u64 started_tick=tickGetCount();bool playing=active->ch[0].file||active->ch[1].file||active->ch[2].file;if(playing&&last_audio_tick){unsigned gap=(started_tick-last_audio_tick)*1000000/TICK_FREQ;if(gap>engine_state[28])engine_state[28]=gap;}last_audio_tick=started_tick;unsigned started=vblank_count;mmStreamUpdate();unsigned took=vblank_count-started;if(took>engine_state[25])engine_state[25]=took;unsigned us=(tickGetCount()-started_tick)*1000000/TICK_FREQ;if(us>engine_state[27])engine_state[27]=us;last_audio_vblank=vblank_count;}}
+void nds_audio_update(void){if(active&&!audio_suspended){u64 started_tick=tickGetCount();bool playing=active->ch[0].file||active->ch[1].file||active->ch[2].file;if(playing&&last_audio_tick){unsigned gap=(started_tick-last_audio_tick)*1000000/TICK_FREQ;if(gap>engine_state[28])engine_state[28]=gap;if(gap>=30000){unsigned seq=audio_trace[1]++,i=4+(seq%128)*8;audio_trace[i]=seq;audio_trace[i+1]=gap;audio_trace[i+2]=last_service_us;audio_trace[i+3]=last_service_pc;audio_trace[i+4]=(unsigned)__builtin_return_address(0);audio_trace[i+5]=engine_state[14];audio_trace[i+6]=vblank_count;audio_trace[i+7]=audio_state[1];if(gap>audio_trace[2])audio_trace[2]=gap;}}last_audio_tick=started_tick;unsigned started=vblank_count;mmStreamUpdate();unsigned took=vblank_count-started;if(took>engine_state[25])engine_state[25]=took;unsigned us=(tickGetCount()-started_tick)*1000000/TICK_FREQ;if(us>engine_state[27])engine_state[27]=us;last_service_us=us;last_service_pc=(unsigned)__builtin_return_address(0);last_audio_vblank=vblank_count;}}
 void nds_audio_suspend(void){
  if(!active||audio_suspended)return;
  nds_audio_update();sleep_state[7]=mmStreamGetPosition();
@@ -101,7 +171,7 @@ void nds_audio_resume(void){
 }
 /* A cheap display-tick guard: no clock read or mixer call for every row. */
 void nds_audio_pump_if_due(void){if(active&&vblank_count!=last_audio_vblank){nds_audio_update();last_audio_vblank=vblank_count;}}
-void cpymo_audio_free(cpymo_audio_system* s){Audio* a=*s;if(a){mmStreamClose();for(unsigned c=0;c<3;++c)stop(&a->ch[c]);free(a);}if(active==a)active=NULL;*s=NULL;}
+void cpymo_audio_free(cpymo_audio_system* s){Audio* a=*s;if(a){mmStreamClose();for(unsigned c=0;c<3;++c)stop(&a->ch[c]);free(a->aliases);free(a);}if(active==a)active=NULL;*s=NULL;}
 bool cpymo_audio_enabled(cpymo_engine* e){return e->audio!=NULL;}
 float cpymo_audio_get_channel_volume(size_t c,const cpymo_audio_system* s){return *s?((Audio*)*s)->ch[c].volume/256.f:0;}
 void cpymo_audio_set_channel_volume(size_t c,cpymo_audio_system* s,float v){if(v<0)v=0;if(v>1)v=1;if(*s)((Audio*)*s)->ch[c].volume=(int)(v*256);}
@@ -121,7 +191,17 @@ static error_t play(cpymo_engine* e,cpymo_str name,unsigned id,bool loop){
  Channel* c=&a->ch[id];stop(c);char path[512];const char* folder=id==0?"bgm":id==1?"se":"voice";
  if(name.len>=sizeof c->name)return CPYMO_ERR_INVALID_ARG;
  memcpy(c->name,name.begin,name.len);c->name[name.len]=0;
- if(nds_cache_enabled){nds_cache_path(path,sizeof path,e->assetloader.gamedir,folder,name,".pcm");c->file=fopen(path,"rb");if(!c->file){if(errno==ENOENT&&known_missing_audio(e->assetloader.gamedir,folder,name)){c->name[0]=0;engine_state[44]++;return CPYMO_ERR_SUCC;}engine_state[19]++;return CPYMO_ERR_CAN_NOT_OPEN_FILE;}engine_state[42]++;}
+ if(nds_cache_enabled){
+  error_t alias_error=load_aliases(a,e->assetloader.gamedir);if(alias_error)return alias_error;
+  if(a->nar_policy==-2){a->nar_policy=-1;snprintf(path,sizeof path,"%s/nds-cache/audio-formats.bin",e->assetloader.gamedir);FILE* f=fopen(path,"rb");if(f){unsigned char h[6];unsigned got=fread(h,1,6,f);fclose(f);if(got!=5||memcmp(h,"NAF1",4)||(h[4]&~7)){engine_state[19]++;/* Optional index is invalid: use checked legacy detection. */}else a->nar_policy=h[4];}}
+  bool try_nar=a->nar_policy<0||(a->nar_policy&(1<<id));
+  if(try_nar){audio_cache_path(path,sizeof path,e->assetloader.gamedir,folder,name,".nar",a,id);c->file=fopen(path,"rb");}else errno=ENOENT;
+  if(c->file){if(setvbuf(c->file,NULL,_IOFBF,2048)){stop(c);return CPYMO_ERR_OUT_OF_MEM;}unsigned char h[16];if(fread(h,1,16,c->file)!=16||(memcmp(h,"NAR1",4)&&memcmp(h,"NAR2",4))||h[8]!=0x22||h[9]!=0x56||h[10]||h[11]||h[12]||h[13]||h[14]||h[15]){stop(c);engine_state[19]++;return CPYMO_ERR_BAD_FILE_FORMAT;}
+   c->nar=calloc(1,sizeof *c->nar);if(!c->nar){stop(c);return CPYMO_ERR_OUT_OF_MEM;}
+   c->nar->modern=h[3]=='2';c->nar->total=c->nar->left=h[4]|((unsigned)h[5]<<8)|((unsigned)h[6]<<16)|((unsigned)h[7]<<24);audio_state[8]++;
+  }else if(errno!=ENOENT){engine_state[19]++;return CPYMO_ERR_CAN_NOT_OPEN_FILE;}
+  if(!c->file){audio_cache_path(path,sizeof path,e->assetloader.gamedir,folder,name,".pcm",a,id);c->file=fopen(path,"rb");}
+if(!c->file){if(errno==ENOENT&&known_missing_audio(e->assetloader.gamedir,folder,name)){c->name[0]=0;engine_state[44]++;return CPYMO_ERR_SUCC;}engine_state[19]++;return CPYMO_ERR_CAN_NOT_OPEN_FILE;}engine_state[42]++;}
  else {snprintf(path,sizeof path,"%s/%s/%s.pcm",e->assetloader.gamedir,folder,c->name);c->file=fopen(path,"rb");}
  c->loop=loop;
  if(!c->file){

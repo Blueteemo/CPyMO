@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import importlib
 
 ROOT = Path(__file__).resolve().parent
 BACKEND = ROOT.parents[1] / 'cpymo-backends/nds'
@@ -19,6 +20,12 @@ def main():
     args = parser.parse_args()
     if os.name != 'nt':
         parser.error('Build the Windows portable executable on Windows.')
+    # Fail before creating a package which starts but cannot compress images.
+    for module in ('PyInstaller', 'PIL.Image', 'lz4.block'):
+        try:
+            importlib.import_module(module)
+        except ImportError as error:
+            parser.error(f'Missing build dependency {module}: {error}')
     ffmpeg = args.ffmpeg.resolve()
     output = args.output.resolve()
     rom = BACKEND / 'engine.nds'
@@ -41,6 +48,8 @@ def main():
                '--exclude-module', 'numpy', '--exclude-module', 'scipy',
                '--exclude-module', 'matplotlib', '--exclude-module', 'pytest',
                str(ROOT/'app.py')]
+    if (ROOT/'lossless-native.dll').is_file():
+        command[-1:-1]=['--add-binary',f'{ROOT / "lossless-native.dll"};.']
     with (output/'helper-build.log').open('w', encoding='utf8') as log:
         subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT)
     shutil.copy2(rom, output/'cpymo-nds.nds')

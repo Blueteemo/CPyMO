@@ -1,17 +1,52 @@
-# CPyMO for Nintendo DS — 1.0.0
+# CPyMO for Nintendo DS 1.1.0
 
-NDS platform port: 千岚之夏. CPyMO: Seng Jik and contributors.
-PyMO: chen_xin_ming and contributors. Engine/backend: AGPL-3.0-or-later;
-standalone converter: MIT. See CREDITS.md, licenses/, the decoder's GPL
-notices and the converter's font licenses for third-party attribution.
+面向普通 DS / DS Lite、4 MiB RAM 和 FAT/DLDI Slot-1 烧录卡。不依赖 DSi 软破。
+NDS 平台移植：千岚之夏；CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。
+引擎与后端为 AGPL-3.0-or-later，独立转换器为 MIT，第三方许可见 CREDITS.md、licenses/ 和转换器 fonts/。
 
-Targets original DS / DS Lite, 4 MiB RAM and FAT/DLDI Slot-1 flashcarts.
-There is no DSi exploit dependency. Offline image, font and audio caches are
-required; original scripts and finalized localization text remain unchanged.
-The paired converter is in cpymo-tool/nds-converter and accepts S60v3,
-S60v5 and Android PyMO game structures. The portable host app is Windows-only.
+## 安装与更新
 
-## Build
+发行包提供独立 `cpymo-nds.nds` 和配套 Windows 免安装转换助手，不附游戏。
+先在电脑上用 `cpymo-tool/nds-converter` 转换自己的 S60v3 / S60v5 / 安卓 PyMO 数据，
+再将转换结果中的 `cpymo-nds.nds` 和 `pymo/games/<游戏目录>` 复制到 TF 根目录。
+保留 R4 内核，已有游戏更新前保留自己的 `save/`，不要用转换结果的空存档目录覆盖。
+已转换的 1.0 游戏仍可使用；想缩小旧数据请从原包转入新目录，单独保留并迁移存档。
+新压缩缓存需要 1.1 引擎，不能配旧版程序。
+
+| 按键 | 作用 |
+|---|---|
+| A / 触控 | 确认、继续 |
+| X | 游戏菜单；游戏列表中打开语言选择 |
+| B | 返回、取消；剧情中按住隐藏文字；脚本选择界面遵循游戏取消设置 |
+| Y | 开关辅助屏及其背光 |
+| L | 交换物理上下屏 |
+| R | 按游戏快进策略跳读 |
+| START / SELECT | 快速保存到标准存档1 / 快速读取存档1 |
+| 合盖 / 开盖 | 暂停静音 / 恢复 |
+
+辅助屏隐藏且位于触控屏时，首次触控只唤醒。字号、已读变灰按游戏保存，立绘特效开关是全局设置。
+关闭立绘特效可跳过立绘渐变、移动和清除动效，仍保留背景转场与透明遮罩，资源加载仍需时间。
+列表、简介和系统标题使用内置原生点阵字体；旧游戏缓存中的标题图不会覆盖新的列表字体。
+角色名按可见字形居中。时钟位于列表下屏右上角；游戏中平时在副屏，打开 X 菜单后只在菜单左上角显示。
+
+## 四语界面与错误页
+
+语言顺序和保存编号为：0 自动、1 简体中文、2 繁體中文、3 English、4 日本語。
+首次正常进入启动器默认简体中文；手动选择保存在 `/pymo/nds-language.cfg`。
+自动模式检测主机固件语言，而非 R4 内核语言：支持日语、英语、中文，其余及无效值回退简中。
+FAT 初始化失败时尚不能读卡上的设置，因此错误页使用固件语言及中文回退，保留原始错误码。
+ROM 内置错误字库不依赖 TF 卡。界面语言不改变游戏脚本、标题、简介或原署名。
+
+## 数据与性能边界
+
+配套转换器默认精简重复原媒体，无损压缩语音及适合压缩的图像缓存；BGM/音效保持 PCM。
+这里的“无损”针对已生成的 NDS RGB555 / 22050 Hz 单声道缓存，不代表原图原音频不经缩放或重采样。
+资源别名去重和两位十六进制分目录减少重复文件及单目录密度。缓存格式6，仍读取旧格式1～5。
+脚本、汉化内容、署名和存档格式保留，原始游戏包不修改。
+转换器省略视频，游戏中的视频指令安全略过。本版不提供通用视频播放；源码内实验解码不属于默认转换功能。
+缺失资源、缺字和待运行检查的指令写入转换报告。加密/打包脚本需要另行导入，不保证任意 PyMO 游戏全兼容。
+
+## 构建
 
 ```sh
 git submodule update --init stb endianness.h
@@ -19,83 +54,16 @@ export DEVKITPRO=/opt/devkitpro
 python3 cpymo-backends/nds/build.py
 ```
 
-PowerShell: `$env:DEVKITPRO='C:/devkitPro'`, then `python build.py` here.
-Python 3.10+ is required for building, not for playing.
-Validated SDK: devkitARM r68/GCC 16.1, Calico 1.2.0, libnds 2.0.2,
-libfat 2.1.0, Maxmod 2.1.0, ndstool 2.3.1. Output: engine.nds.
-build-records/ records compiler commands and diagnostics.
-Source/SDK paths are normalized in compiler-emitted strings so relocating the
-source tree does not embed private paths or change the ROM with the same SDK.
-The installed libfat-nds 2.1.0-4 package provides the modern libdvm FAT
-compatibility API; this port does not assume an older libfat implementation.
+PowerShell 设置 `$env:DEVKITPRO='C:/devkitPro'`，在仓库根运行同一 Python 命令。
+Python 3.10+。验证环境：devkitARM r68 / GCC16.1、Calico1.2.0、libnds2.0.2、
+libfat-nds2.1.0-4（现代 libdvm FAT 兼容接口）、Maxmod2.1.0、ndstool2.3.1。
+输出 `engine.nds`，命令和诊断保存在 `build-records/`。编译字符串中的源/SDK路径归一化，避免嵌入私人路径。
+`VERSION` 与 `release.json` 保持一致，与上游全平台版本号独立。
+ARM9/ARM7 均使用 Calico specs；不要改用默认 ARM7，自定义服务负责背光、合盖和音频恢复。
 
-release.json is the shared engine/assistant release metadata. VERSION is
-checked against it; the build generates the visible version header. This
-does not change the upstream all-platform version. Cache protocol is independent
-of product version: format1 uses NPI1 images, PCM16 audio and NF13/NPF1 fonts.
-Existing converted games do not need reconversion for this UI/version update.
-Existing save formats and locations are retained.
+## 验证范围
 
-Both ARM9 and ARM7 use Calico ds9/ds7 specs. Do not replace the custom ARM7
-with the SDK default: the PXI backlight worker uses the Calico SPI lock to
-update only PMIC backlight bits, preserving standard input/touch, sound,
-LED, power, microphone and wireless services. The Maxmod stream implementation
-contains a documented sleep tick rebase.
-
-## Installation and controls
-
-Copy cpymo-nds.nds and converted pymo/games/<game> to the TF root. Keep the
-flashcart kernel. Back up saves before a game update; never overwrite your
-existing save/ with the converter's new empty directory. Multiple games appear
-in the library. Keep ROM files outside game data folders. FAT/DLDI support
-does not certify every flashcart/card/kernel combination.
-
-| Input | Action |
-|---|---|
-| A / touch | Confirm / advance |
-| X | In-game menu |
-| B | Return/cancel in menus; hold to hide dialogue in game |
-| Y | Toggle the auxiliary screen/backlight |
-| L | Swap physical screens |
-| R | Skip according to the game's skip policy |
-| START / SELECT | Save / load standard slot1 |
-| Close / open lid | Pause and mute / resume |
-
-When the hidden auxiliary screen is the touch screen, the first touch wakes it
-without advancing. Font size and read-text dimming are independent per game.
-The selected game's upper title uses native 16px text; descriptions use native
-12px. Lower list titles use the exact native 12px dialogue font, including
-its complete 16-row storage grid and original advances. Each row builds its
-own in-memory bitmap from its game's small font; selecting a game with a
-different subset cannot remove its glyphs. Older on-card title/meta bitmaps
-may contain the earlier rasterized font and do not control this list's style.
-Game data need no reconversion.
-The in-game settings include a global character-effects switch, enabled by
-default and saved in /pymo/nds-global.cfg. Disabling it finishes character
-fade/movement/clear transitions immediately across games; background effects
-and image transparency remain enabled. It does not remove asset-loading time.
-The embedded
-pixel startup screen covers FAT/library loading without a minimum hold. Bitmap
-VRAM is cleared before reveal; FAT failure shows an error.
-
-## Validation and limits
-
-The final pre-release engine (listfont-r3) was accepted by the user on an
-ordinary R4 with Wood kernel on 2026-10-11. Version 1.0.0 promotes that tested
-engine with release-version metadata updated; it has separate devkitARM and
-stock melonDS 1.1 DS/4MiB checks. These checks do not certify all
-chapters, games or flashcarts.
-Historical lid tests use a separately documented emulator scheduling fix;
-they are not stock-melonDS sleep certification.
-
-Video behavior is unconditional safe skip, even if experimental video caches
-exist. The converter omits video assets and records omissions. Audio caches
-are 22050Hz mono PCM16; install size is currently large. Original non-video
-media are retained. Compression, optional video, DSi enhancements and broader
-game compatibility are later work.
-
-Missing original audio may be silent and is listed in conversion audits.
-Missing glyphs may be boxed only under the explicit converter policy.
-Packed/encrypted scripts need a separate importer. Conversion is not general
-compatibility certification. Game data, user saves, SDK and emulator images
-do not belong in this source directory or the upstream contribution.
+1.1.0 最终程序 807936 字节，与用户 Wood R4 短测程序逐字节一致，用户确认“已测，正常”。
+stock melonDS 1.1 普通 DS / 4 MiB 的19项界面、语言、持久化、错误页及时钟检查及5项标题字形像素对比通过。
+这不代表四游戏全剧情、所有烧录卡或固件认证。合盖恢复有用户实机反馈；历史带调度修正的模拟器检查不能替代原版模拟器认证。
+完整游戏、用户存档、SDK 和模拟器镜像不属于本源码贡献。

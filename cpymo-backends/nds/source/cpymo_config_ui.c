@@ -7,8 +7,9 @@
 #include "cpymo_localization.h"
 #include <assert.h>
 #include <math.h>
+#include "ui-language-nds.h"
 
-#define CONFIG_ITEMS 8
+#define CONFIG_ITEMS 9
 extern int nds_read_gray_get(void);
 extern void nds_read_gray_set(int);
 extern int nds_chara_effects_get(void);
@@ -44,6 +45,7 @@ typedef struct {
 #define ITEM_SKIP_ALREADY_READ_ONLY 5
 #define ITEM_READ_GRAY 6
 #define ITEM_CHARA_EFFECTS 7
+#define ITEM_UI_LANGUAGE 8
 
 const static float side_padding = 16;
 
@@ -359,8 +361,9 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 		(int)e->config_skip_already_read_only,
 		false);
 
-	INIT_ITEM(ITEM_READ_GRAY, "已读变灰", 0, 1, nds_read_gray_get(), false);
-	INIT_ITEM(ITEM_CHARA_EFFECTS, "立绘特效(全局)", 0, 1, nds_chara_effects_get(), false);
+	INIT_ITEM(ITEM_READ_GRAY, nds_ui("已读变灰"), 0, 1, nds_read_gray_get(), false);
+	INIT_ITEM(ITEM_CHARA_EFFECTS, nds_ui("立绘特效(全局)"), 0, 1, nds_chara_effects_get(), false);
+	INIT_ITEM(ITEM_UI_LANGUAGE, nds_ui("界面语言"), 0, NDS_LANG_COUNT-1, nds_language_choice_get(), false);
 	#undef INIT_ITEM
 }
 
@@ -376,8 +379,9 @@ static void cpymo_config_ui_extract_setting_title(cpymo_engine *e, int item_id)
 	case ITEM_FONT_SIZE: p = l->config_fontsize; break;
 	case ITEM_TEXT_SPEED: p = l->config_sayspeed; break;
 	case ITEM_SKIP_ALREADY_READ_ONLY: p = l->config_skip_mode; break;
-	case ITEM_READ_GRAY: p = "已读变灰"; break;
-	case ITEM_CHARA_EFFECTS: p = "立绘特效(全局)"; break;
+	case ITEM_READ_GRAY: p = nds_ui("已读变灰"); break;
+	case ITEM_CHARA_EFFECTS: p = nds_ui("立绘特效(全局)"); break;
+	case ITEM_UI_LANGUAGE: p = nds_ui("界面语言"); break;
 	default: assert(false);
 	}
 
@@ -405,8 +409,9 @@ static error_t cpymo_config_ui_set_value(
 	char val_str_buf[8];
 	const char *val_str = val_str_buf;
 	switch (item_index) {
+	case ITEM_UI_LANGUAGE: val_str = nds_language_choice_name(val); break;
 	case ITEM_READ_GRAY:
-	case ITEM_CHARA_EFFECTS: val_str = val ? "开" : "关"; break;
+	case ITEM_CHARA_EFFECTS: val_str = nds_ui(val ? "开" : "关"); break;
 	case ITEM_BGM_VOL:
 	case ITEM_SE_VOL:
 	case ITEM_VO_VOL:
@@ -415,7 +420,7 @@ static error_t cpymo_config_ui_set_value(
 		break;
 	case ITEM_FONT_SIZE:
 		#ifdef __NDS__
-		if (nds_font_choices_available()) val_str = val ? "大" : "小";
+		if (nds_font_choices_available()) val_str = nds_ui(val ? "大" : "小");
 		else
 #endif
 		sprintf(val_str_buf, "%d", val);
@@ -453,6 +458,7 @@ static error_t cpymo_config_ui_set_value(
 
 JUST_REFRESH:
 	switch (item_index) {
+	case ITEM_UI_LANGUAGE: nds_language_choice_set(val); cpymo_config_ui_refresh_items(e); break;
 	case ITEM_READ_GRAY: nds_read_gray_set(val); break;
 	case ITEM_CHARA_EFFECTS: nds_chara_effects_set(val); break;
 	case ITEM_BGM_VOL:

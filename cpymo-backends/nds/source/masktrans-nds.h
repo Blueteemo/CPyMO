@@ -31,7 +31,8 @@ void cpymo_backend_masktrans_draw(cpymo_backend_masktrans mask,float t,bool fade
  unsigned char opacity[256];int threshold=(int)(t*765+.5f);
  for(int value=0;value<256;value++){int a=(threshold-2*value)*32/255;if(a<0)a=0;if(a>32)a=32;if(t<=0)a=0;if(t>=1)a=32;opacity[value]=fade_in?32-a:a;}
  int x0=(int)(display_x()+.5f),y0=(int)(display_y()+.5f),dw=(int)(engine.gameconfig.imagesize_w*display_scale()+.5f),dh=(int)(engine.gameconfig.imagesize_h*display_scale()+.5f);
+ unsigned columns[256];bool mapped=(render_bits&2)&&dw>0&&dw<=256;if(mapped){for(int x=0;x<dw;x++)columns[x]=x*m->w/dw;render_policy[5]++;}
  for(int y=0;y<dh;y++){if(!(y&15))nds_audio_pump_if_due();int py=y0+y;if(py<0||py>=192)continue;unsigned row=y*m->h/dh*m->w;
-  for(int x=0;x<dw;x++){int px=x0+x;if(px<0||px>=256)continue;int a=opacity[m->pixels[row+x*m->w/dw]];unsigned i=py*256+px;framebuffer[i]=blend(framebuffer[i],BIT(15),a);}}
+  for(int x=0;x<dw;x++){int px=x0+x;if(px<0||px>=256)continue;int a=opacity[m->pixels[row+(mapped?columns[x]:(unsigned)x*m->w/dw)]];unsigned i=py*256+px;framebuffer[i]=blend(framebuffer[i],BIT(15),a);}}
  mask_state[3]++;mask_state[4]|=fade_in?2:1;mask_state[5]|=1u<<(unsigned)(t*31);mask_state[7]=(unsigned)(t*1000);mask_state[8]=fade_in;
 }

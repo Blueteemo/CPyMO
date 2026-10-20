@@ -46,6 +46,24 @@ def hashes(folder):
     return {p.relative_to(folder).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in folder.rglob('*') if p.is_file()}
 
 class ConverterTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),'FFmpeg required')
+    def test_helper_release_defaults_preserve_scripts_and_compress_voice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);src=base/'input';script=fixture(src,'s60v3')
+            (src/'voice').mkdir();shutil.copy2(src/'bgm/tone.wav',src/'voice/line.wav')
+            before=hashes(src)
+            report=helper_core.run_job({'action':'convert','source':str(src),'output':str(base/'output'),
+                'result':str(base/'job/result.json'),'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
+            self.assertTrue(report['ok'],report)
+            self.assertTrue(report['cache_only']);self.assertEqual(report['lossless']['audio_mode'],'voice')
+            dst=Path(report['game_directory'])
+            self.assertEqual(before,hashes(src));self.assertEqual(script,(dst/'script/START.txt').read_bytes())
+            self.assertFalse((dst/'video').exists());self.assertFalse((dst/'bg/scene.png').exists())
+            self.assertTrue(list((dst/'nds-cache/voice').rglob('*.nar')))
+            self.assertTrue(list((dst/'nds-cache/bgm').rglob('*.pcm')))
+            self.assertFalse(list((dst/'nds-cache/bgm').rglob('*.nar')))
+            convert.verify(dst)
+
     def test_unsafe_archive_paths_are_rejected(self):
         for name in ['../escape','/absolute','C:/escape','a/../../escape']:
             with self.assertRaises(ValueError):helper_core.checked_name(name)
@@ -68,7 +86,9 @@ class ConverterTests(unittest.TestCase):
                     self.assertTrue(manifest['audit']['unsupported_video_commands'])
                     self.assertTrue(manifest['omitted_files'])
                     convert.verify(dst)
-                    audio=next((dst/'nds-cache/bgm').glob('*.pcm'))
+                    self.assertEqual(manifest['format'],6)
+                    self.assertEqual(manifest['cache_layout']['name'],'sharded')
+                    audio=next((dst/'nds-cache/bgm').rglob('*.pcm'))
                     self.assertGreater(audio.stat().st_size,0)
                     with audio.open('ab') as out:out.write(b'corrupt')
                     with self.assertRaises(ValueError):convert.verify(dst)
@@ -112,12 +132,13 @@ class ConverterTests(unittest.TestCase):
                         (src/'chara/HERO.png').write_bytes(pic.getvalue());(src/'chara/HERO_MASK.png').write_bytes(buf.getvalue())
                     dst=base/'out'
                     convert.convert(argparse.Namespace(source=src,destination=dst,ffmpeg=ffmpeg,font=None,jobs=1,missing_glyph_policy='box'))
-                    raw=(dst/'nds-cache/chara'/(convert.key('HERO')+'.npi')).read_bytes()
+                    hashed=convert.key('HERO')
+                    raw=(dst/'nds-cache/chara'/hashed[:2]/(hashed+'.npi')).read_bytes()
                     magic,lw,lh,w,h,alpha=struct.unpack('<4sHHHHI',raw[:16])
                     self.assertEqual((magic,lw,lh,w,h,alpha),(b'NPI1',10,10,8,8,1))
                     opacity=raw[16+w*h*2:]
                     self.assertEqual(opacity[0],0);self.assertEqual(opacity[-1],255)
-                    self.assertFalse((dst/'nds-cache/chara'/(convert.key('HERO_MASK')+'.npi')).exists())
+                    self.assertFalse(any((dst/'nds-cache/chara').rglob(convert.key('HERO_MASK')+'.npi')))
                     convert.verify(dst)
 
 if __name__=='__main__':unittest.main()

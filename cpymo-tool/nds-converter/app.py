@@ -14,7 +14,7 @@ class App:
         self.source=tk.StringVar();self.output=tk.StringVar(value=str(Path.home()/'Desktop'))
         self.status=tk.StringVar(value='先选择游戏压缩包或游戏文件夹。')
         self.candidates=[];self.serial=0;self.last_result=None;self.last_output=None
-        window.title('CPyMO NDS 转换助手');window.geometry('840x780');window.minsize(760,740)
+        window.title('CPyMO NDS 转换助手');window.geometry('840x890');window.minsize(760,870)
         window.option_add('*Font',('Microsoft YaHei UI',10))
         style=ttk.Style();style.theme_use('clam');style.configure('TButton',padding=(12,7));style.configure('Title.TLabel',font=('Microsoft YaHei UI',19,'bold'))
         frame=ttk.Frame(window,padding=22);frame.pack(fill='both',expand=True)
@@ -33,6 +33,14 @@ class App:
         ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档。视频默认省略并安全跳过。',foreground='#526579').pack(anchor='w',pady=(0,10))
         self.box=tk.BooleanVar(value=True)
         ttk.Checkbutton(frame,text='遇到字库缺字时显示 □ 并记录，保留原脚本内容',variable=self.box).pack(anchor='w')
+        self.cache_only=tk.BooleanVar(value=True)
+        ttk.Checkbutton(frame,text='精简重复媒体：省去已有 NDS 缓存的原媒体，保留脚本与署名',variable=self.cache_only).pack(anchor='w')
+        self.compression=tk.StringVar(value='无损压缩语音与适合的图片（推荐）')
+        self.compression_modes=['不压缩缓存（读取优先）','无损压缩语音与适合的图片（推荐）','无损压缩全部音频与适合的图片（实验）']
+        row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='缓存压缩：').pack(side='left')
+        self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,state='readonly',width=47);self.compression_box.pack(side='left')
+        self.compression_box.bind('<<ComboboxSelected>>',lambda _:self.cache_only.set(True) if self.compression_modes.index(self.compression.get()) else None)
+        ttk.Label(frame,text='请使用随附的 '+VERSION+' 引擎；无损缓存压缩不额外降低画质或音质。',foreground='#526579').pack(anchor='w',pady=(3,0))
         row=ttk.Frame(frame);row.pack(fill='x',pady=(13,8))
         self.convert_button=ttk.Button(row,text='3  开始转换',command=self.begin,state='disabled');self.convert_button.pack(side='left')
         self.cancel_button=ttk.Button(row,text='取消',command=self.cancel,state='disabled');self.cancel_button.pack(side='left',padx=8)
@@ -43,6 +51,8 @@ class App:
         ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579').pack(anchor='w')
         window.protocol('WM_DELETE_WINDOW',self.close)
         if self_test:
+            if 'cache_only' in self_test:self.cache_only.set(self_test['cache_only'])
+            if 'audio_lossless' in self_test:self.compression.set(self.compression_modes[{'off':0,'voice':1,'all':2}[self_test['audio_lossless']]])
             self.source.set(self_test['source']);self.output.set(self_test['output_base']);window.after(300,self.inspect)
 
     def pick_zip(self):
@@ -89,7 +99,8 @@ class App:
         if not report['ok']:self.failed(report);return
         self.candidates=report['candidates']
         for i,c in enumerate(self.candidates):self.games.insert('end',f"{'推荐  ' if i==0 else ''}[{c['platform']}]  {c['title']}")
-        self.games.selection_set(0);self.convert_button.configure(state='normal');self.status.set('已识别游戏。确认保存位置后，点击“开始转换”。')
+        selected=self.self_test.get('candidate',0) if self.self_test else 0
+        self.games.selection_set(selected);self.convert_button.configure(state='normal');self.status.set('已识别游戏。确认保存位置后，点击“开始转换”。')
         if self.self_test and not self.test_started:self.test_started=True;self.window.after(200,self.begin)
 
     def begin(self):
@@ -99,12 +110,19 @@ class App:
         if source.is_dir() and base.is_relative_to(source):self.failed({'ok':False,'error':'保存位置不能位于原游戏目录内部。'});return
         name='CPyMO_NDS_转换结果_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f');output=base/name
         self.status.set('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
-        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box' if self.box.get() else 'error'},self.converted)
+        audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
+        if audio_mode!='off':self.cache_only.set(True)
+        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box' if self.box.get() else 'error','cache_only':self.cache_only.get(),'audio_lossless':audio_mode},self.converted)
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
         self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.status.set(report['status']+'。点击“打开结果文件夹”查看安装必读。')
         self.log.insert('end','\n'+('\n'.join(report['warnings']) if report['warnings'] else '未发现静态兼容性警告。')+'\n');self.log.see('end')
+        if report.get('cache_only'):
+            self.log.insert('end',f"已省去重复媒体 {report['redundant_media_bytes']/1048576:.2f} MiB。脚本与署名保留，原包未修改。\n");self.log.see('end')
+        comp=report.get('lossless',{})
+        if comp.get('audio_mode','off')!='off':
+            self.log.insert('end',f"无损缓存另节省 {(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576:.2f} MiB。请使用随附的 {VERSION} 引擎。\n");self.log.see('end')
         if self.self_test:self.finish_test(report)
 
     def failed(self,report):
@@ -116,8 +134,9 @@ class App:
         def capture():
             self.window.lift();self.window.update()
             from PIL import ImageGrab
-            box=(self.window.winfo_rootx(),self.window.winfo_rooty(),self.window.winfo_rootx()+self.window.winfo_width(),self.window.winfo_rooty()+self.window.winfo_height())
-            ImageGrab.grab(bbox=box).save(self.self_test['screenshot'])
+            # Capture this test window directly, even when another app covers it.
+            # Desktop cropping can accidentally include an unrelated foreground app.
+            ImageGrab.grab(window=self.window.winfo_id()).save(self.self_test['screenshot'])
             Path(self.self_test['result']).write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8');self.window.after(250,self.close)
         self.window.after(250,capture)
 
