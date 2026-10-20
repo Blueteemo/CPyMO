@@ -10,15 +10,15 @@ volatile unsigned launcher_state[7]={0x4c41554e};
 static unsigned launcher_count,launcher_selected;
 static u16* launcher_sub;
 static bool launcher_about,launcher_restored,launcher_language_menu;
-/* Runtime CPU mode is distinct from console model and memory link layout.
- * An NTR binary does not gain 16 MiB merely because it runs on a DSi. */
+/* Report the *actual* CPU environment, not a guessed console model.
+ * Heap addresses are displayed separately for hardware verification. */
 static const char* nds_runtime_mode_label(void){
- if(!isDSiMode())return "NTR / DS mode · 4 MiB";
-#ifdef CPYMO_DSI_MEMORY_LAYOUT
- return "TWL / DSi mode · 16 MiB";
-#else
- return "TWL detected · DS layout";
-#endif
+ return isDSiMode() ? "TWL / DSi runtime" : "NTR / DS runtime";
+}
+static void nds_runtime_heap_label(char* dest,unsigned cap){
+ unsigned long lo=(unsigned long)getHeapStart();
+ unsigned long hi=(unsigned long)getHeapLimit();
+ snprintf(dest,cap,"%s H:%08lX-%08lX",isDSiMode()?"TWL":"NTR",lo,hi);
 }
 static unsigned launcher_language_cursor;
 static char launcher_font_path[256],launcher_icon_path[256];
@@ -262,7 +262,7 @@ static void launcher_draw(const char* message){
  const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,245);
  launcher_text(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),12,175,accent,245);}
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
- if(!launcher_count||launcher_about)launcher_text(nds_ui(nds_runtime_mode_label()),12,177,muted,245);launcher_publish(vram);
+ if(!launcher_count||launcher_about){char heap_line[64];nds_runtime_heap_label(heap_line,sizeof heap_line);launcher_text(heap_line,12,177,muted,245);}launcher_publish(vram);
  launcher_background();
  if(!launcher_about&&!launcher_language_menu){
   launcher_rect(0,0,256,28,RGB15(5,10,16));
