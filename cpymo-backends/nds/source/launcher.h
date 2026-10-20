@@ -9,6 +9,15 @@ static LauncherGame launcher_games[64];
 /* magic, visible, count, selected, launches, scan truncated, last init error */
 volatile unsigned launcher_state[7]={0x4c41554e};
 static unsigned launcher_count,launcher_selected;
+/* Four visible rows; keep the selected game on-screen without page jumps. */
+static unsigned launcher_scroll_first;
+static void launcher_scroll_ensure_visible(void){
+ if(launcher_count<=4){launcher_scroll_first=0;return;}
+ unsigned last_start=launcher_count-4;
+ if(launcher_scroll_first>last_start)launcher_scroll_first=last_start;
+ if(launcher_selected<launcher_scroll_first)launcher_scroll_first=launcher_selected;
+ else if(launcher_selected>=launcher_scroll_first+4)launcher_scroll_first=launcher_selected-3;
+}
 static u16* launcher_sub;
 static bool launcher_about,launcher_restored,launcher_language_menu;
 /* Report the *actual* CPU environment, not a guessed console model.
@@ -105,7 +114,21 @@ static void launcher_scan(const char* hint){
  for(unsigned i=0;i<launcher_count;i++)if(!strcmp(previous,launcher_games[i].path)){launcher_selected=i;frontend_state[4]=1;break;}
 
 }
-static void launcher_rect(int x,int y,int w,int h,u16 color){for(int yy=y;yy<y+h&&yy<192;yy++)for(int xx=x;xx<x+w&&xx<256;xx++)if(xx>=0&&yy>=0)framebuffer[yy*256+xx]=color|BIT(15);}
+static void launcher_rect(int x,int y,int w,int h,u16 color){for(int yy=y;yy<y+h&&yy<192;yy++)for(int xx=x;xx<w+x&&xx<256;xx++)if(xx>=0&&yy>=0)framebuffer[yy*256+xx]=color|BIT(15);}
+/* 256px LCD: 4px right gutter, no collision with the 244px game rows.
+ * A proportional thumb represents the visible 4/N portion of the library. */
+static void launcher_scrollbar_draw(void){
+ if(launcher_count<=4)return;
+ const int y=33,h=121,min_thumb=14;
+ int thumb=(h*4+(int)launcher_count/2)/(int)launcher_count;
+ if(thumb<min_thumb)thumb=min_thumb;
+ if(thumb>h)thumb=h;
+ const int travel=h-thumb;
+ const int max_first=(int)launcher_count-4;
+ const int thumb_y=y+(int)((travel*(unsigned)launcher_scroll_first+(unsigned)max_first/2)/(unsigned)max_first);
+ launcher_rect(251,y,4,h,RGB15(6,10,14));
+ launcher_rect(252,thumb_y,2,thumb,RGB15(14,24,30));
+}
 static void launcher_text_mode(const char* text,int x,int y,u16 color,int max_x,unsigned mode){
  const char* p=text;int start=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10|| (cp=='\\'&&*p=='n')){if(cp=='\\')p++;x=start;y+=17;continue;}if(y>178)break;
  int g=text_glyph(mode,cp),fallback=g<0?ui_fallback_glyph(cp):-1;if(g<0&&fallback<0)g=text_glyph(mode,'?');if(g<0&&fallback<0)continue;unsigned advance=fallback>=0?ui_fallback_advances[fallback]:text_advance(mode,g);if(x+(int)advance>max_x){while(*p&&*p!='\n')p++;continue;}
@@ -278,6 +301,7 @@ static void launcher_library_clock(u16* pixels,bool erase){
  nds_clock_paint_impl(pixels,200,4,RGB15(26,28,30),false);
 }
 static void launcher_draw(const char* message){
+ launcher_scroll_ensure_visible();
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
  u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
  launcher_selected_icon();
@@ -306,10 +330,11 @@ static void launcher_draw(const char* message){
  launcher_text(nds_ui("PyMO：chen_xin_ming"),10,47,white,248);launcher_text(nds_ui("CPyMO：Seng Jik 及贡献者"),10,75,muted,248);launcher_text(nds_ui("游戏与汉化署名照原样保留"),10,103,muted,248);launcher_text(nds_ui("新游戏请先使用转换助手"),10,131,muted,248);
  launcher_text(nds_ui("按 B 返回游戏列表"),10,169,accent,248);}
 
- else {unsigned first=launcher_selected/4*4;
+ else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
+ launcher_scrollbar_draw();
  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,160,accent,250);launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,178,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}
@@ -337,7 +362,7 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  if(down&KEY_SELECT){launcher_font_path[0]=0;launcher_scan(hint);redraw=true;}
  if(launcher_count){if(down&KEY_UP){launcher_selected=(launcher_selected+launcher_count-1)%launcher_count;redraw=true;}if(down&KEY_DOWN){launcher_selected=(launcher_selected+1)%launcher_count;redraw=true;}
  if(down&KEY_LEFT){launcher_selected=launcher_selected>=4?launcher_selected-4:0;redraw=true;}if(down&KEY_RIGHT){launcher_selected+=4;if(launcher_selected>=launcher_count)launcher_selected=launcher_count-1;redraw=true;}
- if(down&KEY_TOUCH){touchPosition t;touchRead(&t);if(t.py>=33&&t.py<157){unsigned index=launcher_selected/4*4+(t.py-33)/31;if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}}}
+ if(down&KEY_TOUCH){touchPosition t;touchRead(&t);if(t.px>=6&&t.px<250&&t.py>=33&&t.py<157){unsigned index=launcher_scroll_first+(t.py-33)/31;if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}}}
  if(down&KEY_A)start=true;
  if(start){LauncherGame* game=&launcher_games[launcher_selected];if(game->status==1){launcher_remember();snprintf(out,size,"%s",game->path);launcher_release_keys();launcher_state[1]=0;launcher_state[4]++;return;}launcher_draw("请在电脑上先转换或修复缓存");continue;}}
  if(redraw)launcher_draw(NULL);
