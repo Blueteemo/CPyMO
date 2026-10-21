@@ -81,7 +81,7 @@ static void nds_dual_load(const char* gamedir){
    if(sscanf(line,"NDSDISPLAY2 %d %n",&mode,&parsed)==1 &&
       parsed>0 && line[parsed]==0 && mode>=0 && mode<=2){
     nds_display_mode=(unsigned)mode;
-   }else if(line[0]=='1' && (line[1]==0||line[1]=='\\n')){
+   }else if(line[0]=='1' && (line[1]==0||line[1]=='\n')){
     /* First 1.2 dual prototype wrote '1' for enhanced mode. */
     nds_display_mode=2;
    }
@@ -95,7 +95,7 @@ static void nds_dual_load(const char* gamedir){
 static void nds_dual_save(const char* gamedir){
  char path[512];nds_dual_filename(path,sizeof path,gamedir);
  FILE* f=fopen(path,"wb");bool ok=false;
- if(f){ok=fprintf(f,"NDSDISPLAY2 %u\\n",nds_display_mode)>0;
+ if(f){ok=fprintf(f,"NDSDISPLAY2 %u\n",nds_display_mode)>0;
        if(fclose(f))ok=false;}
  nds_dual_state[4]++;
  if(!ok)nds_dual_state[5]++;
