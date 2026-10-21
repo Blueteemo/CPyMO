@@ -46,7 +46,7 @@ for y in range(26,213,17):
 dr.rectangle((28,55,291,177),outline=(144,192,200),width=3)
 dr.rectangle((42,82,278,154),fill=(32,51,77))
 im.save(ROOT/"bg"/"TEST.png")
-(ROOT/"nds-fvds-probe.flag").write_text("CPYMO 1.2 FVDS PRE-FLIGHT ONLY - NO VIDEO PLAYBACK\n",encoding="ascii")
+# The opt-in flag is placed in converted save/ AFTER conversion.
 def synthetic_fvds(frames):
     data=bytearray(struct.pack("<4sHHIIHHII",b"FVDS",256,192,12,1,47605,2,frames,1))
     data+=struct.pack("<II",0,36)
