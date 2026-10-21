@@ -99,13 +99,24 @@ static void nds_display_start(void){
  nds_dual_mode=nds_display_mode==2;
  nds_dual_bottom_pass=false;
  nds_dual_force_scene=false;
- if(nds_display_mode==1){
-  lcdSwap();screens_swapped=true;
- }else{
-  lcdMainOnTop();screens_swapped=false;
- }
+ /* The selected game may be launched after a previous game used lower LCD.
+    Always establish a known physical mapping BEFORE applying its preference.
+    Blind lcdSwap() would invert a still-swapped previous session. */
+ lcdMainOnTop();screens_swapped=false;
+ if(nds_display_mode==1){lcdSwap();screens_swapped=true;}
  presentation_state[1]=screens_swapped;
  nds_dual_state[1]=nds_display_mode;
+}
+static void nds_display_restore_launcher(void){
+ /* Launcher always owns the regular upper-game/lower-helper assignment.
+    Do not leak per-game LCD routing, split drawing or hidden helper state. */
+ nds_dual_mode=false;
+ nds_dual_bottom_pass=false;
+ nds_dual_force_scene=false;
+ nds_aux_override=false;
+ lcdMainOnTop();
+ screens_swapped=false;
+ presentation_state[1]=0;
 }
 static void nds_display_cycle(void){
  unsigned next=(nds_display_mode+1)%3;
