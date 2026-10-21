@@ -6,6 +6,7 @@ on:
       - codex/nds-v1.2-video-foundation
     paths:
       - cpymo-tool/nds-converter/tests/make_fvds_probe_game.py
+      - cpymo-tool/nds-converter/tests/make_nvl_playback_clips.py
       - cpymo-tool/nds-converter/fvds_inspect.py
       - cpymo-tool/nds-converter/convert.py
       - .github/workflows/fvds-probe-fixture.yml
@@ -32,6 +33,35 @@ jobs:
           python cpymo-tool/nds-converter/convert.py convert /tmp/fvds_probe_src pymo/games/fvds_probe_v12 --ffmpeg ffmpeg --cache-only --video-fvds --missing-glyph-policy box --cache-layout sharded
           python cpymo-tool/nds-converter/convert.py verify pymo/games/fvds_probe_v12
           printf "FVDS preflight only\n" > pymo/games/fvds_probe_v12/save/nds-fvds-probe.flag
+      - name: Add independent synthetic NVL1/NVA1 playback samples
+        run: |
+          python cpymo-tool/nds-converter/tests/make_nvl_playback_clips.py /tmp/nds-video-samples
+          python - <<'PY'
+          import hashlib,json,shutil,sys
+          from pathlib import Path
+          sys.path.insert(0,'cpymo-tool/nds-converter')
+          from convert import key
+          game=Path('pymo/games/fvds_probe_v12')
+          manifest_path=game/'nds-cache/manifest.json'
+          manifest=json.loads(manifest_path.read_text())
+          entries=[]
+          for name in ('NVL1S','NVA3S'):
+              src=Path('/tmp/nds-video-samples')/(name+'.nvl')
+              hashed=key(name)
+              dst=game/'nds-cache/video'/hashed[:2]/(hashed+'.nvl')
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(src,dst)
+              relative=dst.relative_to(game).as_posix()
+              digest=hashlib.sha256(dst.read_bytes()).hexdigest()
+              manifest['cache_files'].append({'path':relative,'sha256':digest})
+              entries.append({'name':name,'path':relative,'bytes':dst.stat().st_size,
+                              'sha256':digest,'status':'actual playable synthetic NVL1/NVA1'})
+          manifest['nvl_playback_probes']=entries
+          manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
+          (game/'save/nds-nvl-probe.flag').write_text('NVL playback diagnostics only')
+          print('Added playback files:',entries)
+          PY
+          python cpymo-tool/nds-converter/convert.py verify pymo/games/fvds_probe_v12
       - name: Verify source and converted assets
         run: |
           python - <<'PY'
@@ -44,6 +74,8 @@ jobs:
           assert {x['frames'] for x in clips}=={12,36}
           assert not manifest['audit']['missing_resource_references']
           assert (game/'save/nds-fvds-probe.flag').is_file()
+          assert (game/'save/nds-nvl-probe.flag').is_file()
+          assert len(manifest['nvl_playback_probes'])==2
           assert (game/'script/START.txt').is_file()
           assert all((game/x['path']).is_file() for x in clips)
           assert not (game/'video').exists()
