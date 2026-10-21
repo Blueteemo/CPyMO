@@ -73,3 +73,17 @@ Keep stable R7 and version number 1.1.0 unchanged. User-approved banner third li
 - Avoid extra notification noise: full NDS/DSi SDK CI has **not** been triggered for these source changes. Only the explicit host milestone was checked. End-to-end video/image decoding, ARM7 audio output, normal DS 4MiB resource management, B skip and all three LCD layouts still require hardware acceptance before 1.2.
 
 Stable 1.1.0 and R7 remain unchanged; the 1.2 banner continues to show the port credit `千岚之夏` and the real, unbumped version number.
+
+
+## 2026-10-22 — original CPyMO 3DS visual layout and test-session economy
+
+Latest 1.2 enhanced display work is now based on an explicit comparison against the original upstream 3DS `main.c`, `cpymo_backend_image.c` and `cpymo_backend_text.c`. The visual focus is game-authored art and correct category partition, not decorative recreation of a 3DS system shell.
+
+- Changed the lower-dialogue safe-area from an approximate 20%-height offset to a physical **14-pixel top anchor**, computed from actual game resolution, message-box height, speaker-font height, namebox vertical origin and letterboxing. Oversized authored artwork retains its original position to avoid further cropping.
+- Normal enhanced gameplay keeps **original game-owned namebox, textbox and text**, plus a subtle dark gradient and a nonintrusive localized "A / Touch" hint **only when dialogue is active**. This has no effect in either classic mode.
+- UI now splits the *same drawing categories as upstream 3DS*: `ui_bg` appears on top and `ui_element`/`ui_element_bg` below. To avoid blank upper LCDs on menus that omit a custom UI background, the top scene is also drawn beneath its UI backdrop. NDS intentionally routes story choices below (unlike upstream 3DS) for usable physical touch selection.
+- Added host regression `test_nds_dual_layout.py` for several original game resolutions, nonzero name offset, letterboxed content, absent namebox and oversize art. Passed in [NDS UI Host Regression 39691998874](https://github.com/Blueteemo/CPyMO/actions/runs/39691998874), together with saved display preference and ROM Banner CRC tests.
+- A milestone full SDK run [39691721143](https://github.com/Blueteemo/CPyMO/actions/runs/39691721143) was requested **once**: ARM9/ARM7 build blocked at devkitPro package database HTTP 403 before compilation. Its independent converter run initially exposed an old **test-only bug** that treated the banner CRC as an immutable byte, which has been corrected; the targeted Banner regression then passed in SDK-free UI CI. This is **not** evidence of an ARM9 compilation error, nor proof that the latest display visuals work on hardware. Avoid repeating failing SDK runs solely to produce redundant email.
+- Hardware plan: aim for ~2–3 **concentrated** real-device sessions: (1) enhanced 3DS-like visual and three-layout touch test, (2) real FVDS decoded audio/video playback and B skip when integrated, (3) optional final release candidate across TWL/NTR; deviations or performance defects may require extras. The two major feature lines remain gated separately.
+
+No DSi visual acceptance is claimed yet. Do not publish 1.2 until the actual hardware UI, real FVDS video decode and ARM7 audio path are verified. Stable R7 and current version metadata stay unchanged.
