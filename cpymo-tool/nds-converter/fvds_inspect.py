@@ -26,7 +26,7 @@ def require(condition, reason):
         raise FVDSFormatError(reason)
 
 
-def inspect_fvds(filename, hash_file=False):
+def inspect_fvds(filename, hash_file=False, payload_hash=False):
     path = Path(filename)
     size = path.stat().st_size
     require(size >= HEADER.size, "Truncated FVDS header")
@@ -54,6 +54,8 @@ def inspect_fvds(filename, hash_file=False):
         require(keys[0] == (0, data_start), "Missing first keyframe")
         expected_key_offsets = dict(keys)
         video_bytes = audio_bytes = audio_blocks_total = 0
+        payload_digest = 2166136261
+        payload_read = 0
         for frame_index in range(frames):
             position = f.tell()
             if frame_index in expected_key_offsets:
@@ -68,7 +70,16 @@ def inspect_fvds(filename, hash_file=False):
             audio_length = blocks * channels * AUDIO_BLOCK_SIZE
             require(f.tell() + video_length + audio_length <= size,
                     "Video or audio packet exceeds file")
-            f.seek(video_length + audio_length, os.SEEK_CUR)
+            if payload_hash:
+                remaining=video_length+audio_length
+                while remaining:
+                    block=f.read(min(65536,remaining))
+                    require(len(block)>0, "Truncated media payload")
+                    for value in block:
+                        payload_digest=((payload_digest ^ value)*16777619)&0xffffffff
+                    payload_read+=len(block);remaining-=len(block)
+            else:
+                f.seek(video_length + audio_length, os.SEEK_CUR)
             video_bytes += video_length
             audio_bytes += audio_length
             audio_blocks_total += blocks
@@ -89,6 +100,9 @@ def inspect_fvds(filename, hash_file=False):
         "expected_audio_samples_per_channel": seconds * rate,
         "container_exact_bytes": data_start + frames * 4 + video_bytes + audio_bytes,
     }
+    if payload_hash:
+        report["payload_fnv1a32"]=f"{payload_digest:08X}"
+        report["payload_read_bytes"]=payload_read
     if hash_file:
         digest = hashlib.sha256()
         with path.open("rb") as f:
@@ -102,9 +116,10 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("video", type=Path)
     p.add_argument("--sha256", action="store_true")
+    p.add_argument("--payload-hash", action="store_true", help="Read all packet payload bytes and report on-device comparable FNV checksum")
     args = p.parse_args()
     try:
-        print(json.dumps(inspect_fvds(args.video, args.sha256), indent=2, ensure_ascii=False))
+        print(json.dumps(inspect_fvds(args.video, args.sha256, args.payload_hash), indent=2, ensure_ascii=False))
     except (OSError, FVDSFormatError) as e:
         p.exit(2, "Invalid FVDS: %s\n" % e)
 
