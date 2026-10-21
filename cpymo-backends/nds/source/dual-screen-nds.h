@@ -1,12 +1,16 @@
 /* CPyMO for NDS · experimental dual-screen routing for 1.2.
  * Original independent implementation; behavior informed by the 3DS backend's
  * draw-type partition. No upstream 3DS rendering code is copied.
- * Enabled in-game with L+SELECT; SELECT alone remains quick-load, L alone
- * remains LCD swap, Y alone remains auxiliary hide.
+ * L cycles classic top -> classic bottom -> enhanced dual screen.
+ * SELECT still quick-loads; Y still hides/reveals the auxiliary LCD.
  */
 #ifndef CPYMO_NDS_DUALSCREEN_H
 #define CPYMO_NDS_DUALSCREEN_H
 
+/* 0: classic game top / auxiliary bottom
+ * 1: classic game bottom / auxiliary top
+ * 2: enhanced scene top / dialogue or menu bottom. */
+static unsigned nds_display_mode;
 static bool nds_dual_mode, nds_dual_bottom_pass;
 /* magic, selected, enabled, toggles, saves, save failures, bottom draws,
  * skipped top, skipped bottom */
@@ -56,32 +60,65 @@ static void nds_dual_filename(char* path,size_t size,const char* gamedir){
  snprintf(path,size,"%s/save/nds-dualscreen-mode.txt",gamedir);
 }
 static void nds_dual_load(const char* gamedir){
- nds_dual_mode=false;nds_dual_bottom_pass=false;
+ nds_display_mode=0;
+ nds_dual_mode=false;
+ nds_dual_bottom_pass=false;
  char path[512];nds_dual_filename(path,sizeof path,gamedir);
  FILE* f=fopen(path,"rb");
- if(f){nds_dual_mode=fgetc(f)=='1';fclose(f);}
- nds_dual_state[1]=nds_dual_mode;
+ if(f){
+  char line[48]={0};
+  if(fgets(line,sizeof line,f)){
+   unsigned parsed=0;int mode=-1;
+   if(sscanf(line,"NDSDISPLAY2 %d %n",&mode,&parsed)==1 &&
+      parsed>0 && line[parsed]==0 && mode>=0 && mode<=2){
+    nds_display_mode=(unsigned)mode;
+   }else if(line[0]=='1' && (line[1]==0||line[1]=='\\n')){
+    /* First 1.2 dual prototype wrote '1' for enhanced mode. */
+    nds_display_mode=2;
+   }
+  }
+  fclose(f);
+ }
+ nds_dual_mode=nds_display_mode==2;
+ nds_dual_state[1]=nds_display_mode;
  nds_dual_state[2]=0;
 }
 static void nds_dual_save(const char* gamedir){
  char path[512];nds_dual_filename(path,sizeof path,gamedir);
  FILE* f=fopen(path,"wb");bool ok=false;
- if(f){ok=fputc(nds_dual_mode?'1':'0',f)!=EOF;if(fclose(f))ok=false;}
+ if(f){ok=fprintf(f,"NDSDISPLAY2 %u\\n",nds_display_mode)>0;
+       if(fclose(f))ok=false;}
  nds_dual_state[4]++;
  if(!ok)nds_dual_state[5]++;
 }
-static void nds_dual_toggle(void){
- nds_dual_mode=!nds_dual_mode;
+static void nds_display_start(void){
+ nds_dual_mode=nds_display_mode==2;
  nds_dual_bottom_pass=false;
- if(nds_dual_mode){
-  /* Enhanced layout always means physical top = scene, bottom = dialogue. */
-  lcdMainOnTop();
-  screens_swapped=false;
-  presentation_state[1]=0;
-  nds_aux_override=false;
+ if(nds_display_mode==1){
+  lcdSwap();screens_swapped=true;
+ }else{
+  lcdMainOnTop();screens_swapped=false;
  }
- nds_aux_refresh(); /* Repaint classic help panel only when leaving enhanced. */
- nds_dual_state[1]=nds_dual_mode;
+ presentation_state[1]=screens_swapped;
+ nds_dual_state[1]=nds_display_mode;
+}
+static void nds_display_cycle(void){
+ unsigned next=(nds_display_mode+1)%3;
+ /* LCD swap applies only to classic lower-game. Enhanced always has
+    the scene on the physical upper LCD and interactive UI below. */
+ if(next==1){lcdSwap();screens_swapped=true;}
+ else if(nds_display_mode==1 || screens_swapped){
+  lcdMainOnTop();screens_swapped=false;
+ }
+ nds_display_mode=next;
+ nds_dual_mode=next==2;
+ nds_dual_bottom_pass=false;
+ presentation_state[1]=screens_swapped;
+ /* A newly selected display must be visible, even when the previous
+    auxiliary LCD was temporarily hidden with Y. */
+ nds_aux_override=false;
+ nds_aux_refresh();
+ nds_dual_state[1]=nds_display_mode;
  nds_dual_state[3]++;
  nds_dual_save(engine.assetloader.gamedir);
  cpymo_engine_request_redraw(&engine);
