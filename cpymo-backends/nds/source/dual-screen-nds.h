@@ -79,7 +79,7 @@ static void nds_dual_load(const char* gamedir){
   if(fgets(line,sizeof line,f)){
    /* fgets retains the line ending; trim it before validating %n. Without
       this, every normally saved NDSDISPLAY2 file silently loads as classic. */
-   line[strcspn(line,"\\r\\n")]=0;
+   line[strcspn(line,"\r\n")]=0;
    int parsed=0,mode=-1;
    if(sscanf(line,"NDSDISPLAY2 %d %n",&mode,&parsed)==1 &&
       parsed>0 && line[parsed]==0 && mode>=0 && mode<=2){
