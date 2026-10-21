@@ -16,7 +16,7 @@ static float display_y(void);
  * 1: classic game bottom / auxiliary top
  * 2: enhanced scene top / dialogue or menu bottom. */
 static unsigned nds_display_mode;
-static bool nds_dual_mode, nds_dual_bottom_pass, nds_dual_force_scene;
+static bool nds_dual_mode, nds_dual_bottom_pass;
 /* magic, selected, enabled, toggles, saves, save failures, bottom draws,
  * skipped top, skipped bottom */
 volatile unsigned nds_dual_state[9]={0x4e445332};
@@ -39,9 +39,8 @@ static bool nds_dual_is_ui(enum cpymo_backend_image_draw_type type){
 }
 static bool nds_dual_accept(enum cpymo_backend_image_draw_type type){
  if(!nds_dual_active())return true;
- /* A paused in-game menu does not own the scenery. Repaint its scene
-    explicitly on top; the interactive menu itself belongs to the bottom. */
- if(nds_dual_force_scene)return !nds_dual_bottom_pass;
+ /* Mirror 3DS: UI background and non-interactive graphics above,
+    interactive menu elements below; story choices below on NDS. */
  bool lower = cpymo_ui_enabled(&engine)?nds_dual_is_ui(type):
      (nds_dual_is_say(type) ||
       (nds_dual_has_choice() && type==cpymo_backend_image_draw_type_sel_img));
@@ -74,7 +73,6 @@ static void nds_dual_load(const char* gamedir){
  nds_display_mode=0;
  nds_dual_mode=false;
  nds_dual_bottom_pass=false;
- nds_dual_force_scene=false;
  char path[512];nds_dual_filename(path,sizeof path,gamedir);
  FILE* f=fopen(path,"rb");
  if(f){
@@ -100,7 +98,6 @@ static void nds_dual_save(const char* gamedir){
 static void nds_display_start(void){
  nds_dual_mode=nds_display_mode==2;
  nds_dual_bottom_pass=false;
- nds_dual_force_scene=false;
  /* The selected game may be launched after a previous game used lower LCD.
     Always establish a known physical mapping BEFORE applying its preference.
     Blind lcdSwap() would invert a still-swapped previous session. */
@@ -114,7 +111,6 @@ static void nds_display_restore_launcher(void){
     Do not leak per-game LCD routing, split drawing or hidden helper state. */
  nds_dual_mode=false;
  nds_dual_bottom_pass=false;
- nds_dual_force_scene=false;
  nds_aux_override=false;
  lcdMainOnTop();
  screens_swapped=false;
@@ -131,7 +127,6 @@ static void nds_display_cycle(void){
  nds_display_mode=next;
  nds_dual_mode=next==2;
  nds_dual_bottom_pass=false;
- nds_dual_force_scene=false;
  presentation_state[1]=screens_swapped;
  /* A newly selected display must be visible, even when the previous
     auxiliary LCD was temporarily hidden with Y. */
