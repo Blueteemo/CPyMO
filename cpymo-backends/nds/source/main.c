@@ -750,7 +750,7 @@ int main(int argc,char** argv){
  bool dual_toggle=(keysDown()&(KEY_L|KEY_SELECT)) &&
        (keysHeld()&(KEY_L|KEY_SELECT))==(KEY_L|KEY_SELECT);
  if(dual_toggle)nds_dual_toggle();
- if((keysDown()&KEY_L)&&!dual_toggle){lcdSwap();screens_swapped=!screens_swapped;presentation_state[1]=screens_swapped;nds_aux_refresh();}
+ if((keysDown()&KEY_L)&&!dual_toggle&&!nds_dual_mode){lcdSwap();screens_swapped=!screens_swapped;presentation_state[1]=screens_swapped;nds_aux_refresh();}
  nds_aux_poll();
  nds_clock_poll();
  if(keysDown()&KEY_START){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
