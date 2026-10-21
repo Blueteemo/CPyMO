@@ -84,3 +84,18 @@ The user requested that enhanced mode **look intentional and near the original 3
 **The actual NDS visual output remains unverified on hardware.** The next visual acceptance must inspect a game with a real namebox/messagebox, a game without custom assets, multiple-line names/text, an X settings/backlog menu, script choices, L mode cycling, touch targets, Y hide/reveal, return to library and game switching. Do not state "3DS-quality visuals accepted" merely because the source composition and CI build succeeded.
 
 Plan remaining hardware sessions as **roughly 2–3 concentrated rounds**, not a fixed guaranteed number: (1) 3DS-inspired visual/UI layout checkpoint; (2) actual FVDS decoded video/audio/skip checkpoint once it exists; (3) optionally final candidate regression on both TWL DSi and NTR DS mode. Any hardware-only discrepancy or video decoder performance issue may require another focused round. Stable R7 remains untouched.
+
+
+## Authentic visual captures — hardware review path (opt-in, unreleased)
+
+The user explicitly rejected AI-generated concept art as a proxy for the actual CPyMO interface. Only genuine program-rendered images should be presented as UI evidence.
+
+A new optional **NDSPIX1** capture facility provides this without bundling an emulator, inventing a scene or introducing a second runtime framebuffer:
+- In the selected game's existing `save/` folder, the tester creates an empty `nds-visual-capture.flag` file **before launching the game**. Without the file, no frame captures, no additional SD writes and no extra framebuffer allocation occur.
+- While the game is in **enhanced dual-screen mode**, the first actual dialogue redraw and the first actual core UI/menu redraw each generate one `nds-capture-dialogue.ndsraw` or `nds-capture-menu.ndsraw`. Each file contains a 16-byte `NDSPIX1` header and exactly two 256×192 RGB555 screen buffers in **physical upper, then lower screen** order. The saved pixels are the real buffers used for VRAM presentation, not high-resolution art or speculative reconstructions.
+- The source ROM exports actual top/bottom pixels on the ARM9. The local host script `python cpymo-backends/nds/tools/nds-capture-to-png.py <path-to-ndsraw>` produces `-top.png` and `-bottom.png` at **exact native 256×192** resolution, standard-library only, without scaling, borders or decorative changes.
+- Capture is **opt-in, diagnostic only**. Each capture writes ~192 KiB to SD and may momentarily pause the game; disable it for performance/sound/video timing tests. It does not capture NVL1/FVDS movie decoding, and cannot prove 3DS visual fidelity without comparing actual CPyMO 3DS runtime evidence.
+- Separate SDK-independent regression tests compile and exercise the production C writer with synthetic RGB555 *test vectors* and check the exact raw format + PNG conversion. Those synthetic buffers are **never presented as screenshots of CPyMO gameplay**.
+- The current environment has no accessible running DS emulator. **No actual 1.2 enhanced-mode image has yet been captured**, and nothing in this toolchain should be described as an authentic visual preview until the raw pixel dump comes from the physical DSi or from a running emulator.
+
+This capture feature will be folded into the user's already-planned first concentrated UI/visual acceptance round; no separate immediate hardware testing is requested. Stable R7 is not changed.
