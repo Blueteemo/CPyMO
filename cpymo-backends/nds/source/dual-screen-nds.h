@@ -6,6 +6,7 @@
  */
 #ifndef CPYMO_NDS_DUALSCREEN_H
 #define CPYMO_NDS_DUALSCREEN_H
+#include "display-mode-prefs-nds.h"
 
 /* 0: classic game top / auxiliary bottom
  * 1: classic game bottom / auxiliary top
@@ -76,19 +77,8 @@ static void nds_dual_load(const char* gamedir){
  FILE* f=fopen(path,"rb");
  if(f){
   char line[48]={0};
-  if(fgets(line,sizeof line,f)){
-   /* fgets retains the line ending; trim it before validating %n. Without
-      this, every normally saved NDSDISPLAY2 file silently loads as classic. */
-   line[strcspn(line,"\r\n")]=0;
-   int parsed=0,mode=-1;
-   if(sscanf(line,"NDSDISPLAY2 %d %n",&mode,&parsed)==1 &&
-      parsed>0 && line[parsed]==0 && mode>=0 && mode<=2){
-    nds_display_mode=(unsigned)mode;
-   }else if(line[0]=='1' && (line[1]==0||line[1]=='\n')){
-    /* First 1.2 dual prototype wrote '1' for enhanced mode. */
-    nds_display_mode=2;
-   }
-  }
+  if(fgets(line,sizeof line,f))
+   nds_display_mode=nds_display_pref_parse(line);
   fclose(f);
  }
  nds_dual_mode=nds_display_mode==2;
@@ -96,10 +86,12 @@ static void nds_dual_load(const char* gamedir){
  nds_dual_state[2]=0;
 }
 static void nds_dual_save(const char* gamedir){
- char path[512];nds_dual_filename(path,sizeof path,gamedir);
- FILE* f=fopen(path,"wb");bool ok=false;
- if(f){ok=fprintf(f,"NDSDISPLAY2 %u\n",nds_display_mode)>0;
-       if(fclose(f))ok=false;}
+ char path[512],line[32];
+ nds_dual_filename(path,sizeof path,gamedir);
+ bool ok=nds_display_pref_format(line,sizeof line,nds_display_mode);
+ FILE* f=ok?fopen(path,"wb"):NULL;
+ if(f){ok=fputs(line,f)!=EOF;if(fclose(f))ok=false;}
+ else ok=false;
  nds_dual_state[4]++;
  if(!ok)nds_dual_state[5]++;
 }
