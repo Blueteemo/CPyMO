@@ -17,6 +17,7 @@ C_FILES=["fvds-pcm-queue-nds.c","fvds-stream-nds.c",
          "fvds-adpcm-nds.c","fvds-stage-nds.c"]
 DRIVER=r"""
 #include "fvds-pcm-queue-nds.h"
+#include "fvds-av-clock-nds.h"
 #include "fvds-stage-nds.h"
 #include <stdlib.h>
 #include <string.h>
@@ -88,8 +89,9 @@ int main(int argc,char **argv){
  size_t previously_drained=0;
  for(unsigned frame=0;frame<3;frame++){
   CHECK(nds_fvds_stage_step(&file,&stage,&callbacks,&c)==0);
-  size_t target=(uint64_t)(frame+1)*47605/12;
-  size_t delta=target-previously_drained;
+  size_t target=nds_fvds_pcm_target(frame+1,12,1,47605);
+  size_t delta=nds_fvds_pcm_interval(frame,12,1,47605);
+  CHECK(delta==target-previously_drained);
   CHECK(delta<4096);
   CHECK(nds_fvds_pcm_queue_drain(&c.queue,out,delta)==delta);
   for(size_t j=0;j<delta*2;j++)CHECK(out[j]==0);
@@ -103,6 +105,10 @@ int main(int argc,char **argv){
  CHECK(c.queue.high_watermark>=4096);
  CHECK(c.queue.underflows==0 && c.queue.overflows==0);
  CHECK(c.queue.produced==47*256 && c.queue.consumed==previously_drained);
+ CHECK(nds_fvds_pcm_target(1908,12,1,47605)==7569195ULL);
+ CHECK(nds_fvds_pcm_interval(1907,12,1,47605)>=3967);
+ CHECK(nds_fvds_pcm_interval(1907,12,1,47605)<=3968);
+ CHECK(nds_fvds_pcm_interval(0,0,1,47605)==0);
  nds_fvds_close(&file);
  return 0;
 }
