@@ -537,6 +537,7 @@ static void nds_power_event(void* user,PmEvent event){
  else if(event==PmEvent_OnWakeup){u64 delta=tickGetCount()-sleep_started;sleep_state[4]=delta*1000/TICK_FREQ;if(presentation_state[2])toast_started+=delta;nds_audio_resume();sleep_state[1]=0;sleep_state[3]++;}
 }
 
+#include "fvds-preflight-nds.h"
 #include "movie-lz4-r7.h"
 extern void __real_cpymo_charas_wait(cpymo_engine*);
 extern void cpymo_charas_gc(cpymo_charas*,bool);
