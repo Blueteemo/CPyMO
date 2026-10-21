@@ -559,6 +559,7 @@ extern void nds_audio_resume(void);
 static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3];if(!pmMainLoop())exit(0);if(wakes!=sleep_state[3])nds_aux_refresh();}
 #include "launcher.h"
 #include "aux-screen-nds.h"
+#include "visual-capture-nds.h"
 /* Refined lower-LCD presentation for the 1.2 enhanced screen.
  * Native RGB555 decoration sits BEHIND the game's own speaker/name/text.
  * Do not stretch a captured upper screen or allocate a second framebuffer.
@@ -770,6 +771,7 @@ int main(int argc,char** argv){
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
  nds_dual_load(game_dir);
+ nds_capture_init(game_dir);
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
  FILE* sequential_file=savefile(game_dir,"nds-image-sequential.txt","rb");image_sequential=!sequential_file||fgetc(sequential_file)!='0';if(sequential_file)fclose(sequential_file);
  char layout_path[512],layout_marker[32]={0};snprintf(layout_path,sizeof layout_path,"%s/nds-cache/format.txt",game_dir);FILE* marker_file=fopen(layout_path,"rb");if(marker_file){fread(layout_marker,1,31,marker_file);fclose(marker_file);}int format_layout=!strcmp(layout_marker,"CPYMO-NDS-CACHE-6\n")?3:0;
@@ -839,6 +841,12 @@ int main(int argc,char** argv){
   DC_FlushRange(framebuffer,sizeof framebuffer);
   dmaCopy(framebuffer,vram,sizeof framebuffer);engine_state[29]++;
   if(nds_dual_active() && launcher_sub){
+   /* Save the exact rendered pixels only when explicitly armed by a file
+      in this game's save directory. Never render synthetic preview data. */
+   unsigned capture_kind=cpymo_ui_enabled(&engine)?2:
+     (engine.say.active&&!engine.say.hide_window&&
+      !engine.input.hide_window)?1:0;
+   FILE* capture=nds_capture_begin(capture_kind,framebuffer);
    /* Render only say / UI on the lower LCD, preserving the current scene
       on the upper LCD and the existing VRAM and ARM7 owners. No extra heap
       framebuffer; reuse the RAM draw surface after publishing the top. */
@@ -853,6 +861,7 @@ int main(int argc,char** argv){
    }
    DC_FlushRange(framebuffer,sizeof framebuffer);
    dmaCopy(framebuffer,launcher_sub,sizeof framebuffer);
+   nds_capture_finish(capture,capture_kind,framebuffer);
    nds_dual_bottom_pass=false;
    nds_dual_state[6]++;
   }
