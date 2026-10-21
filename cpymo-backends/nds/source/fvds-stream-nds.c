@@ -51,7 +51,8 @@ void nds_fvds_close(nds_fvds_stream *s){
 int nds_fvds_next(nds_fvds_stream *s,nds_fvds_packet *pkt){
  uint8_t word[4];
  if(!s||!s->file||!pkt||s->packet_open)return -1;
- if(s->frame_index==s->frame_count)return 1;
+ if(s->frame_index==s->frame_count)
+  return cursor(s->file)==s->bytes?1:-5;
  uint32_t pos=cursor(s->file);
  if(pos==UINT32_MAX||pos>s->bytes||s->bytes-pos<4||
     !read_exact(s->file,word,4))return -2;
