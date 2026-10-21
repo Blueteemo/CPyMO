@@ -7,6 +7,10 @@
 #ifndef CPYMO_NDS_DUALSCREEN_H
 #define CPYMO_NDS_DUALSCREEN_H
 #include "display-mode-prefs-nds.h"
+#include "dual-layout-nds.h"
+/* Defined later in main.c, declared here for enhanced geometry. */
+static float display_scale(void);
+static float display_y(void);
 
 /* 0: classic game top / auxiliary bottom
  * 1: classic game bottom / auxiliary top
@@ -27,9 +31,10 @@ static bool nds_dual_is_say(enum cpymo_backend_image_draw_type type){
 static bool nds_dual_has_choice(void){
  return !cpymo_ui_enabled(&engine) && engine.select_img.selections!=NULL;
 }
+/* Match CPyMO's actual 3DS behavior: engine UI background remains on
+ * the upper screen; individual interactive elements live below. */
 static bool nds_dual_is_ui(enum cpymo_backend_image_draw_type type){
- return type==cpymo_backend_image_draw_type_ui_bg ||
-        type==cpymo_backend_image_draw_type_ui_element ||
+ return type==cpymo_backend_image_draw_type_ui_element ||
         type==cpymo_backend_image_draw_type_ui_element_bg;
 }
 static bool nds_dual_accept(enum cpymo_backend_image_draw_type type){
@@ -46,24 +51,21 @@ static bool nds_dual_accept(enum cpymo_backend_image_draw_type type){
  }
  return true;
 }
-/* Match the 3DS enhanced non-menu principle: pull the original dialogue
- * panel toward the middle of the lower LCD, leaving room for name + lines.
- * All computations are in the game's own logical coordinates. */
+/* 3DS-style: original game assets retain their size, but the complete
+ * dialogue/name group starts around 14 physical pixels down, not 20% of
+ * the logical game height. Detect oversized assets and avoid clipping. */
 static float nds_dual_say_offset(void){
  if(!nds_dual_active() || !nds_dual_bottom_pass ||
     cpymo_ui_enabled(&engine))return 0;
  float height=(float)engine.gameconfig.imagesize_h;
  float box_h=height*.25f;
- if(engine.say.msgbox && engine.say.namebox && engine.say.msgbox_h>0 && engine.say.msgbox_w>0){
+ if(engine.say.msgbox && engine.say.msgbox_h>0 && engine.say.msgbox_w>0)
   box_h=(float)engine.say.msgbox_h *
-    ((float)engine.gameconfig.imagesize_w/(float)engine.say.msgbox_w);
- }
- float font_size=cpymo_gameconfig_font_size(&engine.gameconfig);
- float name_height=font_size*1.4f;
- float top=height-box_h-name_height;
- /* Keep dialogue in a comfortable lower-LCD upper-middle position. */
- float destination_top=height*.20f;
- return destination_top-top;
+      ((float)engine.gameconfig.imagesize_w/(float)engine.say.msgbox_w);
+ float name_offset=(float)engine.gameconfig.nameboxorg_y / 360.f * height;
+ return nds_dual_dialogue_shift(height,box_h,
+     cpymo_gameconfig_font_size(&engine.gameconfig),name_offset,
+     engine.say.name!=NULL,display_scale(),display_y());
 }
 static void nds_dual_filename(char* path,size_t size,const char* gamedir){
  snprintf(path,size,"%s/save/nds-dualscreen-mode.txt",gamedir);
