@@ -862,6 +862,6 @@ int main(int argc,char** argv){
  if(false && engine_state[2]%60==0)printf("\x1b[6;0HFrame: %6u    \nHeap: %7u      \nPeak: %7u      ",engine_state[2],engine_state[3],engine_state[4]);
  if(engine_state[2]%120==0){trace=trace_open("ab");if(trace){fprintf(trace,"STATE frame=%u ms=%u vblank=%u bg=%s\n",engine_state[2],engine_state[5],engine_state[6],engine.bg.current_bg_name?engine.bg.current_bg_name:"none");fclose(trace);}}
  }
- nds_playing=false;nds_aux_refresh();cpymo_engine_free(&engine);
+ nds_playing=false;nds_display_restore_launcher();nds_aux_refresh();cpymo_engine_free(&engine);
  }
 }
