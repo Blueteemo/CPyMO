@@ -347,8 +347,10 @@ static void launcher_failure_hint(const char* message,int error,const char* hint
 static void launcher_failure(const char* message,int error){launcher_failure_hint(message,error,"按 B 返回游戏资料库");}
 static void launcher_library_clock(u16* pixels,bool erase){
  /* Header-only minute patch: never re-read game metadata or repaint the list. */
- if(erase)for(int y=4;y<22;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
- nds_clock_paint_impl(pixels,200,4,RGB15(26,28,30),false);
+ /* Center the time numerals on the same visible baseline as the heading.
+     Only modify this 48x18 patch, leaving the R7 list geometry unchanged. */
+ if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
+ nds_clock_paint_impl(pixels,200,6,RGB15(26,28,30),false);
 }
 static void launcher_draw(const char* message){
  launcher_scroll_ensure_visible();
