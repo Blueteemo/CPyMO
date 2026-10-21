@@ -67,6 +67,7 @@ int main(int argc,char**argv){
  if(state.mode==0){
   REQUIRE(status==NDS_FVDS_STEP_EOF);
   REQUIRE(stage.completed_frames==3 && stage.audio_frames==47u*256u);
+  REQUIRE(stage.key_pictures==1 && stage.predicted_pictures==0);
   REQUIRE(state.audio_blocks==47 && state.video_bytes==24);
   REQUIRE(state.begins==3 && state.ends==3);
   REQUIRE(state.last_pts==166666);
@@ -77,7 +78,7 @@ int main(int argc,char**argv){
  }else if(state.mode==2){
   REQUIRE(status==NDS_FVDS_STEP_ERROR);
   REQUIRE(stage.completed_frames==0 && stream.packet_open==0);
- }else if(state.mode==3){
+ }else if(state.mode==3 || state.mode==4){
   REQUIRE(status==NDS_FVDS_STEP_ERROR);
   REQUIRE(stream.packet_open==0);
  }else REQUIRE(0);
@@ -107,4 +108,10 @@ class FVDSStageTests(unittest.TestCase):
             damaged[36+4+8+2]=89
             source.write_bytes(damaged)
             subprocess.run([str(binary),str(source),"3"],
+                           capture_output=True,text=True,check=True)
+            bad_keyframe=bytearray(sample())
+            # The indexed first video picture must have its I/P flag clear.
+            bad_keyframe[36+4+1]|=0x80
+            source.write_bytes(bad_keyframe)
+            subprocess.run([str(binary),str(source),"4"],
                            capture_output=True,text=True,check=True)
