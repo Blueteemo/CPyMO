@@ -41,6 +41,17 @@
 
 **Release gate:** a genuine 1.2 release must pass normal DS and DSi regression, EOF/skip/exception/sleep restoration, format verification, licensing and user approval. No automatic push to the official release branch.
 
+## Consolidated hardware acceptance package (2026-10-21)
+
+- **User request:** do more investigation up-front so several related video tests can run in **one** card-copy / ROM launch session. The private downloadable package is delivered to the user separately and does not belong in this public source repository.
+- **Core:** The existing `#movie` wrapper now writes opt-in `save/nds-nvl-probe-<NAME>.txt` logs when `save/nds-nvl-probe.flag` exists. Each log records NTR/TWL, EOF/SKIPPED/MISSING/ERROR, decoded and presented frames, elapsed wall time, measured late count and movie audio samples. The original NVL1/NVA1 behavior and automatic cleanup code are otherwise unchanged.
+- **FVDS:** 1s/3s real user-provided FVDS containers exercise the current per-packet *read-only* on-device preflight and its distinct result logs. **No FVDS pixel decoder/audio output is implemented at this point.** Missing FVDS still falls back to NVL1 probing/playback when present.
+- **Original generated playback:** `tests/make_nvl_playback_clips.py` creates a 1s dynamic NVL1 RGB555/LZ4/PCM video and a 3s dynamic NVA1 RGB555/LZ4/NAR2 video with audible synthetic tones, sharing original CPyMO NDS codec logic. The public fixture CI places them into NDS cache and validates manifest hashes.
+- **Private long clip:** 20s (240 frames) is **prefix-trimmed** from the user's supplied 159s NVL1 file without recoding. The original packets have been LZ4-decoded and all first 240 reconstructed-frame Adler32 checks pass. The private clip itself is not uploaded to GitHub. `nvl_trim.py` and synthetic host tests make this process reproducible without shipping the copyrighted source.
+- **One game, six checkpoints:** FVDS CHECK1 12-packet pass, FVDS CHECK3 36-packet pass, NVL1S 12-frame playback/EOF, NVA3S 36-frame compressed-audio playback/EOF, NVL20S 240-frame playback/B skip, and NOFILE missing-video safe return. The game plays a looping original BGM for checking sound restoration. Six log filenames can be collected offline.
+- **Hardware test statuses:** Build and converter CI = passed on the latest relevant code; **all six real NDSi device experiences pending.** NTR 4 MiB movie playback and original DS/R4 storage still need separate tests. The user-accepted R7 gameplay performance and UI remain the rollback baseline.
+- **No public external codec integration:** actual FVDS frame playback requires licensing/independent decoding, ARM7 streaming/IPC and VRAM capture conflict resolution; results of NVL1/NVA1 must not be cited as FVDS decoding evidence.
+
 ## Run host checks
 
 ```sh
