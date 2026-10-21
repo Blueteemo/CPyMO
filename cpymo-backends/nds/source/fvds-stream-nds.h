@@ -18,7 +18,7 @@ typedef struct {
   * These are the NEXT expected keyframe coordinates, updated by fseek
   * only when a keyframe is crossed (usually hundreds of frames apart). */
  uint32_t next_key_index, next_key_frame, next_key_offset;
- unsigned packet_open;
+ unsigned packet_open, current_is_keyframe;
 } nds_fvds_stream;
 
 typedef struct {
