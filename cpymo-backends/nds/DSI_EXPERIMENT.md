@@ -1,6 +1,6 @@
 # CPyMO for NDS/DSi · Experimental development record
 
-This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library` and `codex/nds-dsi-library-scrollbar`. The published `nds-v1.1.0` release remains unchanged.
+This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library`, `codex/nds-dsi-library-scrollbar`, and `codex/nds-dsi-runtime-ui-cache`. The published `nds-v1.1.0` release remains unchanged.
 
 ## Hardware confirmation (2026-10-21)
 
@@ -24,7 +24,15 @@ This document records verified facts separately from hypotheses. It covers follo
 - Actual user test: original DSi with DSpico/AKMenu-Next and separate **128 MB console SD**. The converted original PyMO synthetic game `dualcard_echo_30m` occupied **31,035,615 bytes** (29.60 MiB); game data was generated through the **1.1.0 official NDS converter**, 12 scenes, 4 characters, 8 BGM tracks, 0 missing references or unknown commands. The user reports R3's cross-card game test **passed**. This verifies the basic dual-card discovery/play route; do not claim all chapter, save/load, or full-game scenarios individually tested without additional evidence.
 - Follow-on R4 library polish: show a proportional right-edge scrollbar **only with more than four games**; replace four-item page jumps with a four-row rolling viewport that follows D-pad navigation, works with touch selection, and also handles library refresh, selection restore, and wraparound. With five games, selecting the fifth displays games **2–5**, not the fifth alone.
 - Normal DS/R4 retains its single-card path and the 384 KiB image-cache budget; TWL with a suitable heap window may use a bounded 2 MiB recent-image budget. No shared CPyMO script, save or interpreter formats are modified.
-- R4 is code/CI validated; the newly added scrollbar interaction still needs a user's 5-game real-device confirmation.
+- **R4 five-game scrollbar has been confirmed working on the user's real NDSi** (2026-10-21). This is a regression baseline: four or fewer games retain the original screen layout and no scrollbar.
+
+## R5 user-facing runtime and TWL sprite cache
+
+- The splash, library About and optional diagnostic console use the same live `isDSiMode()` selection. Default readable captions are **`DSi 模式 · 16 MiB`** (TWL) and **`DS 模式 · 4 MiB`** (NTR), with corresponding Chinese (simplified/traditional), English and Japanese entries in the existing NDS UI localization. A DSi in DS-compatibility mode is correctly shown as DS mode.
+- The label describes **runtime mode and hardware RAM capacity**, not free heap, overclocking or the exact retail model (DSi vs DSi XL/LL). Raw heap bounds remain in `nds_runtime_state` for debugging instead of cluttering the regular About screen.
+- Before relying on the native splash font, ensure every glyph is in `ui_fallback_codes`. Japanese technical mode labels use supported ASCII `mode` because `モ` is absent from the shipping minimal font subset.
+- This release also enables up to **12 recent character-image cache entries** on TWL if the bounded 2 MiB heap-budget policy activates; ordinary DS remains at the same six cached images and 384 KiB byte budget. A larger maximum does not allocate 2 MiB in advance, and does not claim proven real-world speedup.
+- No engine scripts, save format, default card behavior, or 1.1.0 release were changed. R5 needs real-hardware regression, especially the NTR label under real DS/R4 and load/eviction under TWL.
 
 ## Next functional milestone: video
 
