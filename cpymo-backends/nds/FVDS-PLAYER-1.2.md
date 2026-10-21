@@ -36,3 +36,15 @@ To reduce the risk of mixing video decoder and ARM7/Maxmod ownership, two furthe
 The important distinction remains: video data callbacks receive **compressed** chunks, not RGB555 pixels. A completed full FVDS 1.2 player still needs an independently implemented video bitstream decoder, sound output using an explicit resource owner, and verified restoration of original display/BGM on skip, EOF and failure. This new queue is not IPC-safe without an explicit synchronization layer.
 
 All added code is original and contains no copied FastVideoDSPlayer implementation. New synthesized tests are shipped in the public GitHub repository; the user's original video samples remain private.
+
+
+### Timing and first video-header findings on the private 159-second j1 sample
+
+An independent, offline simulation based only on per-frame ADPCM block counts in the user's own FVDS sample (not uploaded to the repository) found:
+
+- 1,908 pictures at 12 fps, with 8 indexed I pictures and 1,900 P pictures. The I-picture header begins with an MSB-first picture-type bit and six-bit quantizer. A sample first word `0x3c0f` in little-endian storage yields **quantizer = 30**, consistent with the research encoding setting.
+- The 1,908 packets have 961 frames with **15** stereo ADPCM pairs and 947 with **16** pairs, for **7,569,152 stereo PCM frames** at 47,605 Hz. Exact 159-second nominal demand is **7,569,195** PCM frames: source capacity ends just **43 samples (~0.903 ms)** earlier than ideal, a normal short tail suitable for guarded EOF silence.
+- **Naïve queue policy:** decode each picture's audio, then immediately drain that picture interval from an 8,192-stereo-frame ring. This causes a measured **255 silent-sample underflow** in the sample sequence (127 on frame 0, 127 on frame 1, 1 later). Therefore **simple same-picture push/drain is not acceptable** as the final live scheduler, even when video/picture decoder is fast.
+- **One-picture audio lookahead:** prime from the first **two** compressed picture packets before starting presentation, then continually decode one future packet before consuming the next presentation interval (with A/V frame staging coordinated). With 8,192 stereo frames (32 KiB) of buffer, the whole 159-second schedule has **no overflow**, peak occupancy **7,934 stereo frames** (~31 KiB), and the **only underflow is the 43-sample EOF shortfall**. That must be padded with silence at natural EOF, not misdiagnosed as a stream failure. This is a deterministic **host simulation** of sample budgets, not a performance benchmark or an ARM7-tested implementation.
+
+The live video decoder must therefore preserve at least one picture of compressed/audio lookahead without displaying a frame early, while the audio transport uses `nds_fvds_pcm_target()`/`nds_fvds_pcm_interval()` (rational sample clock) and never substitutes arbitrary silent priming for real samples. Maintaining the ring headroom also constrains decoder scheduling on NTR 4 MiB. The video image bitstream beyond picture flag + intra quantizer is still undecoded.
