@@ -1,20 +1,7 @@
 name: FVDS Host Audio Tools
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - codex/nds-v1.2-integration
-    paths:
-      - cpymo-backends/nds/source/fvds-stream-nds.c
-      - cpymo-backends/nds/source/fvds-stream-nds.h
-      - cpymo-backends/nds/source/fvds-adpcm-nds.c
-      - cpymo-backends/nds/source/fvds-adpcm-nds.h
-      - cpymo-backends/nds/tools/fvds-to-wav.c
-      - cpymo-tool/nds-converter/tests/test_fvds_audio_pipeline.py
-      - cpymo-tool/nds-converter/tests/test_fvds_adpcm.py
-      - cpymo-tool/nds-converter/tests/test_fvds_stream.py
-      - cpymo-tool/nds-converter/tests/test_fvds_wav_export.py
-      - .github/workflows/fvds-host-tools.yml
+  # Opt-in milestone validation; avoid daily development email noise.
 permissions:
   contents: read
 jobs:

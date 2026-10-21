@@ -1,15 +1,7 @@
 name: FVDS Preflight Game
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - codex/nds-v1.2-video-foundation
-    paths:
-      - cpymo-tool/nds-converter/tests/make_fvds_probe_game.py
-      - cpymo-tool/nds-converter/tests/make_nvl_playback_clips.py
-      - cpymo-tool/nds-converter/fvds_inspect.py
-      - cpymo-tool/nds-converter/convert.py
-      - .github/workflows/fvds-probe-fixture.yml
+  # Generate a test game only when manually requested.
 permissions:
   contents: read
 jobs:

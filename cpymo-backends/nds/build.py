@@ -1,6 +1,7 @@
 """Build the native DS backend using the pinned devkitPro SDK; Python 3.10+."""
 from pathlib import Path
 import subprocess, json, hashlib, os, sys
+from rom_banner import patch_nds_banner_titles
 experiment = sys.argv[1:] == ['--dsi-experiment']
 if sys.argv[1:] and not experiment:
  raise SystemExit('usage: build.py [--dsi-experiment]')
@@ -64,7 +65,12 @@ with (record/'native-windows-build.log').open('w',encoding='utf-8') as log:
   run([gcc,'-L'+str(sdk/'calico/lib'),'-L'+str(sdk/'libnds/lib'),'-specs='+str(sdk/'calico/share/ds7.specs'),'-g','-march=armv4t','-mtune=arm7tdmi','-mthumb',build/'arm7-main.o','-lmm7','-lcalico_ds7','-lm','-o',arm7])
  version=(engine/'VERSION').read_text().strip() if (engine/'VERSION').exists() else '0.5.0-test'
  rom=engine/('cpymo-dsi-experiment.nds' if experiment else 'engine.nds')
- run([sdk/('tools/bin/ndstool'+exe),'-c',rom,'-9',elf,'-7',arm7,'-b',icon if icon.exists() else sdk/'calico/share/nds-icon.bmp',f'CPyMO for NDS;{version};PYMO / CPyMO' if icon.exists() else 'engine;built with devkitARM;http://devkitpro.org'])
+ # ndstool's -b parser handles one-byte characters, not UTF-8 text.
+ # Generate a safe ASCII banner first; then write the desired UTF-16LE
+ # attribution and refresh the banner CRC16 in the finished ROM.
+ run([sdk/('tools/bin/ndstool'+exe),'-c',rom,'-9',elf,'-7',arm7,'-b',icon if icon.exists() else sdk/'calico/share/nds-icon.bmp',f'CPyMO for NDS;{version};NDS port' if icon.exists() else 'engine;built with devkitARM;http://devkitpro.org'])
+ if icon.exists():
+  patch_nds_banner_titles(rom,('CPyMO for NDS',version,'千岚之夏'))
  run([sdk/('devkitARM/bin/arm-none-eabi-size'+exe),elf])
 (record/'native-windows-build-commands.json').write_text(json.dumps(commands,indent=2),encoding='utf-8')
 rom=engine/('cpymo-dsi-experiment.nds' if experiment else 'engine.nds')

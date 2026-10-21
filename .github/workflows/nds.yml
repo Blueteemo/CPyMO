@@ -1,15 +1,8 @@
 name: Nintendo DS
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - 'codex/nds-*'
-    paths:
-      - 'cpymo/**'
-      - 'cpymo-backends/include/**'
-      - 'cpymo-backends/nds/**'
-      - 'cpymo-tool/nds-converter/**'
-      - '.github/workflows/nds.yml'
+  # Development commits are deliberately NOT built automatically.
+  # Run by hand at milestones; PR checks remain automatic.
   pull_request:
     paths:
       - 'cpymo/**'
