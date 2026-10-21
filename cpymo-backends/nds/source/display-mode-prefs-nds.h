@@ -25,7 +25,7 @@ static inline unsigned nds_display_pref_parse(const char *src){
  return mode;
 }
 static inline int nds_display_pref_format(char *dst,size_t capacity,unsigned mode){
- if(!dst||!capacity||mode>2)return 0;
+ if(!dst||capacity<sizeof("NDSDISPLAY2 0\n")||mode>2)return 0;
  int n=snprintf(dst,capacity,"NDSDISPLAY2 %u\n",mode);
  return n>0 && (size_t)n<capacity;
 }
