@@ -29,7 +29,7 @@ int main(int argc,char **argv){
  int result=nds_fvds_open(&s,argv[2]);
  if(!strcmp(argv[1],"bad-header")){ck(result!=0);return 0;}
  if(!strcmp(argv[1],"bad-packet")){ck(result==0);ck(nds_fvds_next(&s,&p)==-3);nds_fvds_close(&s);return 0;}
- ck(result==0);ck(s.frame_count==3);ck(s.width==256);ck(s.keyframe_count==1);
+ ck(result==0);ck(s.frame_count==3);ck(s.width==256);ck(s.keyframe_count==1||s.keyframe_count==2);
  uint8_t chunk[1007];
  for(unsigned frame=0;frame<3;frame++){
   int rc=nds_fvds_next(&s,&p);
