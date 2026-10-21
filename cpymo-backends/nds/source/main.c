@@ -565,30 +565,29 @@ static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3]
  * Menus/choices use a less decorated canvas to preserve hit-test contrast. */
 static void nds_dual_lower_background(bool ui,bool choices){
  const bool interactive=ui||choices;
+ /* Native RGB555 backdrop rather than a magnified copy of the top LCD.
+    Low-contrast dusk gradient preserves the actual PyMO game dialogue art. */
  for(unsigned y=0;y<192;y++){
-  unsigned tone=y<26?1:0;
-  u16 col=interactive?(tone?RGB15(5,10,15):RGB15(3,6,10)):
-       (tone?RGB15(5,9,13):RGB15(3,6,10));
+  unsigned band=y/48;
+  u16 col=band==0?RGB15(5,9,13):
+          band==1?RGB15(4,7,11):
+          band==2?RGB15(3,6,9):RGB15(2,4,7);
   for(unsigned x=0;x<256;x++)framebuffer[y*256+x]=col|BIT(15);
   if((y&31u)==0)nds_audio_pump_if_due();
  }
- /* Integrated trim is deliberately subtle, not a second text box.
-    The game can draw a large opaque or transparent message window over it. */
- u16 edge=RGB15(10,15,19)|BIT(15),subtle=RGB15(6,11,16)|BIT(15);
- unsigned top=interactive?14:27;
- for(unsigned x=12;x<244;x++){
-  framebuffer[top*256+x]=edge;
-  framebuffer[182*256+x]=subtle;
- }
- for(unsigned y=top;y<=182;y++){
-  framebuffer[y*256+12]=subtle;
-  framebuffer[y*256+243]=subtle;
- }
+ u16 upper=RGB15(12,18,23)|BIT(15),muted=RGB15(7,12,17)|BIT(15);
+ for(unsigned x=12;x<244;x++)framebuffer[7*256+x]=muted;
+ for(unsigned x=12;x<38;x++)framebuffer[7*256+x]=upper;
  if(!interactive){
-  /* Speaker/copy area: accent never overlaps dialogue glyphs. */
-  u16 accent=RGB15(15,22,25)|BIT(15);
-  for(unsigned x=12;x<42;x++)framebuffer[27*256+x]=accent;
-  for(unsigned y=22;y<27;y++)framebuffer[y*256+12]=accent;
+  /* Native small-font controls occupy a separate low contrast footer.
+     Draw BEHIND game assets, so oversized scripted text has precedence. */
+  for(unsigned y=162;y<192;y++)
+   for(unsigned x=0;x<256;x++)
+    framebuffer[y*256+x]=RGB15(3,6,9)|BIT(15);
+  for(unsigned x=12;x<244;x++)framebuffer[162*256+x]=muted;
+  launcher_text(nds_ui("A / 轻触：继续"),14,169,RGB15(19,25,28),248);
+  /* The current narrative owns the lower screen; keep game-authored
+     textbox/speaker above this footer without introducing another box. */
  }
 }
 static PmEventCookie sleep_cookie;
@@ -699,13 +698,10 @@ static void nds_base_draw(const cpymo_engine* e){cpymo_bg_draw(e);cpymo_scroll_d
 static void nds_engine_draw(const cpymo_engine* e){
  nds_menu_clock_visible=false;clock_state[9]=0;
  if(cpymo_ui_enabled(e)){
-  if(nds_dual_active()&&!nds_dual_bottom_pass){
-   /* Rendering the normal UI on the bottom must not blank the upper scene. */
-   nds_dual_force_scene=true;
-   nds_base_draw(e);
-   nds_dual_force_scene=false;
-  }
-  else cpymo_engine_draw(e);
+  /* Exact 3DS category split: upper receives UI background, lower receives
+     interactive elements. Rendering only the old scene on the upper LCD
+     erased the actual authored menu background and looked unlike 3DS. */
+  cpymo_engine_draw(e);
   return;
  }
  scene_count=0;scene_overflow=false;scene_collect=true;nds_base_draw(e);scene_collect=false;
