@@ -1,7 +1,11 @@
 name: FVDS Host Audio Tools
 on:
   workflow_dispatch:
-  # Opt-in milestone validation; avoid daily development email noise.
+  push:
+    branches:
+      - 'codex/nds-v1.2-integration'
+    paths:
+      - '.github/ci-requests/fvds.txt'
 permissions:
   contents: read
 jobs:

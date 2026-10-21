@@ -1,8 +1,13 @@
 name: Nintendo DS
 on:
   workflow_dispatch:
-  # Development commits are deliberately NOT built automatically.
-  # Run by hand at milestones; PR checks remain automatic.
+  # Optional single-file CI request from the 1.2 integration branch.
+  # Ordinary code commits no longer create a build or failure email.
+  push:
+    branches:
+      - 'codex/nds-v1.2-integration'
+    paths:
+      - '.github/ci-requests/nds.txt'
   pull_request:
     paths:
       - 'cpymo/**'
