@@ -25,7 +25,16 @@ with (record/'native-windows-build.log').open('w',encoding='utf-8') as log:
  def run(args):
   args=list(map(str,args));commands.append(args)
   log.write(json.dumps(args)+'\n');log.flush()
-  subprocess.run(args,cwd=build,stdout=log,stderr=subprocess.STDOUT,check=True)
+  try:
+   subprocess.run(args,cwd=build,stdout=log,stderr=subprocess.STDOUT,check=True)
+  except subprocess.CalledProcessError:
+   # CI previously emitted only the Python traceback; show the actual GCC
+   # diagnostics while retaining the full reproducible build record on disk.
+   log.flush()
+   lines=(record/'native-windows-build.log').read_text(encoding='utf-8',errors='replace').splitlines()
+   print('NDS compiler/linker failure — last 90 build-log lines:',file=sys.stderr)
+   print('\\n'.join(lines[-90:]),file=sys.stderr)
+   raise
  gcc=sdk/('devkitARM/bin/arm-none-eabi-gcc'+exe)
  flags=[*prefix_flags,'-D__NDS__','-DARM9','-std=gnu11','-g','-Wall','-O2','-DHAVE_CONFIG_H','-DDISABLE_MOVIE','-DDISABLE_FFMPEG_AUDIO','-DENABLE_TEXT_EXTRACT','-DSTREAMING_LOAD_IMAGE','-ffunction-sections','-fdata-sections','-march=armv5te','-mtune=arm946e-s','-marm']
  if experiment:
