@@ -11,6 +11,9 @@ volatile unsigned launcher_state[7]={0x4c41554e};
 static unsigned launcher_count,launcher_selected;
 /* Four visible rows; keep the selected game on-screen without page jumps. */
 static unsigned launcher_scroll_first;
+static bool launcher_scroll_dragging;
+static int launcher_scroll_drag_y;
+static unsigned launcher_scroll_drag_first;
 static void launcher_scroll_ensure_visible(void){
  if(launcher_count<=4){launcher_scroll_first=0;return;}
  unsigned last_start=launcher_count-4;
@@ -112,19 +115,68 @@ static void launcher_scan(const char* hint){
 
 }
 static void launcher_rect(int x,int y,int w,int h,u16 color){for(int yy=y;yy<y+h&&yy<192;yy++)for(int xx=x;xx<w+x&&xx<256;xx++)if(xx>=0&&yy>=0)framebuffer[yy*256+xx]=color|BIT(15);}
-/* 256px LCD: 4px right gutter, no collision with the 244px game rows.
- * A proportional thumb represents the visible 4/N portion of the library. */
+/* The visible track stays 4px wide; the 14px-wide touch target on its left
+ * is reserved only when there are more than four games. */
+#define LAUNCHER_SCROLL_Y 33
+#define LAUNCHER_SCROLL_H 121
+#define LAUNCHER_SCROLL_TOUCH_X 242
+static int launcher_scroll_thumb_height(void){
+ if(launcher_count<=4)return LAUNCHER_SCROLL_H;
+ int h=(LAUNCHER_SCROLL_H*4+(int)launcher_count/2)/(int)launcher_count;
+ return h<14?14:h;
+}
+static int launcher_scroll_thumb_top(void){
+ if(launcher_count<=4)return LAUNCHER_SCROLL_Y;
+ int travel=LAUNCHER_SCROLL_H-launcher_scroll_thumb_height();
+ unsigned max_first=launcher_count-4;
+ return LAUNCHER_SCROLL_Y+(int)((travel*launcher_scroll_first+max_first/2)/max_first);
+}
+static bool launcher_scroll_set_first(unsigned first){
+ if(launcher_count<=4)return false;
+ const unsigned max_first=launcher_count-4;
+ if(first>max_first)first=max_first;
+ const unsigned old_first=launcher_scroll_first,old_selected=launcher_selected;
+ launcher_scroll_first=first;
+ /* Keep the highlighted title attached to a visible row, not an
+  * offscreen game, when the viewport moves independently of the D-pad. */
+ if(launcher_selected<first)launcher_selected=first;
+ else if(launcher_selected>=first+4)launcher_selected=first+3;
+ return old_first!=launcher_scroll_first||old_selected!=launcher_selected;
+}
+static bool launcher_scrollbar_begin_touch(int x,int y){
+ if(launcher_count<=4||x<LAUNCHER_SCROLL_TOUCH_X||x>=256||
+    y<LAUNCHER_SCROLL_Y||y>=LAUNCHER_SCROLL_Y+LAUNCHER_SCROLL_H)return false;
+ int top=launcher_scroll_thumb_top(),height=launcher_scroll_thumb_height();
+ /* A tap outside the thumb jumps to the corresponding place. Pressing
+  * the thumb itself keeps its position and avoids an initial jump. */
+ if(y<top||y>=top+height){
+  int travel=LAUNCHER_SCROLL_H-height,relative=y-LAUNCHER_SCROLL_Y-height/2;
+  if(relative<0)relative=0;
+  if(relative>travel)relative=travel;
+  launcher_scroll_set_first((unsigned)((relative*(int)(launcher_count-4)+travel/2)/travel));
+ }
+ launcher_scroll_dragging=true;
+ launcher_scroll_drag_y=y;
+ launcher_scroll_drag_first=launcher_scroll_first;
+ return true;
+}
+static bool launcher_scrollbar_move_touch(int y){
+ if(!launcher_scroll_dragging||launcher_count<=4)return false;
+ const int travel=LAUNCHER_SCROLL_H-launcher_scroll_thumb_height();
+ const int max_first=(int)launcher_count-4;
+ const int delta=(y-launcher_scroll_drag_y)*max_first;
+ /* Signed rounding, then clamp. Keep capture even if the pen slides
+  * outside the narrow gutter until release, for natural nail dragging. */
+ const int shift=(delta+(delta>=0?travel/2:-(travel/2)))/travel;
+ int first=(int)launcher_scroll_drag_first+shift;
+ if(first<0)first=0;
+ if(first>max_first)first=max_first;
+ return launcher_scroll_set_first((unsigned)first);
+}
 static void launcher_scrollbar_draw(void){
  if(launcher_count<=4)return;
- const int y=33,h=121,min_thumb=14;
- int thumb=(h*4+(int)launcher_count/2)/(int)launcher_count;
- if(thumb<min_thumb)thumb=min_thumb;
- if(thumb>h)thumb=h;
- const int travel=h-thumb;
- const int max_first=(int)launcher_count-4;
- const int thumb_y=y+(int)((travel*(unsigned)launcher_scroll_first+(unsigned)max_first/2)/(unsigned)max_first);
- launcher_rect(251,y,4,h,RGB15(6,10,14));
- launcher_rect(252,thumb_y,2,thumb,RGB15(14,24,30));
+ launcher_rect(251,LAUNCHER_SCROLL_Y,4,LAUNCHER_SCROLL_H,RGB15(6,10,14));
+ launcher_rect(252,launcher_scroll_thumb_top(),2,launcher_scroll_thumb_height(),RGB15(14,24,30));
 }
 static void launcher_text_mode(const char* text,int x,int y,u16 color,int max_x,unsigned mode){
  const char* p=text;int start=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10|| (cp=='\\'&&*p=='n')){if(cp=='\\')p++;x=start;y+=17;continue;}if(y>178)break;
@@ -304,7 +356,7 @@ static void launcher_draw(const char* message){
  launcher_selected_icon();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  if(launcher_about){launcher_icon(12,40);launcher_text(nds_ui("CPyMO / PYMO"),53,47,white,246);launcher_text(nds_ui("NDS 平台移植：千岚之夏"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
- else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,46,accent,245);
+ else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,53,accent,245);
  launcher_title(game,12,90,white,245);
  launcher_intro(game,1,12,114,RGB15(26,27,29));launcher_intro(game,2,12,132,RGB15(26,27,29));
  const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,215);
@@ -329,7 +381,7 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
- launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
+ launcher_rect(6,y,launcher_count>4?236:244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,160,accent,250);launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,178,muted,250);}
@@ -343,8 +395,9 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  nds_playing=false;nds_aux_override=false;nds_aux_refresh();lcdMainOnTop();screens_swapped=false;presentation_state[1]=0;presentation_state[2]=0;launcher_icon_path[0]=0;
  free(game_glyphs);game_glyphs=NULL;game_glyph_count=0;launcher_font_path[0]=0;free_pixel_fonts();clear_menu_images();nds_cache_enabled=false;
  nds_menu_clock_visible=false;clock_state[9]=0;
- launcher_about=false;launcher_language_menu=false;launcher_state[1]=1;launcher_scan(hint);launcher_draw(NULL);launcher_video_show();launcher_release_keys();
- while(1){nds_power_poll();swiWaitForVBlank();scanKeys();int down=keysDown();bool redraw=false,start=false;
+ launcher_about=false;launcher_language_menu=false;launcher_scroll_dragging=false;launcher_state[1]=1;launcher_scan(hint);launcher_draw(NULL);launcher_video_show();launcher_release_keys();
+ while(1){nds_power_poll();swiWaitForVBlank();scanKeys();int down=keysDown(),held=keysHeld();bool redraw=false,start=false;
+ if(!(held&KEY_TOUCH))launcher_scroll_dragging=false;
  if(nds_clock_sample()&&!launcher_about&&!launcher_language_menu)launcher_library_clock(launcher_sub,true);
  if(down&KEY_X){launcher_language_menu=!launcher_language_menu;launcher_about=false;launcher_language_cursor=nds_language_choice_get();launcher_draw(NULL);continue;}
  if(down&KEY_B){if(launcher_language_menu)launcher_language_menu=false;else launcher_about=!launcher_about;launcher_draw(NULL);continue;}
@@ -359,7 +412,17 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  if(down&KEY_SELECT){launcher_font_path[0]=0;launcher_scan(hint);redraw=true;}
  if(launcher_count){if(down&KEY_UP){launcher_selected=(launcher_selected+launcher_count-1)%launcher_count;redraw=true;}if(down&KEY_DOWN){launcher_selected=(launcher_selected+1)%launcher_count;redraw=true;}
  if(down&KEY_LEFT){launcher_selected=launcher_selected>=4?launcher_selected-4:0;redraw=true;}if(down&KEY_RIGHT){launcher_selected+=4;if(launcher_selected>=launcher_count)launcher_selected=launcher_count-1;redraw=true;}
- if(down&KEY_TOUCH){touchPosition t;touchRead(&t);if(t.px>=6&&t.px<250&&t.py>=33&&t.py<157){unsigned index=launcher_scroll_first+(t.py-33)/31;if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}}}
+ if(down&KEY_TOUCH){touchPosition t;touchRead(&t);
+  if(launcher_scrollbar_begin_touch(t.px,t.py)){redraw=true;}
+  else if(t.px>=6&&t.px<(launcher_count>4?LAUNCHER_SCROLL_TOUCH_X:250)&&t.py>=33&&t.py<157){
+   unsigned index=launcher_scroll_first+(t.py-33)/31;
+   if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}
+  }
+ }
+ if(launcher_scroll_dragging&&(held&KEY_TOUCH)){
+  touchPosition t;touchRead(&t);
+  if(launcher_scrollbar_move_touch(t.py))redraw=true;
+ }
  if(down&KEY_A)start=true;
  if(start){LauncherGame* game=&launcher_games[launcher_selected];if(game->status==1){launcher_remember();snprintf(out,size,"%s",game->path);launcher_release_keys();launcher_state[1]=0;launcher_state[4]++;return;}launcher_draw("请在电脑上先转换或修复缓存");continue;}}
  if(redraw)launcher_draw(NULL);
