@@ -33,7 +33,10 @@ with (record/'native-windows-build.log').open('w',encoding='utf-8') as log:
    log.flush()
    lines=(record/'native-windows-build.log').read_text(encoding='utf-8',errors='replace').splitlines()
    print('NDS compiler/linker failure — last 90 build-log lines:',file=sys.stderr)
-   print('\\n'.join(lines[-90:]),file=sys.stderr)
+   errors=[i for i,line in enumerate(lines) if ('error:' in line or 'undefined reference' in line or 'fatal error:' in line)]
+   for i in errors[:15]:
+    print('\\n'.join(lines[max(0,i-3):min(len(lines),i+3)]),file=sys.stderr)
+   print('\\n'.join(lines[-25:]),file=sys.stderr)
    raise
  gcc=sdk/('devkitARM/bin/arm-none-eabi-gcc'+exe)
  flags=[*prefix_flags,'-D__NDS__','-DARM9','-std=gnu11','-g','-Wall','-O2','-DHAVE_CONFIG_H','-DDISABLE_MOVIE','-DDISABLE_FFMPEG_AUDIO','-DENABLE_TEXT_EXTRACT','-DSTREAMING_LOAD_IMAGE','-ffunction-sections','-fdata-sections','-march=armv5te','-mtune=arm946e-s','-marm']
