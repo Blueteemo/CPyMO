@@ -1,0 +1,19 @@
+name: NDS UI Host Regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/nds-v1.2-integration]
+    paths:
+      - .github/ci-requests/nds-ui.txt
+permissions:
+  contents: read
+jobs:
+  ui-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Test 3DS-inspired NDS geometry, display preferences and ROM banner
+        run: |
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_layout.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_display_mode_prefs.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_rom_banner.py' -v
