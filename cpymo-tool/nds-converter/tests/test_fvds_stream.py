@@ -5,6 +5,7 @@ Only synthetic 3-frame samples from test_fvds_inspect.py are used.
 No reference FastVideoDS decoder source or commercial game assets.
 """
 import shutil
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -31,7 +32,11 @@ int main(int argc,char **argv){
  ck(result==0);ck(s.frame_count==3);ck(s.width==256);ck(s.keyframe_count==1);
  uint8_t chunk[1007];
  for(unsigned frame=0;frame<3;frame++){
-  ck(nds_fvds_next(&s,&p)==0);ck(p.frame==frame);
+  int rc=nds_fvds_next(&s,&p);
+  if(!strcmp(argv[1],"bad-index")&&frame==2){
+   ck(rc==-6);nds_fvds_close(&s);return 0;
+  }
+  ck(rc==0);ck(p.frame==frame);
   ck(p.video_bytes==8);
   for(unsigned remain=p.video_bytes;remain;){
    size_t n=nds_fvds_read_video(&s,chunk,sizeof(chunk));
@@ -55,6 +60,16 @@ int main(int argc,char **argv){
 
 @unittest.skipUnless(shutil.which("gcc"),"C compiler unavailable")
 class FVDSStreamTests(unittest.TestCase):
+    @staticmethod
+    def two_keyframe_sample(invalid=False):
+        original=sample()
+        head=bytearray(original[:28])
+        struct.pack_into("<I",head,24,2)
+        # Original first/second packets contain 16 audio block pairs.
+        second_start=44+2*(4+8+16*264)
+        key2=struct.pack("<II",2,second_start+(4 if invalid else 0))
+        return bytes(head)+struct.pack("<II",0,44)+key2+original[36:]
+
     def test_synthetic_packet_stream_and_rejection(self):
         with tempfile.TemporaryDirectory() as d:
             d=Path(d)
@@ -64,7 +79,9 @@ class FVDSStreamTests(unittest.TestCase):
                             "-fsanitize=undefined","-I",str(INCLUDE),
                             str(SOURCE),str(d/"runner.c"),"-o",str(exe)],check=True)
             for mode,raw in [("valid",sample()),("bad-header",sample(bad_key=True)),
-                             ("tail",sample(tail=True)),("bad-packet",sample(bad_video=True))]:
+                             ("tail",sample(tail=True)),("bad-packet",sample(bad_video=True)),
+                             ("valid",self.two_keyframe_sample()),
+                             ("bad-index",self.two_keyframe_sample(invalid=True))]:
                 path=d/(mode+str(len(raw))+".fv")
                 path.write_bytes(raw)
                 subprocess.run([str(exe),mode,str(path)],check=True,
