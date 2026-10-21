@@ -290,7 +290,7 @@ static void launcher_play_panel(const char* message){
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  launcher_text(nds_ui("A / 轻触：继续"),12,32,white,183);launcher_text(nds_ui("X：菜单 · B：返回"),12,50,white,183);launcher_text(nds_ui("B：按住隐藏文字"),12,68,white,183);
  if(launcher_count)launcher_game_icon(&launcher_games[launcher_selected],196,40,true);
- launcher_text(nds_ui("R：按设置快进"),12,86,white,245);launcher_text(nds_ui("L：交换上下屏"),12,104,white,245);launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,122,white,245);
+ launcher_text(nds_ui("R：按设置快进"),12,86,white,245);launcher_text(nds_ui("L：切换显示模式"),12,104,white,245);launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,122,white,245);
  launcher_text(nds_ui("START：快速保存到存档1"),12,140,muted,245);launcher_text(nds_ui("SELECT：快速读取存档1"),12,158,muted,245);
  launcher_text(message?message:nds_ui("显示、字号、音量：X 菜单"),12,176,accent,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
