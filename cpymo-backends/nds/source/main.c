@@ -132,17 +132,26 @@ static unsigned nds_recent_image_budget(void){
  return hi>lo && hi-lo>=(8u*1024u*1024u)?RECENT_LIMIT_TWL:RECENT_LIMIT;
 }
 typedef struct {char path[512];Image* image;unsigned bytes,age;} RecentImage;
-static RecentImage recent_images[6];static unsigned recent_bytes,recent_age,recent_limit=RECENT_LIMIT;
+/* NTR keeps the original six-slot policy. TWL's 2 MiB budget can retain
+ * more recently used sprites; more memory is NOT reserved for sprite pixels
+ * unless those assets are actually loaded. */
+#define RECENT_SLOTS_DS 6u
+#define RECENT_SLOTS_TWL 12u
+static RecentImage recent_images[RECENT_SLOTS_TWL];
+static unsigned recent_bytes,recent_age,recent_limit=RECENT_LIMIT;
+static unsigned recent_capacity(void){
+ return recent_limit>=RECENT_LIMIT_TWL?RECENT_SLOTS_TWL:RECENT_SLOTS_DS;
+}
 static void recent_remove(unsigned i){if(recent_images[i].image){recent_bytes-=recent_images[i].bytes;cpymo_backend_image_free(recent_images[i].image);}memset(&recent_images[i],0,sizeof recent_images[i]);}
-static void recent_clear(void){for(unsigned i=0;i<6;i++)recent_remove(i);recent_age=0;}
-static Image* recent_find(const char* path){for(unsigned i=0;i<6;i++)if(recent_images[i].image&&!strcmp(recent_images[i].path,path)){recent_images[i].age=++recent_age;recent_images[i].image->refs++;load_state[9]++;return recent_images[i].image;}load_state[10]++;return NULL;}
+static void recent_clear(void){for(unsigned i=0;i<RECENT_SLOTS_TWL;i++)recent_remove(i);recent_age=0;}
+static Image* recent_find(const char* path){for(unsigned i=0;i<recent_capacity();i++)if(recent_images[i].image&&!strcmp(recent_images[i].path,path)){recent_images[i].age=++recent_age;recent_images[i].image->refs++;load_state[9]++;return recent_images[i].image;}load_state[10]++;return NULL;}
 static void recent_store(const char* path,Image* im){
  unsigned cost=sizeof *im+im->pw*im->ph*(im->mask?3:2)+(im->bounds?im->ph*4:0)+(((render_bits&1)&&im->mask&&im->bounds)?im->ph*4:0);
  if(cost>recent_limit)return;
  int slot=-1;
- for(;;){slot=-1;for(unsigned i=0;i<6;i++)if(!recent_images[i].image){slot=i;break;}
+ for(;;){slot=-1;for(unsigned i=0;i<recent_capacity();i++)if(!recent_images[i].image){slot=i;break;}
   if(slot>=0&&recent_bytes+cost<=recent_limit)break;
-  unsigned oldest=0;for(unsigned i=1;i<6;i++)if(recent_images[i].image&&(!recent_images[oldest].image||recent_images[i].age<recent_images[oldest].age))oldest=i;
+  unsigned oldest=0;for(unsigned i=1;i<recent_capacity();i++)if(recent_images[i].image&&(!recent_images[oldest].image||recent_images[i].age<recent_images[oldest].age))oldest=i;
   recent_remove(oldest);load_state[11]++;
  }
  RecentImage* r=&recent_images[slot];snprintf(r->path,sizeof r->path,"%s",path);r->image=im;r->bytes=cost;r->age=++recent_age;im->refs++;recent_bytes+=cost;
@@ -682,7 +691,7 @@ int main(int argc,char** argv){
  FILE* mask_flag=savefile(game_dir,"nds-maskbench.flag","rb");if(mask_flag){fclose(mask_flag);run_mask_bench();for(;;)swiWaitForVBlank();}
  FILE* bench_flag=savefile(game_dir,"nds-renderbench.flag","rb");if(bench_flag){fclose(bench_flag);run_render_bench();for(;;)swiWaitForVBlank();}
  nds_playing=true;nds_aux_refresh();
- if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\nDS mode: 4 MiB\n");}else launcher_play_panel(NULL);
+ if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\n%s\n",nds_runtime_mode_label());}else launcher_play_panel(NULL);
  // Count actual display interrupts; include missed frames during decoding/drawing.
  irqSet(IRQ_VBLANK,on_vblank);irqEnable(IRQ_VBLANK);
  FILE* load_flag=savefile(game_dir,"nds-loadbench.flag","rb");if(load_flag){fclose(load_flag);run_load_bench();for(;;){swiWaitForVBlank();nds_audio_update();}}
