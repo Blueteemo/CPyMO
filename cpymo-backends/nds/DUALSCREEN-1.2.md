@@ -36,3 +36,21 @@ Use a converted **existing** PyMO game, ideally the previously accepted 30 MB du
 The user's private video research established sequential j1 video compaction versus NVL1 on ordinary NTR, but only FVDS **read-only** path has been verified through CPyMO on DSi. 1.2 still needs licensed or original FVDS frame decoding (including texture/GX and RAM constraints) and 47,605 Hz stereo ADPCM audio integration while preserving the CPyMO Calico/Maxmod ARM7, libfat double-volume behavior, lid suspend/resume, B skip and script return. The FastVideoDS repository has no clear source redistribution license; do not copy its player implementation into AGPL CPyMO pending authorization.
 
 Both major features are separately gated; neither may silently replace the classic visual-novel experience.
+
+## Follow-up: actual DSi hardware feedback and corrected three-mode touch model (2026-10-22)
+
+The user physically tested the first dual-screen build on DSi TWL: the split screen's baseline works and the movie's **B skip** returns successfully. The earlier user accepted seven-video batch reached EOF, so this separate B-skip test closes that specific input path in DSi mode. The first enhanced layout, however, was visually too bare and needs further polish relative to the actual 3DS behavioral reference.
+
+**Updated user-approved L cycling:** every standalone **L** press cycles through three physical LCD assignments:
+
+| State | Main gameplay | Secondary display | Lower-LCD touch semantics |
+| --- | --- | --- | --- |
+| 0 (default) | Classic game on upper LCD | Original control+clock panel below | Entire lower panel acts as virtual **A**; NEVER project touch to upper menu coordinates, even while a core menu is open |
+| 1 | Classic game on lower LCD | Original control+clock panel above | **Full PyMO coordinate projection** from physical lower LCD, including normal dialogues, choices and in-game menus |
+| 2 | Enhanced split | Background/characters on upper LCD; dialogue or engine menus below | Tap narrative dialogue to advance (**A**); project physical lower touches to genuine menu coordinates when the core UI is drawn below |
+
+The next L after state 2 returns to state 0; no more awkward **L+SELECT** chord. Single SELECT retains quick-load. Single Y retains hide/reveal of the auxiliary display and the temporary single-screen legibility policy. A transition explicitly resets auxiliary hide so the newly active LCD is visible. Classic upper or lower uses the exact original rendering, not a duplicated enhanced composition.
+
+The per-game `save/nds-dualscreen-mode.txt` now stores `NDSDISPLAY2 0`, `NDSDISPLAY2 1`, or `NDSDISPLAY2 2`, retaining backward compatibility: the previous one-byte `1` means the prior prototype's enhanced split (now state 2). No core save slots, game config, cache formats, or users' R7 installations are changed. Localized auxiliary help now says L cycles display modes.
+
+**Accept only after next real-device trial**, specifically all six transitions 0→1→2→0 and menu coordinate interaction in state 1/state 2. The existing simple enhanced dialogue layout is a first step rather than an accepted final 3DS-like screen composition. Determine text box safe area, choice routing, legibility and save menu UI from the DSi real hardware before release. B skip and audiovisual playback should be regressions in all three states.
