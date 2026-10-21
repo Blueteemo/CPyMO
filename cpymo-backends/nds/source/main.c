@@ -52,9 +52,9 @@ void nds_scene_release(void){scene_valid=false;if(scene_pixels){free(scene_pixel
 
 static bool screens_swapped;
 #include "preferences-nds.h"
-#include "dual-screen-nds.h"
 /* magic, swapped, toast active/shown/expired/age ms, icon loaded, metadata lines, touch samples */
 volatile unsigned presentation_state[9]={0x4e505232};
+#include "dual-screen-nds.h"
 volatile unsigned engine_state[46]={0x4350454e};
 /* magic, image loads, total/max load us, draws, total/max draw us, loop pixels, omitted pixels */
 volatile unsigned perf_state[9]={0x4e505246};
