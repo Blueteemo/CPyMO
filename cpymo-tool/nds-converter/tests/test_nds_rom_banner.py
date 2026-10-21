@@ -34,7 +34,14 @@ class ROMBannerTests(unittest.TestCase):
             banner.patch_nds_banner_titles(path,("CPyMO for NDS","1.1.0","千岚之夏"))
             updated=path.read_bytes()
             self.assertEqual(len(updated),len(source))
-            self.assertEqual(updated[:0x400+0x20],source[:0x400+0x20])
+            # The banner checksum at +0x02 MUST change with its titles.
+            # Only the rest of the header (including offset and icon)
+            # must remain byte-identical.
+            self.assertEqual(updated[:0x400+2],source[:0x400+2])
+            self.assertEqual(updated[0x400+4:0x400+0x20],
+                             source[0x400+4:0x400+0x20])
+            self.assertNotEqual(updated[0x400+2:0x400+4],
+                                source[0x400+2:0x400+4])
             self.assertEqual(updated[0x400+0x20:0x400+0x240],
                              source[0x400+0x20:0x400+0x240])
             self.assertEqual(updated[0x400+0x840:],source[0x400+0x840:])
