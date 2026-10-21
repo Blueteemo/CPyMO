@@ -1,0 +1,2 @@
+1.2 milestone: verify bounded FVDS stage callbacks + audio PCM + existing stream/WAV tests.
+Request: 2026-10-22 stage host validation only; DS/DSi hardware validation deferred.
