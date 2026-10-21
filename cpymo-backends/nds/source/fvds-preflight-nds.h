@@ -128,7 +128,18 @@ close:
  if(result)fvds_preflight_state[3]++;else fvds_preflight_state[2]++;
  /* Opt-in file writes only; never touch game saves or ordinary game files.
   * This diagnostic intentionally leaves the original graphics and music active. */
- FILE *log=savefile(engine->assetloader.gamedir,"nds-fvds-probe-result.txt","wb");
+ /* One report per movie avoids overwriting CHECK1 when CHECK3 is probed.
+  * Sanitize untrusted script names before using them as filenames. */
+ char report_name[80],safe_name[33]={0};
+ unsigned j=0;
+ for(unsigned i=0;i<name.len && j<32;i++){
+  unsigned char c=(unsigned char)name.begin[i];
+  safe_name[j++]=(c>='A'&&c<='Z')||(c>='a'&&c<='z')||
+                 (c>='0'&&c<='9')||c=='_'||c=='-'?(char)c:'_';
+ }
+ if(!j)safe_name[0]='_',safe_name[1]=0;
+ snprintf(report_name,sizeof report_name,"nds-fvds-probe-%s.txt",safe_name);
+ FILE *log=savefile(engine->assetloader.gamedir,report_name,"wb");
  if(log){
   fprintf(log,"CPyMO 1.2 FVDS preflight (NO playback)\n");
   fprintf(log,"mode=%s\n",isDSiMode()?"DSi-TWL":"DS-NTR");
