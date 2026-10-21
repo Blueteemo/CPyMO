@@ -29,6 +29,18 @@ class FVDSWAVTests(unittest.TestCase):
                 pcm=wav.readframes(47*256)
                 self.assertEqual(pcm,bytes(47*256*4))
             self.assertEqual(output_file.stat().st_size,44+47*256*4)
+            # Do not allow the host exporter to clobber the source movie.
+            before=input_file.read_bytes()
+            unsafe=subprocess.run([str(exe),str(input_file),str(input_file)],
+                                  capture_output=True,text=True)
+            self.assertEqual(unsafe.returncode,2)
+            self.assertEqual(input_file.read_bytes(),before)
+            alias=d/"movie-alias.fv"
+            alias.symlink_to(input_file)
+            unsafe=subprocess.run([str(exe),str(input_file),str(alias)],
+                                  capture_output=True,text=True)
+            self.assertEqual(unsafe.returncode,2)
+            self.assertEqual(input_file.read_bytes(),before)
             output_file.unlink()
             input_file.write_bytes(sample(tail=True))
             broken=subprocess.run([str(exe),str(input_file),str(output_file)],
