@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT=Path(sys.argv[1]).resolve()
-for d in ("bg","script","video","save"):
+for d in ("bg","bgm","script","video","save"):
     (ROOT/d).mkdir(parents=True,exist_ok=True)
 (ROOT/"gameconfig.txt").write_text(
     "gametitle,FVDS视频资源检查\n"
@@ -23,18 +23,41 @@ for d in ("bg","script","video","save"):
 script=[
     "#label LOOP",
     "#bg TEST,BG_NOFADE,0",
-    "#say 系统,这是 CPyMO 1.2 视频资源测试。",
+    "#bgm TESTBGM,1",
+    "#say 系统,这是 CPyMO 1.2 综合视频测试。",
     "#say 系统,继续后检查第一段短视频容器。",
     "#movie CHECK1",
     "#say 系统,第一段返回剧情，请稍后查看检测报告。",
     "#say 系统,继续后检查第二段短视频容器。",
     "#movie CHECK3",
-    "#say 系统,第二段返回剧情，本轮检测完成。",
-    "#say 系统,本游戏尚不具备视频画面播放能力。",
-    "#say 系统,检查游戏目录内两份 nds-fvds-probe 报告。",
+    "#say 系统,FVDS 容器检测结束。接下来检查已有 NVL1 播放器。",
+    "#say 系统,短片一：一秒画面及声音，等待自然结束。",
+    "#movie NVL1S",
+    "#say 系统,一秒视频已经返回剧情。",
+    "#say 系统,短片二：三秒画面及声音，等待自然结束。",
+    "#movie NVL3S",
+    "#say 系统,三秒视频已经返回剧情。",
+    "#say 系统,短片三：二十秒画面。可以按 B 中途跳过。",
+    "#movie NVL20S",
+    "#say 系统,长视频已经返回剧情。最后测试缺失视频。",
+    "#movie NOFILE",
+    "#say 系统,缺失视频处理结束。请检查 save 中的各项报告。",
+    "#say 系统,如果画面和背景音乐恢复正常，说明测试流程完成。",
     "#goto LOOP",
 ]
 (ROOT/"script"/"START.txt").write_text("\n".join(script)+"\n",encoding="utf-8")
+# A genuine looping background theme tests stream restoration after NVL.
+import wave, math
+rate=22050
+with wave.open(str(ROOT/"bgm"/"TESTBGM.wav"),"wb") as out:
+    out.setnchannels(1);out.setsampwidth(2);out.setframerate(rate)
+    wave_data=bytearray()
+    for n in range(rate*4):
+        t=n/rate
+        freq=[220,262,330,294][int(t*2)%4]
+        wave_data+=struct.pack("<h",int(2500*math.sin(2*math.pi*freq*t)))
+    out.writeframes(wave_data)
+
 im=Image.new("RGB",(320,240),(16,32,55))
 dr=ImageDraw.Draw(im)
 for y in range(240):
