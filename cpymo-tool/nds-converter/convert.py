@@ -12,6 +12,7 @@ from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw, __version__ as pillow_version
 from pixel_font import pixel_font_cache
 import lossless
+from fvds_inspect import inspect_fvds
 
 from release_info import VERSION
 CORE_COMMANDS = frozenset(['add', 'album', 'anime_off', 'anime_on', 'bg', 'bgm', 'bgm_stop', 'call', 'change', 'chara', 'chara_anime', 'chara_cls', 'chara_down', 'chara_pos', 'chara_quake', 'chara_scroll', 'chara_up', 'chara_y', 'config', 'date', 'fade_in', 'fade_out', 'flash', 'goto', 'if', 'label', 'load', 'movie', 'music', 'quake', 'rand', 'ret', 'say', 'scroll', 'se', 'se_stop', 'sel', 'select_img', 'select_imgs', 'select_text', 'select_var', 'set', 'sub', 'text', 'text_off', 'textbox', 'title', 'title_dsp', 'vo', 'wait', 'wait_se', 'waitkey'])
@@ -264,6 +265,39 @@ def convert(args):
         if kind=='chara' and not (src/kind/(kind+'.pak')).is_file():
             masks=assets(src/kind,config.get('charamaskformat',ext))
             folders[kind].update({k:v for k,v in masks.items() if k.lower().endswith('_mask')})
+    # Opt-in 1.2 research: ingest only already-encoded FVDS files, without
+    # re-encoding or changing any game scripts, saves or the existing cache
+    # formats. The normal conversion still omits all videos.
+    video_entries=[]
+    if getattr(args,'video_fvds',False):
+        fv_candidates=[p for p in source_files
+                       if len(p.relative_to(src).parts)==2
+                       and p.parent.name.casefold() in ('video','movie')
+                       and p.suffix.casefold()=='.fv']
+        seen_video={}
+        for asset in fv_candidates:
+            name=asset.stem
+            hashed=key(name)
+            if hashed in seen_video:
+                raise ValueError(f'Ambiguous FVDS movie identity: {seen_video[hashed]} vs {asset}')
+            seen_video[hashed]=asset
+            report=inspect_fvds(asset,hash_file=True)
+            if (report['width'],report['height'])!=(256,192) or report['frames']>18000:
+                raise ValueError(f'FVDS unsupported display geometry/duration: {asset}')
+            if report['audio_sample_rate']!=47605 or report['audio_channels']!=2:
+                raise ValueError(f'FVDS audio format not supported for probe: {asset}')
+            output=cache/'video'/hashed[:2]/(hashed+'.fv')
+            output.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(asset,output)
+            if sha(output)!=report['sha256']:
+                raise ValueError(f'FVDS copy checksum mismatch: {asset}')
+            video_entries.append({'name':name,'path':output.relative_to(stage).as_posix(),
+                                  'bytes':report['size_bytes'],'frames':report['frames'],
+                                  'keyframes':report['keyframe_count'],'duration_seconds':report['duration_seconds'],
+                                  'source_sha256':report['sha256'],'status':'preflight only; not yet playable'})
+        retained={p.relative_to(src).as_posix() for p in fv_candidates}
+        omitted=[item for item in omitted if item['path'] not in retained]
+
     # Some legacy packers included Windows Thumbs.db in image packages.
     # Recognize both its name and OLE signature; never hide corrupt game images.
     ignored=[]
@@ -363,7 +397,10 @@ def convert(args):
     manifest['lossless']['experimental_sparse']=getattr(args,'experimental_sparse',False)
     if audio_mode!='off':manifest['audio_format']='PCM16/NAR2 per file; identical 22050 Hz mono PCM16 samples'
     manifest['source_files']=source_hashes
-    manifest['video_policy']='omit video assets; keep scripts; runtime safely skips movie commands'
+    manifest['video_policy']=('opt-in FVDS cache pass-through; 1.2 runtime preflight only; video decoding not implemented'
+                              if getattr(args,'video_fvds',False)
+                              else 'omit video assets; keep scripts; runtime safely skips movie commands')
+    manifest['fvds_videos']=video_entries
     manifest['resource_policy']='cache-only experimental' if cache_only else 'original media retained'
     manifest['presentation']=presentation
     manifest['source_platform']=config.get('platform','pygame')
@@ -386,6 +423,7 @@ def main():
     c.add_argument('--audio-lossless',choices=('off','voice','all'),default='off');c.add_argument('--compress-images',action='store_true',help='Lossless NPA4 or row-span NPS1 selected per image; keep raw when not worthwhile')
     c.add_argument('--cache-layout',choices=('flat','sharded'),default='sharded',help='Two-hex directory fanout avoids large flat FAT directories; requires r15 engine')
     c.add_argument('--experimental-sparse',action='store_true',help='Private NPS2: smaller transparent images; may increase scene-change stalls')
+    c.add_argument('--video-fvds',action='store_true',help='Research-only: validate and copy pre-encoded video/*.fv into hashed NDS cache; NOT playback')
     v=sub.add_parser('verify');v.add_argument('destination',type=Path)
     i=sub.add_parser('inspect');i.add_argument('source',type=Path)
     args=parser.parse_args()
