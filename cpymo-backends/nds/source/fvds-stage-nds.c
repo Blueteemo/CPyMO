@@ -1,4 +1,5 @@
 #include "fvds-stage-nds.h"
+#include "fvds-picture-prefix-nds.h"
 
 /* Normalize callback codes while leaving our published stage result stable. */
 static int cb_result(int value){
@@ -24,6 +25,7 @@ int nds_fvds_stage_step(nds_fvds_stream *file,nds_fvds_stage *stage,
                file->fps_num;
  status=cb_result(callbacks->video_begin(ctx,packet.frame,pts));
  if(status)goto close_packet;
+ unsigned picture_prefix_seen=0, picture_predicted=0;
  for(uint32_t remain=packet.video_bytes;remain;){
   status=poll_result(callbacks,ctx);
   if(status)goto close_packet;
@@ -31,6 +33,13 @@ int nds_fvds_stage_step(nds_fvds_stream *file,nds_fvds_stage *stage,
   size_t got=nds_fvds_read_video(file,stage->video,amount);
   if(got!=amount){status=NDS_FVDS_STEP_ERROR;goto close_packet;}
   remain-=(uint32_t)got;
+  if(!picture_prefix_seen){
+   int picture=nds_fvds_picture_type(stage->video,got,
+                                     file->current_is_keyframe);
+   if(picture<0){status=NDS_FVDS_STEP_ERROR;goto close_packet;}
+   picture_predicted=(unsigned)picture;
+   picture_prefix_seen=1;
+  }
   status=cb_result(callbacks->video_chunk(ctx,stage->video,got));
   if(status)goto close_packet;
  }
@@ -51,6 +60,8 @@ int nds_fvds_stage_step(nds_fvds_stream *file,nds_fvds_stage *stage,
  }
  if(nds_fvds_finish(file))return NDS_FVDS_STEP_ERROR;
  stage->completed_frames++;
+ if(file->current_is_keyframe)stage->key_pictures++;
+ if(picture_predicted)stage->predicted_pictures++;
  return NDS_FVDS_STEP_FRAME;
 close_packet:
  /* On cancellation the owner will normally close the movie immediately.
