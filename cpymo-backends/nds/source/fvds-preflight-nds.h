@@ -9,7 +9,8 @@
 
 /* [0] magic, [1] runs, [2] pass, [3] fail, [4] frames scanned,
  * [5] video bytes, [6] audio bytes, [7] last code, [8] TWL, [9] I/O us */
-volatile unsigned fvds_preflight_state[10]={0x46565031};
+/* [10] FNV1a payload checksum, [11] verified payload byte count */
+volatile unsigned fvds_preflight_state[12]={0x46565031};
 
 static unsigned fvds_le16(const unsigned char *p){
  return (unsigned)p[0] | ((unsigned)p[1]<<8);
@@ -39,10 +40,16 @@ static bool nds_fvds_preflight(cpymo_engine *engine,cpymo_str name){
  fvds_preflight_state[8]=isDSiMode()?1:0;
  fvds_preflight_state[4]=fvds_preflight_state[5]=fvds_preflight_state[6]=0;
  unsigned result=1,frames=0,video_total=0,audio_total=0,keyframes=0;
+ unsigned payload_digest=2166136261u,payload_read=0;
+ /* Allocate this only for explicit I/O tests: ordinary NTR game memory
+  * is not penalized with permanent, always-resident probe buffers. */
+ unsigned char *io_buffer=malloc(4096);
+ if(!io_buffer)result=17;
  const u64 started=tickGetCount();
  unsigned char header[28],key[8],packet[4];
  unsigned size=0,frame_count=0,data_start=0;
  unsigned next_key_frame=0,next_key_offset=0,next_key_idx=0,last_key_frame=0,last_key_offset=0;
+ if(!io_buffer)goto close;
  const bool size_ok=fseek(f,0,SEEK_END)==0;
  long end=size_ok?ftell(f):-1;
  if(end<28 || end>192*1024*1024 || fseek(f,0,SEEK_SET)!=0){result=2;goto close;}
@@ -110,21 +117,30 @@ static bool nds_fvds_preflight(cpymo_engine *engine,cpymo_str name){
      (unsigned long long)payload+video_bytes+audio_bytes>size){
    result=14;goto close;
   }
-  if(!fvds_skip_to(f,(unsigned)payload+video_bytes+audio_bytes)){
-   result=15;goto close;
+  /* Unlike index-only scans, read the full video and ADPCM payload
+   * through libfat. This proves sequential media transfer, not merely
+   * successful fseek into FAT data clusters. No codec is invoked. */
+  unsigned remaining=video_bytes+audio_bytes;
+  while(remaining){
+   unsigned n=remaining>4096?4096:remaining;
+   if(!fvds_read_exact(f,io_buffer,n)){result=15;goto close;}
+   for(unsigned i=0;i<n;i++)payload_digest=(payload_digest^io_buffer[i])*16777619u;
+   payload_read+=n;remaining-=n;
+   nds_audio_update();nds_power_poll();
   }
   frames++;video_total+=video_bytes;audio_total+=audio_bytes;
-  if((frame&31u)==0){nds_audio_update();nds_power_poll();}
  }
  if(ftell(f)!=(long)size){result=16;goto close;}
  result=0;
 close:
- fclose(f);
+ fclose(f);free(io_buffer);
  fvds_preflight_state[4]=frames;
  fvds_preflight_state[5]=video_total;
  fvds_preflight_state[6]=audio_total;
  fvds_preflight_state[7]=result;
  fvds_preflight_state[9]=(unsigned)((tickGetCount()-started)*1000000ULL/TICK_FREQ);
+ fvds_preflight_state[10]=payload_digest;
+ fvds_preflight_state[11]=payload_read;
  if(result)fvds_preflight_state[3]++;else fvds_preflight_state[2]++;
  /* Opt-in file writes only; never touch game saves or ordinary game files.
   * This diagnostic intentionally leaves the original graphics and music active. */
@@ -147,6 +163,8 @@ close:
   fprintf(log,"frames=%u/%u keys=%u video_bytes=%u audio_bytes=%u\n",
           frames,frame_count,keyframes,video_total,audio_total);
   fprintf(log,"file_bytes=%u io_microseconds=%u\n",size,fvds_preflight_state[9]);
+  fprintf(log,"payload_read_bytes=%u payload_fnv1a32=%08X\n",
+          payload_read,payload_digest);
   fprintf(log,"source=%s\n",path);
   fclose(log);
  }
