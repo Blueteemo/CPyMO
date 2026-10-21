@@ -52,6 +52,7 @@ void nds_scene_release(void){scene_valid=false;if(scene_pixels){free(scene_pixel
 
 static bool screens_swapped;
 #include "preferences-nds.h"
+#include "dual-screen-nds.h"
 /* magic, swapped, toast active/shown/expired/age ms, icon loaded, metadata lines, touch samples */
 volatile unsigned presentation_state[9]={0x4e505232};
 volatile unsigned engine_state[46]={0x4350454e};
@@ -411,6 +412,8 @@ __attribute__((optimize("O3"))) static void image_draw_fast(float dx,float dy,fl
  unsigned perf_us=(tickGetCount()-perf_start)*1000000/TICK_FREQ;perf_state[4]++;perf_state[5]+=perf_us;if(perf_us>perf_state[6])perf_state[6]=perf_us;
 }
 void cpymo_backend_image_draw(float dx,float dy,float dw,float dh,cpymo_backend_image image,int sx,int sy,int sw,int sh,float alpha,enum cpymo_backend_image_draw_type type){
+ if(!nds_dual_accept(type))return;
+ if(nds_dual_bottom_pass && nds_dual_is_say(type))dy+=nds_dual_say_offset();
  nds_clock_menu_rect(dx,dy,type);
  if(renderer_fast)image_draw_fast(dx,dy,dw,dh,image,sx,sy,sw,sh,alpha,type);
  else image_draw_reference(dx,dy,dw,dh,image,sx,sy,sw,sh,alpha,type);
@@ -422,7 +425,15 @@ static void fill_rects_impl(const float* r,size_t n,cpymo_color c,float alpha,en
  for(size_t i=0;i<n;i++,r+=4){int x0=(int)(r[0]*scale+ox),y0=(int)(r[1]*scale+oy),x1=(int)((r[0]+r[2])*scale+ox),y1=(int)((r[1]+r[3])*scale+oy);if(x0<0)x0=0;if(y0<0)y0=0;if(x1>256)x1=256;if(y1>192)y1=192;for(int y=y0;y<y1;y++){if(!(y&15))nds_audio_pump_if_due();for(int x=x0;x<x1;x++)framebuffer[y*256+x]=blend(framebuffer[y*256+x],col,a);}}
 }
 bool cpymo_backend_image_album_ui_writable(){return false;}
-void cpymo_backend_image_fill_rects(const float* r,size_t n,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){u64 t=tickGetCount();fill_rects_impl(r,n,c,alpha,type);fill_us+=(tickGetCount()-t)*1000000/TICK_FREQ;}
+void cpymo_backend_image_fill_rects(const float* r,size_t n,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){
+ if(!nds_dual_accept(type))return;
+ u64 t=tickGetCount();
+ if(nds_dual_bottom_pass && nds_dual_is_say(type) && n){
+  float off=nds_dual_say_offset();
+  for(size_t i=0;i<n;i++){float shifted[4]={r[i*4],r[i*4+1]+off,r[i*4+2],r[i*4+3]};fill_rects_impl(shifted,1,c,alpha,type);}
+ }else fill_rects_impl(r,n,c,alpha,type);
+ fill_us+=(tickGetCount()-t)*1000000/TICK_FREQ;
+}
 #include "masktrans-nds.h"
 static unsigned decode(const char** p){unsigned c=(unsigned char)*(*p)++;if(c<128)return c;unsigned n=c<224?1:c<240?2:3;c&=(1u<<(6-n))-1;while(n--){c=(c<<6)|((unsigned char)*(*p)++&63);}return c;}
 typedef struct {u32 code;u8 advance,pad[3];u16 rows[14];} GameGlyph;
@@ -473,7 +484,13 @@ static void text_draw_impl(cpymo_backend_text text,float x,float baseline,cpymo_
  float start_x=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10){x=start_x;baseline+=(font_nominal(mode)+3)*scale;continue;}int g=text_glyph(mode,cp);if(g<0){missing_glyph(cp);g=text_glyph(mode,'?');}
  if(g>=0)for(int y=0;y<h;y++)for(int xx=0;xx<w;xx++){unsigned gy=(unsigned)(y/scale),gx=(unsigned)(xx/scale);if(gy<gh&&gx<gw&&(text_row(mode,g,gy)&(1<<gx)))pixel((int)x+xx,(int)(baseline-gb*scale)+y,c,alpha);}x+=(g>=0?text_advance(mode,g):font_nominal(mode))*scale;}
 }
-void cpymo_backend_text_draw(cpymo_backend_text text,float x,float baseline,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){u64 t=tickGetCount();text_draw_impl(text,x,baseline,c,alpha,type);text_us+=(tickGetCount()-t)*1000000/TICK_FREQ;}
+void cpymo_backend_text_draw(cpymo_backend_text text,float x,float baseline,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){
+ if(!nds_dual_accept(type))return;
+ u64 t=tickGetCount();
+ if(nds_dual_bottom_pass && nds_dual_is_say(type))baseline+=nds_dual_say_offset();
+ text_draw_impl(text,x,baseline,c,alpha,type);
+ text_us+=(tickGetCount()-t)*1000000/TICK_FREQ;
+}
 cpymo_input cpymo_input_snapshot(){
  int k=keysHeld();touchPosition t={0};if(k&KEY_TOUCH){touchRead(&t);presentation_state[8]++;}
  bool ui=cpymo_ui_enabled(&engine);
@@ -636,7 +653,11 @@ static void run_load_bench(void){
 static void nds_base_draw(const cpymo_engine* e){cpymo_bg_draw(e);cpymo_scroll_draw(&e->scroll);cpymo_charas_draw(e);cpymo_anime_draw(&e->anime);}
 static void nds_engine_draw(const cpymo_engine* e){
  nds_menu_clock_visible=false;clock_state[9]=0;
- if(cpymo_ui_enabled(e)){cpymo_engine_draw(e);return;}
+ if(cpymo_ui_enabled(e)){
+  if(nds_dual_active()&&!nds_dual_bottom_pass)nds_base_draw(e);
+  else cpymo_engine_draw(e);
+  return;
+ }
  scene_count=0;scene_overflow=false;scene_collect=true;nds_base_draw(e);scene_collect=false;
  float view[3]={display_scale(),display_x(),display_y()};
  nds_audio_pump_if_due();
@@ -697,6 +718,7 @@ int main(int argc,char** argv){
  memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
+ nds_dual_load(game_dir);
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
  FILE* sequential_file=savefile(game_dir,"nds-image-sequential.txt","rb");image_sequential=!sequential_file||fgetc(sequential_file)!='0';if(sequential_file)fclose(sequential_file);
  char layout_path[512],layout_marker[32]={0};snprintf(layout_path,sizeof layout_path,"%s/nds-cache/format.txt",game_dir);FILE* marker_file=fopen(layout_path,"rb");if(marker_file){fread(layout_marker,1,31,marker_file);fclose(marker_file);}int format_layout=!strcmp(layout_marker,"CPYMO-NDS-CACHE-6\n")?3:0;
@@ -723,11 +745,16 @@ int main(int argc,char** argv){
  while(1){unsigned wakes=sleep_state[3];nds_power_poll();bool woke=sleep_state[3]!=wakes;if(woke)prev_tick=observed_tick=tickGetCount();swiWaitForVBlank();scanKeys();
  nds_audio_update();
  if(!debug_trace)launcher_update_toast();
- if(keysDown()&KEY_L){lcdSwap();screens_swapped=!screens_swapped;presentation_state[1]=screens_swapped;nds_aux_refresh();}
+ /* L+SELECT switches 3DS-style dual screen in one step; preserve legacy
+    standalone L screen swap and standalone SELECT quick-load. */
+ bool dual_toggle=(keysDown()&(KEY_L|KEY_SELECT)) &&
+       (keysHeld()&(KEY_L|KEY_SELECT))==(KEY_L|KEY_SELECT);
+ if(dual_toggle)nds_dual_toggle();
+ if((keysDown()&KEY_L)&&!dual_toggle){lcdSwap();screens_swapped=!screens_swapped;presentation_state[1]=screens_swapped;nds_aux_refresh();}
  nds_aux_poll();
  nds_clock_poll();
  if(keysDown()&KEY_START){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
- if(keysDown()&KEY_SELECT){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
+ if((keysDown()&KEY_SELECT)&&!dual_toggle){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
  unsigned now=vblank_count;u64 now_tick=tickGetCount();float dt=(float)(now_tick-prev_tick)/TICK_FREQ;prev_tick=now_tick;if(woke)sleep_state[10]=(unsigned)(dt*1000000);elapsed+=dt;bool redraw=false;
  bool saved_skip_policy=engine.config_skip_already_read_only;
  bool skip_override=false; /* L is now exclusively screen swap; skip policy comes from settings. */
@@ -758,11 +785,25 @@ int main(int argc,char** argv){
   /* Generic startup-menu marker; script names are recorded in the trace. */
   engine_state[7]=!strcmp(name,"MENU")?10:0;
  }
- if(redraw){unsigned image_before=perf_state[5],text_before=text_us,fill_before=fill_us;u64 draw_start=tickGetCount();for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);nds_engine_draw(&engine);if(scene_verify_pixels){memcpy(scene_verify_pixels,framebuffer,sizeof framebuffer);for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);unsigned saved_bits=render_bits;bool saved_copy=native_row_copy,saved_fast=renderer_fast;render_bits=0;native_row_copy=false;renderer_fast=false;cpymo_engine_draw(&engine);render_bits=saved_bits;native_row_copy=saved_copy;renderer_fast=saved_fast;scene_state[5]++;if(memcmp(scene_verify_pixels,framebuffer,sizeof framebuffer))scene_state[6]++;}
+ if(redraw){unsigned image_before=perf_state[5],text_before=text_us,fill_before=fill_us;u64 draw_start=tickGetCount();for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);nds_dual_bottom_pass=false;nds_engine_draw(&engine);if(scene_verify_pixels){memcpy(scene_verify_pixels,framebuffer,sizeof framebuffer);for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);unsigned saved_bits=render_bits;bool saved_copy=native_row_copy,saved_fast=renderer_fast;render_bits=0;native_row_copy=false;renderer_fast=false;cpymo_engine_draw(&engine);render_bits=saved_bits;native_row_copy=saved_copy;renderer_fast=saved_fast;scene_state[5]++;if(memcmp(scene_verify_pixels,framebuffer,sizeof framebuffer))scene_state[6]++;}
   // DMA reads main memory, not the ARM9 data cache. Publish the whole frame.
   nds_clock_sync_aux_visibility();
   DC_FlushRange(framebuffer,sizeof framebuffer);
-  dmaCopy(framebuffer,vram,sizeof framebuffer);engine_state[29]++;if(engine.bg.transform_draw){engine_state[38]++;float p=cpymo_tween_value(&engine.bg.transform_progression);if(p>0&&p<1)engine_state[39]|=1u<<(unsigned)(p*31);}
+  dmaCopy(framebuffer,vram,sizeof framebuffer);engine_state[29]++;
+  if(nds_dual_active() && launcher_sub){
+   /* Render only say / UI on the lower LCD, preserving the current scene
+      on the upper LCD and the existing VRAM and ARM7 owners. No extra heap
+      framebuffer; reuse the RAM draw surface after publishing the top. */
+   nds_dual_bottom_pass=true;
+   for(unsigned i=0;i<256*192;i++)framebuffer[i]=RGB15(3,5,8)|BIT(15);
+   if(cpymo_ui_enabled(&engine))cpymo_engine_draw(&engine);
+   else cpymo_say_draw(&engine);
+   DC_FlushRange(framebuffer,sizeof framebuffer);
+   dmaCopy(framebuffer,launcher_sub,sizeof framebuffer);
+   nds_dual_bottom_pass=false;
+   nds_dual_state[6]++;
+  }
+  if(engine.bg.transform_draw){engine_state[38]++;float p=cpymo_tween_value(&engine.bg.transform_progression);if(p>0&&p<1)engine_state[39]|=1u<<(unsigned)(p*31);}
   unsigned draw_us=(tickGetCount()-draw_start)*1000000/TICK_FREQ;if(draw_us>engine_state[30])engine_state[30]=draw_us;if(draw_us>50000){unsigned seq=draw_trace[1]++,j=4+(seq%64)*8;draw_trace[j]=seq;draw_trace[j+1]=draw_us;draw_trace[j+2]=perf_state[5]-image_before;draw_trace[j+3]=text_us-text_before;draw_trace[j+4]=fill_us-fill_before;draw_trace[j+5]=engine_state[14];draw_trace[j+6]=engine_state[2];draw_trace[j+7]=mask_state[3];}}
  nds_audio_update();
  struct mallinfo mi=mallinfo();engine_state[3]=mi.uordblks;if(engine_state[3]>engine_state[4])engine_state[4]=engine_state[3];
