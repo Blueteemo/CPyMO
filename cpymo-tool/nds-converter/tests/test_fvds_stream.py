@@ -26,7 +26,8 @@ int main(int argc,char **argv){
  if(argc!=3)return 2;
  nds_fvds_stream s;nds_fvds_packet p;
  int result=nds_fvds_open(&s,argv[2]);
- if(!strcmp(argv[1],"bad")){ck(result!=0);return 0;}
+ if(!strcmp(argv[1],"bad-header")){ck(result!=0);return 0;}
+ if(!strcmp(argv[1],"bad-packet")){ck(result==0);ck(nds_fvds_next(&s,&p)==-3);nds_fvds_close(&s);return 0;}
  ck(result==0);ck(s.frame_count==3);ck(s.width==256);ck(s.keyframe_count==1);
  uint8_t chunk[1007];
  for(unsigned frame=0;frame<3;frame++){
@@ -62,8 +63,8 @@ class FVDSStreamTests(unittest.TestCase):
             subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
                             "-fsanitize=undefined","-I",str(INCLUDE),
                             str(SOURCE),str(d/"runner.c"),"-o",str(exe)],check=True)
-            for mode,raw in [("valid",sample()),("bad",sample(bad_key=True)),
-                             ("tail",sample(tail=True)),("bad",sample(bad_video=True))]:
+            for mode,raw in [("valid",sample()),("bad-header",sample(bad_key=True)),
+                             ("tail",sample(tail=True)),("bad-packet",sample(bad_video=True))]:
                 path=d/(mode+str(len(raw))+".fv")
                 path.write_bytes(raw)
                 subprocess.run([str(exe),mode,str(path)],check=True,
