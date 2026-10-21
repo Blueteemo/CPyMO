@@ -1,2 +1,1 @@
-1.2 milestone: validate FVDS I/P picture prefixes, 47,605-Hz stereo queue pacing, exact packet boundaries, rollback/skip and host WAV export.
-Requested 2026-10-22 after original bounded stage/PCM queue changes. DS/DSi SDK build intentionally deferred.
+1.2 milestone final host validation (2026-10-22): first I/P quantizer header, exact 47,605 Hz rational clock, two-picture real-sample preroll, 8192-frame bounded queue, video/audio stage and prior WAV regressions. DSi/NTR build intentionally deferred.
