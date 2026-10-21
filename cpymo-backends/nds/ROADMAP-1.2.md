@@ -52,6 +52,16 @@
 - **Hardware test statuses:** Build and converter CI = passed on the latest relevant code; **all six real NDSi device experiences pending.** NTR 4 MiB movie playback and original DS/R4 storage still need separate tests. The user-accepted R7 gameplay performance and UI remain the rollback baseline.
 - **No public external codec integration:** actual FVDS frame playback requires licensing/independent decoding, ARM7 streaming/IPC and VRAM capture conflict resolution; results of NVL1/NVA1 must not be cited as FVDS decoding evidence.
 
+## Seven-checkpoint batch and true FVDS I/O (research build)
+
+- Corrected an important validation weakness: the first FVDS preflight scanned packet headers and **seeked over** the actual audio/video bytes. The new explicitly enabled probe allocates a temporary 4 KiB buffer, reads *every* payload byte sequentially with libfat and continues pumping CPyMO audio. It computes FNV1a32 and logs `payload_read_bytes`, `payload_fnv1a32` and I/O microseconds without decoding FVDS video. The ordinary R7 audio/video paths remain unchanged.
+- The host `fvds_inspect.py --payload-hash` computes the exact same checksum, and its synthetic unit test now checks full payload accounting.
+- The one-session private DSi hardware package includes FVDS CHECK1 (1s), CHECK3 (3s), FULLJ1 (159s, **not played**, entirely read); NVL1S (1s RGB555/PCM animated clip), NVA3S (3s RGB555/NAR2), NVL20S (20s original 159s NVL prefix, B skip or EOF), and NOFILE missing-video return. Both clip generators and the source-independent prefix trimmer are in the public repository; private handoff media remains private.
+- Private real-container transfer expectations: CHECK1 `66248 / D7819B62`; CHECK3 `176072 / 2898659E`; FULLJ1 `12935012 / 56159179` (each pair: payload bytes read / FNV1a32 hex). These are host-verified values **not yet observed on NDSi**. Full source clip totals 12,942,736 bytes with header/index and frame headers.
+- Video source-only first 240 NVL1 frames have additionally been decompressed through independent host LZ4 and had all 240 reconstructed Adler32 frame hashes matched before extracting the unchanged compressed packets/audio prefix. Real device playback remains unverified until the user's test.
+- The device build (NDS and DSi) and synthetic game conversion CI passed; source/private media authenticity checks, installed ROM CI provenance and ZIP CRC were verified. **No FVDS decoder** or public FastVideoDS source is being merged in this step. The seventh-checkpoint package is private and must not be attached to a public GitHub release.
+- Feedback required: seven separate `save/nds-fvds-probe-*.txt` and `save/nds-nvl-probe-*.txt` reports; for dynamic clips, whether the scene visibly moves, whether audio returns, and whether a B skip and NOFILE safely return to dialogue.
+
 ## Run host checks
 
 ```sh
