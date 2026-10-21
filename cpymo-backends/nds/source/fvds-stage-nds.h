@@ -34,6 +34,7 @@ typedef struct {
  int16_t pcm[512];
  uint32_t completed_frames;
  uint64_t audio_frames;
+ uint32_t key_pictures, predicted_pictures;
 } nds_fvds_stage;
 
 /* Call exactly once per video frame. On B skip/error the current FVDS packet
