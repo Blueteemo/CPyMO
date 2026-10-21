@@ -499,8 +499,20 @@ cpymo_input cpymo_input_snapshot(){
  cpymo_input in={0};in.ok=k&KEY_A;in.cancel=k&((ui||script_menu)?KEY_B:KEY_X);
  in.up=k&KEY_UP;in.down=k&KEY_DOWN;in.left=k&KEY_LEFT;in.right=k&KEY_RIGHT;in.skip=k&KEY_R;
  in.hide_window=!ui&&!engine.select_img.selections&&(k&KEY_B);
- in.mouse_button=!nds_touch_blocked&&(k&KEY_TOUCH);in.mouse_position_useable=in.mouse_button;
- in.mouse_x=(t.px-display_x())/display_scale();in.mouse_y=(t.py-display_y())/display_scale();return in;
+ /* Touch semantics follow the PHYSICAL lower LCD, not an assumed game
+    coordinate space. Classic upper-game: whole auxiliary LCD = A.
+    Classic lower-game: accurate PyMO coordinates including menus/choices.
+    Enhanced: story area = A; core menus drawn below = real coordinates.
+    A wake-up touch is blocked by nds_aux_poll when Y hid the sub LCD. */
+ bool touch=!nds_touch_blocked&&(k&KEY_TOUCH);
+ bool screen_coords=nds_display_mode==1||
+       (nds_dual_active()&&cpymo_ui_enabled(&engine));
+ in.ok=(k&KEY_A)||(touch&&!screen_coords);
+ in.mouse_button=touch&&screen_coords;
+ in.mouse_position_useable=in.mouse_button;
+ in.mouse_x=in.mouse_position_useable?(t.px-display_x())/display_scale():0;
+ in.mouse_y=in.mouse_position_useable?(t.py-display_y())/display_scale():0;
+ return in;
 }
 static FILE* savefile(const char* dir,const char* name,const char* mode){char path[512];snprintf(path,sizeof path,"%s/save/%s",dir,name);return fopen(path,mode);}
 FILE* cpymo_backend_read_save(const char* dir,const char* name){return savefile(dir,name,"rb");}
@@ -736,7 +748,7 @@ int main(int argc,char** argv){
  free(scene_verify_pixels);scene_verify_pixels=NULL;FILE* verify_flag=savefile(game_dir,"nds-scene-verify.flag","rb");if(verify_flag){fclose(verify_flag);scene_verify_pixels=malloc(sizeof framebuffer);scene_state[7]=scene_verify_pixels!=NULL;}
  FILE* mask_flag=savefile(game_dir,"nds-maskbench.flag","rb");if(mask_flag){fclose(mask_flag);run_mask_bench();for(;;)swiWaitForVBlank();}
  FILE* bench_flag=savefile(game_dir,"nds-renderbench.flag","rb");if(bench_flag){fclose(bench_flag);run_render_bench();for(;;)swiWaitForVBlank();}
- nds_playing=true;nds_aux_refresh();
+ nds_playing=true;nds_display_start();nds_aux_refresh();
  if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\n%s\n",nds_runtime_mode_label());}else launcher_play_panel(NULL);
  // Count actual display interrupts; include missed frames during decoding/drawing.
  irqSet(IRQ_VBLANK,on_vblank);irqEnable(IRQ_VBLANK);
@@ -745,16 +757,13 @@ int main(int argc,char** argv){
  while(1){unsigned wakes=sleep_state[3];nds_power_poll();bool woke=sleep_state[3]!=wakes;if(woke)prev_tick=observed_tick=tickGetCount();swiWaitForVBlank();scanKeys();
  nds_audio_update();
  if(!debug_trace)launcher_update_toast();
- /* L+SELECT switches 3DS-style dual screen in one step; preserve legacy
-    standalone L screen swap and standalone SELECT quick-load. */
- bool dual_toggle=(keysDown()&(KEY_L|KEY_SELECT)) &&
-       (keysHeld()&(KEY_L|KEY_SELECT))==(KEY_L|KEY_SELECT);
- if(dual_toggle)nds_dual_toggle();
- if((keysDown()&KEY_L)&&!dual_toggle&&!nds_dual_mode){lcdSwap();screens_swapped=!screens_swapped;presentation_state[1]=screens_swapped;nds_aux_refresh();}
+ /* Three screen modes by a single L press:
+    classic scene top -> classic scene bottom -> enhanced split -> repeat. */
+ if(keysDown()&KEY_L)nds_display_cycle();
  nds_aux_poll();
  nds_clock_poll();
  if(keysDown()&KEY_START){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
- if((keysDown()&KEY_SELECT)&&!dual_toggle){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
+ if((keysDown()&KEY_SELECT)&&!(keysHeld()&KEY_L)){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
  unsigned now=vblank_count;u64 now_tick=tickGetCount();float dt=(float)(now_tick-prev_tick)/TICK_FREQ;prev_tick=now_tick;if(woke)sleep_state[10]=(unsigned)(dt*1000000);elapsed+=dt;bool redraw=false;
  bool saved_skip_policy=engine.config_skip_already_read_only;
  bool skip_override=false; /* L is now exclusively screen swap; skip policy comes from settings. */
