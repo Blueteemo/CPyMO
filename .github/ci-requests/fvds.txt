@@ -1,2 +1,2 @@
-1.2 milestone: verify bounded FVDS stage callbacks + audio PCM + existing stream/WAV tests.
-Request: 2026-10-22 stage host validation only; DS/DSi hardware validation deferred.
+1.2 milestone: validate FVDS I/P picture prefixes, 47,605-Hz stereo queue pacing, exact packet boundaries, rollback/skip and host WAV export.
+Requested 2026-10-22 after original bounded stage/PCM queue changes. DS/DSi SDK build intentionally deferred.
