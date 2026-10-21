@@ -24,3 +24,15 @@ The new stage does **not** decode a video frame, display RGB555 pixels, play sou
 The stage's video callbacks **must** be backed by a real frame decoder before the test mode is advertised as full FVDS playback. Avoid copying FastVideoDSPlayer sources while source redistribution/license status remains unresolved.
 
 Builds are requested explicitly via the existing `.github/ci-requests/...` mechanism; push-triggered per-commit CI is intentionally disabled.
+
+
+## 2026-10-22: coded picture metadata + bounded PCM producer/consumer
+
+To reduce the risk of mixing video decoder and ARM7/Maxmod ownership, two further self-contained units are implemented in this branch:
+
+1. **Picture-type precondition, not a decoder** — `fvds-picture-prefix-nds.h` reads the high bit of the little-endian first video word as I/P metadata. The container stream now labels its current indexed keyframe; `fvds-stage-nds.c` rejects a P picture in an indexed I position *before delivering any compressed frame content*. These are independently derived bitstream checks, and cannot reconstruct DCT coefficients, motion vectors, or pixels. The private j1 159-second sample was inspected offline: exactly **8 indexed I pictures** at frames 0, 251, 502, 753, 1004, 1255, 1506 and 1757, and **1900 P pictures** in the other positions; none contradicted the key index. No private payload is committed.
+2. **47,605-Hz stereo PCM queue, not a hardware player** — `fvds-pcm-queue-nds.[ch]` provides a caller-owned, single-thread ring with bounded occupancy, all-or-nothing 16-bit stereo writes, read wraparound, silence on underflow, overload refusal and counters. It has **no direct DMA, ARM7, Maxmod, synchronization or cache-coherence management**. A separate host test uses the *production FVDS stage* to decode 47 synthetic ADPCM pairs over three 12-fps frames and drains at exact integer-rational 47,605 Hz; a capacity of 8,192 stereo frames (32,768 bytes) absorbs frame-block scheduling variation with no underrun in that synthetic scenario. This 32-KiB budget is provisional until a real DS/DSi PCM audio sink is integrated and measured.
+
+The important distinction remains: video data callbacks receive **compressed** chunks, not RGB555 pixels. A completed full FVDS 1.2 player still needs an independently implemented video bitstream decoder, sound output using an explicit resource owner, and verified restoration of original display/BGM on skip, EOF and failure. This new queue is not IPC-safe without an explicit synchronization layer.
+
+All added code is original and contains no copied FastVideoDSPlayer implementation. New synthesized tests are shipped in the public GitHub repository; the user's original video samples remain private.
