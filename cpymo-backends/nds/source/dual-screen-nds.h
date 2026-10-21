@@ -73,10 +73,14 @@ static void nds_dual_save(const char* gamedir){
 static void nds_dual_toggle(void){
  nds_dual_mode=!nds_dual_mode;
  nds_dual_bottom_pass=false;
- if(nds_dual_mode && nds_aux_override){
+ if(nds_dual_mode){
+  /* Enhanced layout always means physical top = scene, bottom = dialogue. */
+  lcdMainOnTop();
+  screens_swapped=false;
+  presentation_state[1]=0;
   nds_aux_override=false;
-  nds_aux_refresh();
  }
+ nds_aux_refresh(); /* Repaint classic help panel only when leaving enhanced. */
  nds_dual_state[1]=nds_dual_mode;
  nds_dual_state[3]++;
  nds_dual_save(engine.assetloader.gamedir);
