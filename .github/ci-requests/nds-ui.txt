@@ -1,0 +1,1 @@
+2026-10-22 NDS UI visual-layout, L three-state saved preference, UTF16 banner CRC checkpoint. Host-only; do not pull devkitPro SDK.
