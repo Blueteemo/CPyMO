@@ -30,7 +30,9 @@ script=[
     "#say 系统,第一段返回剧情，请稍后查看检测报告。",
     "#say 系统,继续后检查第二段短视频容器。",
     "#movie CHECK3",
-    "#say 系统,FVDS 容器检测结束。接下来检查已有 NVL1 播放器。",
+    "#say 系统,接下来读取完整 FVDS 视频与音频数据。",
+    "#movie FULLJ1",
+    "#say 系统,FVDS 全片读取结束。接下来检查已有 NVL1 播放器。",
     "#say 系统,短片一：一秒画面及声音，等待自然结束。",
     "#movie NVL1S",
     "#say 系统,一秒视频已经返回剧情。",
@@ -81,4 +83,5 @@ def synthetic_fvds(frames):
     return data
 (ROOT/"video"/"CHECK1.fv").write_bytes(synthetic_fvds(12))
 (ROOT/"video"/"CHECK3.fv").write_bytes(synthetic_fvds(36))
+(ROOT/"video"/"FULLJ1.fv").write_bytes(synthetic_fvds(1908))
 print("Created synthetic FVDS preflight source:",ROOT)
