@@ -124,8 +124,8 @@ static const char* const extra_ui[2][63]={
 "2回タッチ / B: 情報 / X: 言語",
 "言語設定を保存しました",
 "SELECT: 言語 / B: 戻る",
-"DSi モード · 16 MiB",
-"DS モード · 4 MiB"},
+"DSi mode · 16 MiB",
+"DS mode · 4 MiB"},
 };
 static error_t jp_saved(char** out,int i){*out=malloc(96);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"スロット%dにセーブしました",i);return CPYMO_ERR_SUCC;}
 static error_t jp_failed(char** out,error_t e){const char* s=cpymo_error_message(e);*out=malloc(strlen(s)+64);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"セーブ失敗: %s",s);return CPYMO_ERR_SUCC;}
