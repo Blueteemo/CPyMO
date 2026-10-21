@@ -698,9 +698,11 @@ static void nds_base_draw(const cpymo_engine* e){cpymo_bg_draw(e);cpymo_scroll_d
 static void nds_engine_draw(const cpymo_engine* e){
  nds_menu_clock_visible=false;clock_state[9]=0;
  if(cpymo_ui_enabled(e)){
-  /* Exact 3DS category split: upper receives UI background, lower receives
-     interactive elements. Rendering only the old scene on the upper LCD
-     erased the actual authored menu background and looked unlike 3DS. */
+  /* Keep the live authored scene as the upper canvas. In contrast to the
+     first prototype, also render UI_BG on top (as CPyMO 3DS does), while
+     interactive UI_ELEMENT/UI_ELEMENT_BG are routed to the lower LCD.
+     This avoids an empty black top for menus lacking their own UI_BG. */
+  if(nds_dual_active()&&!nds_dual_bottom_pass)nds_base_draw(e);
   cpymo_engine_draw(e);
   return;
  }
