@@ -57,7 +57,8 @@ int nds_fvds_next(nds_fvds_stream *s,nds_fvds_packet *pkt){
  if(s->frame_index==s->frame_count)
   return cursor(s->file)==s->bytes?1:-5;
  uint32_t pos=cursor(s->file);
- if(s->frame_index==s->next_key_frame){
+ s->current_is_keyframe=(s->frame_index==s->next_key_frame);
+ if(s->current_is_keyframe){
   /* The header index must point to actual packet boundaries, not merely
      monotonically increasing offsets. Otherwise a bad seek could interpret
      compressed payload bytes as packet lengths and overrun buffers. */
