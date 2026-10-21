@@ -70,8 +70,8 @@ jobs:
           game=Path('pymo/games/fvds_probe_v12')
           manifest=json.loads((game/'nds-cache/manifest.json').read_text())
           clips=manifest['fvds_videos']
-          assert len(clips)==2 and {x['name'] for x in clips}=={'CHECK1','CHECK3'}
-          assert {x['frames'] for x in clips}=={12,36}
+          assert len(clips)==3 and {x['name'] for x in clips}=={'CHECK1','CHECK3','FULLJ1'}
+          assert {x['frames'] for x in clips}=={12,36,1908}
           assert not manifest['audit']['missing_resource_references']
           assert (game/'save/nds-fvds-probe.flag').is_file()
           assert (game/'save/nds-nvl-probe.flag').is_file()
