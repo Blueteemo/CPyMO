@@ -17,3 +17,4 @@ jobs:
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_layout.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_display_mode_prefs.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_rom_banner.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_visual_capture.py' -v
