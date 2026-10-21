@@ -64,10 +64,10 @@ int main(int argc,char**argv){
  nds_fvds_stage_callbacks callbacks={poll,begin,compressed_video,end,pcm};
  int status=0;
  while((status=nds_fvds_stage_step(&stream,&stage,&callbacks,&state))==0){}
- if(state.mode==0){
+ if(state.mode==0 || state.mode==5){
   REQUIRE(status==NDS_FVDS_STEP_EOF);
   REQUIRE(stage.completed_frames==3 && stage.audio_frames==47u*256u);
-  REQUIRE(stage.key_pictures==1 && stage.predicted_pictures==0);
+  REQUIRE(stage.key_pictures==1 && stage.predicted_pictures==(state.mode==5?1u:0u));
   REQUIRE(state.audio_blocks==47 && state.video_bytes==24);
   REQUIRE(state.begins==3 && state.ends==3);
   REQUIRE(state.last_pts==166666);
@@ -114,4 +114,12 @@ class FVDSStageTests(unittest.TestCase):
             bad_keyframe[36+4+1]|=0x80
             source.write_bytes(bad_keyframe)
             subprocess.run([str(binary),str(source),"4"],
+                           capture_output=True,text=True,check=True)
+            predicted=bytearray(sample())
+            # The second packet is intentionally non-key. A P flag is valid
+            # here, unlike in the first indexed I-picture.
+            second=36+(4+8+16*264)
+            predicted[second+4+1]|=0x80
+            source.write_bytes(predicted)
+            subprocess.run([str(binary),str(source),"5"],
                            capture_output=True,text=True,check=True)
