@@ -39,6 +39,7 @@ def inspect_fvds(filename, hash_file=False):
         require(0 < rate <= 96000 and channels in (1, 2), "Bad audio configuration")
         require(0 < frames <= 108000, "Frame count beyond safety bound")
         require(0 < key_count <= frames, "Bad keyframe count")
+        require(key_count <= 4096, "Keyframe index too large for NDS research")
         data_start = HEADER.size + key_count * KEY.size
         require(data_start + frames * UINT.size <= size, "Keyframes/frames exceed file bounds")
         keys = []
@@ -61,6 +62,7 @@ def inspect_fvds(filename, hash_file=False):
             require(size - position >= 4, "Truncated per-frame size field")
             value, = UINT.unpack(f.read(4))
             video_length, blocks = value & 0x1FFFF, value >> 17
+            require(0 < blocks <= 255, "Bad per-frame ADPCM block count")
             require(video_length > 0 and video_length % 4 == 0,
                     "Bad video length/alignment")
             audio_length = blocks * channels * AUDIO_BLOCK_SIZE
