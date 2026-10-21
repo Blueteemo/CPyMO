@@ -115,8 +115,9 @@ static void launcher_scan(const char* hint){
 
 }
 static void launcher_rect(int x,int y,int w,int h,u16 color){for(int yy=y;yy<y+h&&yy<192;yy++)for(int xx=x;xx<w+x&&xx<256;xx++)if(xx>=0&&yy>=0)framebuffer[yy*256+xx]=color|BIT(15);}
-/* The visible track stays 4px wide; the 14px-wide touch target on its left
- * is reserved only when there are more than four games. */
+/* Preserve R5's full-width game rows and 4px visual track. The 14px
+ * touch target is hit testing only (partly overlapping the visually blank
+ * right edge of a row), so increased usability does not change appearance. */
 #define LAUNCHER_SCROLL_Y 33
 #define LAUNCHER_SCROLL_H 121
 #define LAUNCHER_SCROLL_TOUCH_X 242
@@ -381,7 +382,7 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
- launcher_rect(6,y,launcher_count>4?236:244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
+ launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,160,accent,250);launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,178,muted,250);}
