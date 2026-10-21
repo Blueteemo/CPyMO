@@ -34,7 +34,8 @@ int main(int argc,char**argv){
  CHECK(!nds_capture_armed);
  CHECK(nds_capture_begin(1,top)==NULL);
  char flag[512];
- CHECK(snprintf(flag,sizeof flag,"%s/save/nds-visual-capture.flag",argv[1])<sizeof flag);
+ int n=snprintf(flag,sizeof flag,"%s/save/nds-visual-capture.flag",argv[1]);
+ CHECK(n>0 && (size_t)n<sizeof flag);
  FILE*f=fopen(flag,"wb");CHECK(f);CHECK(fclose(f)==0);
  nds_capture_init(argv[1]);
  CHECK(nds_capture_armed);
