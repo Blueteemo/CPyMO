@@ -89,12 +89,14 @@ static void test_two_picture_preroll(const char *filename){
  CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==0);
  CHECK(c.queue.queued==8192);
  for(unsigned presentation=0;presentation<3;presentation++){
-  if(presentation+2<3)
-   CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==0);
   size_t demand=nds_fvds_pcm_interval(presentation,12,1,47605);
   CHECK(demand<=4096);
   CHECK(nds_fvds_pcm_queue_drain(&c.queue,output,demand)==demand);
   for(size_t i=0;i<2*demand;i++)CHECK(output[i]==0);
+  /* Once presentation consumes a picture interval, exactly one upcoming
+     picture may be produced into the regained queue headroom. */
+  if(presentation+2<3)
+   CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==0);
  }
  CHECK(stage.completed_frames==3);
  CHECK(c.queue.underflows==0 && c.queue.overflows==0);
