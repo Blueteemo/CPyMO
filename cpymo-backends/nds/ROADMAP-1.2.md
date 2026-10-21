@@ -72,3 +72,25 @@ python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_fvds_insp
 Expected private j1 input SHA-256: `8b2a560f37019b0db470d3e1077f225489d1df94b1daa9faabc3f3024a43a2e8`. The sample is **not** in the GitHub repository.
 
 The suggested hand-drawn 32×32 icon is a separate art track, and the accepted R7 list/UI appearance remains untouched by this milestone.
+
+## Real DSi hardware acceptance — user's seven-stage test (2026-10-22)
+
+Source of truth: private `save.zip` returned from user's original DSi. The user explicitly confirmed that **launching the ROM from console SD runs in TWL / DSi mode** and reported all on-screen behavior normal. The console-SD launched process **cannot reverse-access the DSpico TF volume**, contrary to earlier two-way interpretations. The experimentally supported direction is flashcart-launch accessing `sd:`; no assumption of symmetric mounts. All seven report files below state `mode=DSi-TWL`.
+
+| Game test | Exact real-hardware trace | Result |
+| --- | --- | --- |
+| FVDS CHECK1 | `OK code=0`, `frames=12/12`, payload `66248` B, checksum `D7819B62`, `38733` us | PASS, preflight only |
+| FVDS CHECK3 | `OK code=0`, `frames=36/36`, payload `176072` B, checksum `2898659E`, `99473` us | PASS, preflight only |
+| FVDS FULLJ1 | `OK code=0`, `frames=1908/1908`, `file_bytes=12942736`, payload `12935012` B, checksum `56159179`, `7040097` us | PASS, full-container **read only**, NOT movie decode |
+| NVL1S | `EOF error=0`, decoded/presented `12/12`, `late=0`, `audio_samples=22138`, elapsed `1066` ms | PASS, video path |
+| NVA3S | `EOF error=0`, decoded/presented `36/36`, `late=0`, `audio_samples=66492`, elapsed `3075` ms | PASS, NAR2 audio path |
+| NVL20S | `EOF error=0`, decoded/presented `240/240`, `late=0`, `audio_samples=441107`, elapsed `20075` ms | PASS, full 20-second playback |
+| NOFILE | `MISSING error=1`, decoded/presented `0/0`, `late=0` | PASS, expected graceful missing-resource behavior |
+
+All three FVDS payload checksums match the independently established host expectations. Long-file preflight took **7.040097 seconds on real DSi TWL**; do not confuse this offline read/verify rate with media decode or audiovisual playback speed.
+
+Note: NVL20S returned `EOF`, *not* `SKIPPED`, so the **B-button early-skip behavior remains untested**. User confirmed visual behavior, but the reported logs do not independently prove subjective audio fidelity, uninterrupted BGM restoration, or exact audio/video synchronization. The frame counter `late=0` is the NVL wrapper's own late-frame counter, not a physical proof of zero jitter. Ordinary **NTR 4 MiB DS/R4 hardware remains untested** for this new integration. Keep these acceptance gates open for 1.2.
+
+The user also requested visual alignment of the top game-selection heading and right-hand time. The **1.2 experimental branch only** now moves the 48×18 clock patch from `y=4` to `y=6` (foreground from `y=5` to `y=7`), matching the heading starting at y=7. This source change has not yet received physical user approval. **The R7 stable branch stays unchanged.**
+
+Next major task: plan an *independent, permission-safe* FVDS decode/display adapter with bounded memory and explicit recovery of CPyMO's existing NTR/TWL ARM7, Maxmod and VRAM ownership. The already verified FVDS read-only probe is not a player and cannot justify a 1.2 release alone.
