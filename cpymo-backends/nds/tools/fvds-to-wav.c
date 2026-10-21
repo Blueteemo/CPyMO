@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 static int word16(FILE*f,uint16_t value){
  return fputc(value&255,f)!=EOF && fputc(value>>8,f)!=EOF;
@@ -26,6 +27,16 @@ static int wav_header(FILE*f,uint32_t data_size,uint32_t rate){
 }
 int main(int argc,char**argv){
  if(argc!=3){fprintf(stderr,"usage: fvds-to-wav input.fv output.wav\n");return 2;}
+ /* Never truncate the source: output may alias input via symlink or
+    hardlink even when the supplied path strings differ. */
+ struct stat source_stat, output_stat;
+ if(!strcmp(argv[1],argv[2]) ||
+    (!stat(argv[1],&source_stat) && !stat(argv[2],&output_stat) &&
+     source_stat.st_dev==output_stat.st_dev &&
+     source_stat.st_ino==output_stat.st_ino)){
+  fprintf(stderr,"Source and destination refer to the same file\n");
+  return 2;
+ }
  nds_fvds_stream input;
  if(nds_fvds_open(&input,argv[1])){
   fprintf(stderr,"Invalid or inaccessible FVDS source\n");return 3;
