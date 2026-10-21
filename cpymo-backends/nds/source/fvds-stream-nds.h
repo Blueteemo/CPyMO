@@ -14,6 +14,10 @@ typedef struct {
  uint32_t data_offset, fps_num, fps_den;
  uint16_t width, height, sample_rate, channels;
  uint32_t video_remaining, audio_remaining, packet_end;
+ /* Check packet boundary against the index without caching all keyframes.
+  * These are the NEXT expected keyframe coordinates, updated by fseek
+  * only when a keyframe is crossed (usually hundreds of frames apart). */
+ uint32_t next_key_index, next_key_frame, next_key_offset;
  unsigned packet_open;
 } nds_fvds_stream;
 
