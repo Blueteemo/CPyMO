@@ -1,1 +1,1 @@
-2026-10-22 NDS UI visual-layout, L three-state saved preference, UTF16 banner CRC checkpoint. Host-only; do not pull devkitPro SDK.
+2026-10-22 native RGB555 visual capture milestone: test actual C buffer writer, opt-in zero-default capture, magic/header dimensions, source-accurate two-screen PNG converter, and earlier 3DS-like UI layout/config/banner host regressions. No devkitPro build, no user hardware action.
