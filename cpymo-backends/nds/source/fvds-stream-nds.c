@@ -38,6 +38,9 @@ int nds_fvds_open(nds_fvds_stream *s,const char *filename){
   prior_frame=frame;prior_pos=pos;
  }
  if(!goto_offset(s->file,s->data_offset))goto invalid;
+ s->next_key_index=0;
+ s->next_key_frame=0;
+ s->next_key_offset=s->data_offset;
  return 0;
 invalid:
  nds_fvds_close(s);
@@ -54,6 +57,25 @@ int nds_fvds_next(nds_fvds_stream *s,nds_fvds_packet *pkt){
  if(s->frame_index==s->frame_count)
   return cursor(s->file)==s->bytes?1:-5;
  uint32_t pos=cursor(s->file);
+ if(s->frame_index==s->next_key_frame){
+  /* The header index must point to actual packet boundaries, not merely
+     monotonically increasing offsets. Otherwise a bad seek could interpret
+     compressed payload bytes as packet lengths and overrun buffers. */
+  if(pos!=s->next_key_offset)return -6;
+  if(s->next_key_index+1<s->keyframe_count){
+   uint8_t key[8];
+   if(!goto_offset(s->file,28+(s->next_key_index+1)*8) ||
+      !read_exact(s->file,key,8) ||
+      !goto_offset(s->file,pos))return -7;
+   s->next_key_index++;
+   s->next_key_frame=u32le(key);
+   s->next_key_offset=u32le(key+4);
+  }else{
+   s->next_key_index=s->keyframe_count;
+   s->next_key_frame=s->frame_count;
+   s->next_key_offset=s->bytes;
+  }
+ }
  if(pos==UINT32_MAX||pos>s->bytes||s->bytes-pos<4||
     !read_exact(s->file,word,4))return -2;
  uint32_t value=u32le(word);
@@ -100,5 +122,6 @@ int nds_fvds_seek_keyframe(nds_fvds_stream *s,uint32_t index){
  if(frame>=s->frame_count||pos<s->data_offset||pos>=s->bytes||
     !goto_offset(s->file,pos))return -3;
  s->frame_index=frame;s->packet_open=0;s->video_remaining=0;s->audio_remaining=0;
+ s->next_key_index=index;s->next_key_frame=frame;s->next_key_offset=pos;
  return 0;
 }
