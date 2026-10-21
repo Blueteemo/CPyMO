@@ -87,3 +87,17 @@ Latest 1.2 enhanced display work is now based on an explicit comparison against 
 - Hardware plan: aim for ~2–3 **concentrated** real-device sessions: (1) enhanced 3DS-like visual and three-layout touch test, (2) real FVDS decoded audio/video playback and B skip when integrated, (3) optional final release candidate across TWL/NTR; deviations or performance defects may require extras. The two major feature lines remain gated separately.
 
 No DSi visual acceptance is claimed yet. Do not publish 1.2 until the actual hardware UI, real FVDS video decode and ARM7 audio path are verified. Stable R7 and current version metadata stay unchanged.
+
+
+## 2026-10-22 — exact-source enhanced dual-LCD capture milestone
+
+The user rejected fabricated high-resolution AI art as unusable for judging CPyMO 1.2 UI. The development branch now has a **fully opt-in, actual framebuffer export** rather than a fictional design mockup:
+
+- `visual-capture-nds.h` is included in the actual `cpymo-backends/nds/source/main.c` dual-LCD draw path. Only if `<game>/save/nds-visual-capture.flag` exists at game start, the first real enhanced dialogue and first real enhanced menu each save **two exact 256×192 RGB555 framebuffer images** (top then bottom). Without the flag: no file writes, no second frame allocation and no test-mode drawing.
+- The 16-byte `NDSPIX1` header contains real width/height, two-screen count and dialogue/menu kind. Each capture is approximately 192 KiB and is intentionally omitted from performance/audio timing tests.
+- `tools/nds-capture-to-png.py` converts this captured RGB555 data into two native-resolution RGB PNG files **without dependencies, art generation, upscaling or simulated visuals**.
+- Regression tests `test_nds_visual_capture.py` and `test_nds_visual_capture_c.py` validate both the pure-Python converter and **actual production C frame writer**, including opt-in behavior, buffer dimensions, RGB555 channels, raw header, two-screen split, per-mode one-shot guards, PNG signature/chunk CRCs and malformed files. Synthetic test pixels are used **only for automated assertions** and must not be presented as screenshots of the game.
+- The dedicated SDK-independent [NDS UI Host Regression run 39694100531](https://github.com/Blueteemo/CPyMO/actions/runs/39694100531) passed, without devkitPro package downloads or a full NDS build.
+- The most recent .nds for this exact capture instrumentation remains **unbuilt/unverified** because full NDS CI previously hit devkitPro package-index HTTP 403; no running emulator is available in the current execution environment. An authentic image preview can be claimed only after the opt-in pixels have been recorded by the actual DSi or working emulator in the user's next already-planned concentrated UI test, **not** from synthetic fixtures.
+
+No update to 1.1.0 / stable R7; no new user test requested now. Continue FVDS video frame decoder work separately.
