@@ -283,6 +283,8 @@ static void nds_clock_sync_aux_visibility(void){
  nds_aux_clock_suppressed=suppress;nds_clock_patch_aux(!suppress);
 }
 static void launcher_play_panel(const char* message){
+ /* Enhanced mode owns the sub LCD; never repaint it with the classic help UI. */
+ if(nds_dual_active())return;
  if(nds_aux_hidden()){if(launcher_sub)dmaFillHalfWords(BIT(15),launcher_sub,256*192*2);return;}
  u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
@@ -297,6 +299,7 @@ static void launcher_play_panel(const char* message){
 }
 static void nds_clock_poll(void){
  nds_clock_sample();if(!nds_clock_pending)return;nds_clock_pending=false;
+ if(nds_dual_active())return; /* sub LCD belongs to enhanced dialogue/UI */
  if(nds_menu_clock_visible&&cpymo_ui_enabled(&engine))cpymo_engine_request_redraw(&engine);
  if(nds_aux_hidden()){clock_state[8]++;return;}
  if(!nds_menu_clock_visible)nds_clock_patch_aux(true);
