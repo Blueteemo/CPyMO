@@ -92,7 +92,10 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"选择游戏 · X 语言","Select game / X: Language"},
  {"轻触两次启动 · B 关于 · X 语言","Tap twice / B: About / X: Lang"},
  {"语言设置已保存","Language preference saved"},
- {"SELECT: 语言 / B: 返回","SELECT: Language / B: Back"}
+ {"SELECT: 语言 / B: 返回","SELECT: Language / B: Back"},
+ /* Runtime profile: native mode detection, not a console-model guess. */
+ {"DSi 模式 · 16 MiB","DSi mode · 16 MiB"},
+ {"DS 模式 · 4 MiB","DS mode · 4 MiB"}
 };
 #include "ui-language-extra.h"
 int nds_language_choice_get(void){return preference;}
