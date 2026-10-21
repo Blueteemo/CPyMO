@@ -75,9 +75,37 @@ static void test_boundaries(void){
  nds_fvds_pcm_queue_reset(&q);
  CHECK(!q.queued && !q.underflows && !q.overflows);
 }
+static void test_two_picture_preroll(const char *filename){
+ nds_fvds_stream stream;
+ nds_fvds_stage stage={0};
+ int16_t memory[2*8192],output[2*4096];
+ test_context c={0};
+ const nds_fvds_stage_callbacks callbacks={NULL,begin,chunk,end,pcm};
+ CHECK(nds_fvds_pcm_queue_init(&c.queue,memory,8192));
+ CHECK(nds_fvds_open(&stream,filename)==0);
+ /* Decode two genuine packets before the presentation clock starts.
+    Do not inject fake silence as an artificial warmup. */
+ CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==0);
+ CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==0);
+ CHECK(c.queue.queued==8192);
+ for(unsigned presentation=0;presentation<3;presentation++){
+  if(presentation+2<3)
+   CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==0);
+  size_t demand=nds_fvds_pcm_interval(presentation,12,1,47605);
+  CHECK(demand<=4096);
+  CHECK(nds_fvds_pcm_queue_drain(&c.queue,output,demand)==demand);
+  for(size_t i=0;i<2*demand;i++)CHECK(output[i]==0);
+ }
+ CHECK(stage.completed_frames==3);
+ CHECK(c.queue.underflows==0 && c.queue.overflows==0);
+ CHECK(c.queue.high_watermark==8192);
+ CHECK(nds_fvds_stage_step(&stream,&stage,&callbacks,&c)==1);
+ nds_fvds_close(&stream);
+}
 int main(int argc,char **argv){
  CHECK(argc==2);
  test_boundaries();
+ test_two_picture_preroll(argv[1]);
  int16_t memory[2*8192];
  int16_t out[2*4096];
  test_context c={0};
