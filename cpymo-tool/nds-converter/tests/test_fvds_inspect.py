@@ -27,7 +27,7 @@ class FVDSInspectorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "synthetic.fv"
             path.write_bytes(raw)
-            return inspect_fvds(path, hash_file=True)
+            return inspect_fvds(path, hash_file=True, payload_hash=True)
 
     def test_synthetic_fixture(self):
         info = self.inspect(sample())
@@ -38,6 +38,9 @@ class FVDSInspectorTest(unittest.TestCase):
         self.assertEqual(info["audio_bytes"], 47 * 264)
         self.assertEqual(info["container_exact_bytes"], info["size_bytes"])
         self.assertEqual(len(info["sha256"]), 64)
+        self.assertEqual(info["payload_read_bytes"],
+                         info["video_payload_bytes"]+info["audio_bytes"])
+        self.assertEqual(len(info["payload_fnv1a32"]),8)
 
     def test_bad_first_keyframe(self):
         with self.assertRaises(FVDSFormatError):
