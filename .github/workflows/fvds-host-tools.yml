@@ -1,0 +1,44 @@
+name: FVDS Host Audio Tools
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/nds-v1.2-integration
+    paths:
+      - cpymo-backends/nds/source/fvds-stream-nds.c
+      - cpymo-backends/nds/source/fvds-stream-nds.h
+      - cpymo-backends/nds/source/fvds-adpcm-nds.c
+      - cpymo-backends/nds/source/fvds-adpcm-nds.h
+      - cpymo-backends/nds/tools/fvds-to-wav.c
+      - cpymo-tool/nds-converter/tests/test_fvds_audio_pipeline.py
+      - cpymo-tool/nds-converter/tests/test_fvds_adpcm.py
+      - cpymo-tool/nds-converter/tests/test_fvds_stream.py
+      - cpymo-tool/nds-converter/tests/test_fvds_wav_export.py
+      - .github/workflows/fvds-host-tools.yml
+permissions:
+  contents: read
+jobs:
+  linux-host-audio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Build independent FVDS container and ADPCM WAV exporter
+        run: |
+          mkdir -p dist
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -I cpymo-backends/nds/source \
+            cpymo-backends/nds/source/fvds-stream-nds.c \
+            cpymo-backends/nds/source/fvds-adpcm-nds.c \
+            cpymo-backends/nds/tools/fvds-to-wav.c \
+            -o dist/fvds-to-wav
+          chmod +x dist/fvds-to-wav
+      - name: Execute native regressions with sanitizers
+        run: |
+          python -m unittest discover -s cpymo-tool/nds-converter/tests \
+            -p 'test_fvds_*.py' -v
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-FVDS-Host-WAV-Decoder
+          path: dist/fvds-to-wav
+          retention-days: 14
+          if-no-files-found: error
