@@ -45,7 +45,7 @@ static float nds_dual_say_offset(void){
     cpymo_ui_enabled(&engine))return 0;
  float height=(float)engine.gameconfig.imagesize_h;
  float box_h=height*.25f;
- if(engine.say.msgbox && engine.say.namebox && engine.say.msgbox_h>0){
+ if(engine.say.msgbox && engine.say.namebox && engine.say.msgbox_h>0 && engine.say.msgbox_w>0){
   box_h=(float)engine.say.msgbox_h *
     ((float)engine.gameconfig.imagesize_w/(float)engine.say.msgbox_w);
  }
