@@ -31,6 +31,7 @@ jobs:
           mkdir -p pymo/games
           python cpymo-tool/nds-converter/convert.py convert /tmp/fvds_probe_src pymo/games/fvds_probe_v12 --ffmpeg ffmpeg --cache-only --video-fvds --missing-glyph-policy box --cache-layout sharded
           python cpymo-tool/nds-converter/convert.py verify pymo/games/fvds_probe_v12
+          printf "FVDS preflight only\n" > pymo/games/fvds_probe_v12/save/nds-fvds-probe.flag
       - name: Verify source and converted assets
         run: |
           python - <<'PY'
@@ -42,7 +43,7 @@ jobs:
           assert len(clips)==2 and {x['name'] for x in clips}=={'CHECK1','CHECK3'}
           assert {x['frames'] for x in clips}=={12,36}
           assert not manifest['audit']['missing_resource_references']
-          assert (game/'nds-fvds-probe.flag').is_file()
+          assert (game/'save/nds-fvds-probe.flag').is_file()
           assert (game/'script/START.txt').is_file()
           assert all((game/x['path']).is_file() for x in clips)
           assert not (game/'video').exists()
