@@ -1,6 +1,6 @@
 # CPyMO for NDS/DSi · Experimental development record
 
-This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library`, `codex/nds-dsi-library-scrollbar`, and `codex/nds-dsi-runtime-ui-cache`, and `codex/nds-dsi-library-touch-scroll`. The published `nds-v1.1.0` release remains unchanged.
+This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library`, `codex/nds-dsi-library-scrollbar`, and `codex/nds-dsi-runtime-ui-cache`, `codex/nds-dsi-library-touch-scroll`, and `codex/nds-dsi-asset-cache-r7`. The published `nds-v1.1.0` release remains unchanged.
 
 ## Hardware confirmation (2026-10-21)
 
@@ -43,6 +43,15 @@ This document records verified facts separately from hypotheses. It covers follo
 - Four or fewer games: no scrollbar, no 14px touch zone, original 244px-wide rows and original single/double-tap game entry. D-pad, page moves, refresh and selected-game restoration remain available for larger lists as before.
 - Acceptance: (1) with 5 games scroll thumb down until items 2..5 are visible; (2) tap item 5 once to select and again to launch; (3) hold thumb and return to 1..4; (4) test an ordinary 4-game collection; (5) confirm dual-card games still launch.
 - These are viewport interactions, not new CPyMO core commands or save formats; no file-system writes occur during a drag.
+
+## R7: Visual restoration + runtime-bounded TWL background reuse
+
+- Following R6 real-hardware testing, the user explicitly requested that the wider invisible stylus hit region **not narrow the visible game rows**. Restored the exact R5 row rectangle (`x=6, width=244, height=28`) for **every** game count. The original visible scrollbar remains x=251..254; the R6 14-pixel touch target still works invisibly at x=242..255, only for collections over four games. Preserve the improved vertical position of the selected-game overview title; no further graphic redesign.
+- In TWL **with the proven >=8 MiB heap window**, the same 12-entry / 2 MiB *shared* recent-image LRU can now retain `bg` backgrounds as well as `chara` sprites. Background revisits can reuse decoded RGB555 image buffers rather than re-read/re-decode their `.npi` asset files. No extra cache is preallocated beyond the existing R5 LRU slots, and caching is bounded by actual decoded image costs.
+- In NTR, background caching is **not activated**. The existing 6-entry / 384 KiB sprite-only behavior and original image-read pipeline remain unchanged.
+- For performance A/B or troubleshooting, a per-game `nds-bg-cache.txt` containing character `0` disables only the new TWL background caching; absent or other content defaults to enabled when TWL memory permits. This is not a new CPyMO script command, save format or cache variant.
+- Optional internal read-only `background_cache_state` counters track actual BG hits, misses, successful stores and skips. Increased performance and RAM stability still require hardware confirmation, preferably revisiting the same background multiple times; a sequential tour of 12 different scenes may have no measurable cache-hit benefit.
+- This version targets **fewer repeated resource reads**, **not smaller on-disk game files**. Image/audio compression and file-size reduction remain separate research tasks.
 
 ## Next functional milestone: video
 
