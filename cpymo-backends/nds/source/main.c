@@ -506,7 +506,8 @@ cpymo_input cpymo_input_snapshot(){
     A wake-up touch is blocked by nds_aux_poll when Y hid the sub LCD. */
  bool touch=!nds_touch_blocked&&(k&KEY_TOUCH);
  bool screen_coords=nds_display_mode==1||
-       (nds_dual_active()&&cpymo_ui_enabled(&engine));
+       (nds_dual_active() &&
+        (cpymo_ui_enabled(&engine) || nds_dual_has_choice()));
  in.ok=(k&KEY_A)||(touch&&!screen_coords);
  in.mouse_button=touch&&screen_coords;
  in.mouse_position_useable=in.mouse_button;
@@ -558,6 +559,38 @@ extern void nds_audio_resume(void);
 static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3];if(!pmMainLoop())exit(0);if(wakes!=sleep_state[3])nds_aux_refresh();}
 #include "launcher.h"
 #include "aux-screen-nds.h"
+/* Refined lower-LCD presentation for the 1.2 enhanced screen.
+ * Native RGB555 decoration sits BEHIND the game's own speaker/name/text.
+ * Do not stretch a captured upper screen or allocate a second framebuffer.
+ * Menus/choices use a less decorated canvas to preserve hit-test contrast. */
+static void nds_dual_lower_background(bool ui,bool choices){
+ const bool interactive=ui||choices;
+ for(unsigned y=0;y<192;y++){
+  unsigned tone=y<26?1:0;
+  u16 col=interactive?(tone?RGB15(5,10,15):RGB15(3,6,10)):
+       (tone?RGB15(5,9,13):RGB15(3,6,10));
+  for(unsigned x=0;x<256;x++)framebuffer[y*256+x]=col|BIT(15);
+  if((y&31u)==0)nds_audio_pump_if_due();
+ }
+ /* Integrated trim is deliberately subtle, not a second text box.
+    The game can draw a large opaque or transparent message window over it. */
+ u16 edge=RGB15(10,15,19)|BIT(15),subtle=RGB15(6,11,16)|BIT(15);
+ unsigned top=interactive?14:27;
+ for(unsigned x=12;x<244;x++){
+  framebuffer[top*256+x]=edge;
+  framebuffer[182*256+x]=subtle;
+ }
+ for(unsigned y=top;y<=182;y++){
+  framebuffer[y*256+12]=subtle;
+  framebuffer[y*256+243]=subtle;
+ }
+ if(!interactive){
+  /* Speaker/copy area: accent never overlaps dialogue glyphs. */
+  u16 accent=RGB15(15,22,25)|BIT(15);
+  for(unsigned x=12;x<42;x++)framebuffer[27*256+x]=accent;
+  for(unsigned y=22;y<27;y++)framebuffer[y*256+12]=accent;
+ }
+}
 static PmEventCookie sleep_cookie;
 static u64 sleep_started;
 static void nds_power_event(void* user,PmEvent event){
@@ -666,7 +699,12 @@ static void nds_base_draw(const cpymo_engine* e){cpymo_bg_draw(e);cpymo_scroll_d
 static void nds_engine_draw(const cpymo_engine* e){
  nds_menu_clock_visible=false;clock_state[9]=0;
  if(cpymo_ui_enabled(e)){
-  if(nds_dual_active()&&!nds_dual_bottom_pass)nds_base_draw(e);
+  if(nds_dual_active()&&!nds_dual_bottom_pass){
+   /* Rendering the normal UI on the bottom must not blank the upper scene. */
+   nds_dual_force_scene=true;
+   nds_base_draw(e);
+   nds_dual_force_scene=false;
+  }
   else cpymo_engine_draw(e);
   return;
  }
@@ -804,9 +842,14 @@ int main(int argc,char** argv){
       on the upper LCD and the existing VRAM and ARM7 owners. No extra heap
       framebuffer; reuse the RAM draw surface after publishing the top. */
    nds_dual_bottom_pass=true;
-   for(unsigned i=0;i<256*192;i++)framebuffer[i]=RGB15(3,5,8)|BIT(15);
+   nds_dual_lower_background(cpymo_ui_enabled(&engine),nds_dual_has_choice());
    if(cpymo_ui_enabled(&engine))cpymo_engine_draw(&engine);
-   else cpymo_say_draw(&engine);
+   else{
+    cpymo_say_draw(&engine);
+    if(nds_dual_has_choice())cpymo_select_img_draw(&engine.select_img,
+       engine.gameconfig.imagesize_w,engine.gameconfig.imagesize_h,
+       engine.gameconfig.grayselected);
+   }
    DC_FlushRange(framebuffer,sizeof framebuffer);
    dmaCopy(framebuffer,launcher_sub,sizeof framebuffer);
    nds_dual_bottom_pass=false;
