@@ -1,0 +1,56 @@
+name: FVDS Preflight Game
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/nds-v1.2-video-foundation
+    paths:
+      - cpymo-tool/nds-converter/tests/make_fvds_probe_game.py
+      - cpymo-tool/nds-converter/fvds_inspect.py
+      - cpymo-tool/nds-converter/convert.py
+      - .github/workflows/fvds-probe-fixture.yml
+permissions:
+  contents: read
+jobs:
+  build-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install converter prerequisites
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Generate original PyMO source
+        run: python cpymo-tool/nds-converter/tests/make_fvds_probe_game.py /tmp/fvds_probe_src
+      - name: Convert with opt-in FVDS preflight caches
+        run: |
+          mkdir -p pymo/games
+          python cpymo-tool/nds-converter/convert.py convert /tmp/fvds_probe_src pymo/games/fvds_probe_v12 --ffmpeg ffmpeg --cache-only --video-fvds --missing-glyph-policy box --cache-layout sharded
+          python cpymo-tool/nds-converter/convert.py verify pymo/games/fvds_probe_v12
+      - name: Verify source and converted assets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          game=Path('pymo/games/fvds_probe_v12')
+          manifest=json.loads((game/'nds-cache/manifest.json').read_text())
+          clips=manifest['fvds_videos']
+          assert len(clips)==2 and {x['name'] for x in clips}=={'CHECK1','CHECK3'}
+          assert {x['frames'] for x in clips}=={12,36}
+          assert not manifest['audit']['missing_resource_references']
+          assert (game/'nds-fvds-probe.flag').is_file()
+          assert (game/'script/START.txt').is_file()
+          assert all((game/x['path']).is_file() for x in clips)
+          assert not (game/'video').exists()
+          print('FVDS probe source/asset checks: OK')
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-FVDS-Preflight-Synthetic-PyMO-Game
+          path: pymo/games/fvds_probe_v12/
+          if-no-files-found: error
+          retention-days: 30
