@@ -1,6 +1,6 @@
 # CPyMO for NDS/DSi · Experimental development record
 
-This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library`, `codex/nds-dsi-library-scrollbar`, and `codex/nds-dsi-runtime-ui-cache`. The published `nds-v1.1.0` release remains unchanged.
+This document records verified facts separately from hypotheses. It covers follow-on experimental branches derived from `codex/nds-dsi-runtime-experiment`, including `codex/nds-dsi-dual-card-library`, `codex/nds-dsi-library-scrollbar`, and `codex/nds-dsi-runtime-ui-cache`, and `codex/nds-dsi-library-touch-scroll`. The published `nds-v1.1.0` release remains unchanged.
 
 ## Hardware confirmation (2026-10-21)
 
@@ -33,6 +33,16 @@ This document records verified facts separately from hypotheses. It covers follo
 - Before relying on the native splash font, ensure every glyph is in `ui_fallback_codes`. Japanese technical mode labels use supported ASCII `mode` because `モ` is absent from the shipping minimal font subset.
 - This release also enables up to **12 recent character-image cache entries** on TWL if the bounded 2 MiB heap-budget policy activates; ordinary DS remains at the same six cached images and 384 KiB byte budget. A larger maximum does not allocate 2 MiB in advance, and does not claim proven real-world speedup.
 - No engine scripts, save format, default card behavior, or 1.1.0 release were changed. R5 needs real-hardware regression, especially the NTR label under real DS/R4 and load/eviction under TWL.
+
+## R6: Touch scrolling and library header alignment
+
+- User confirmed R5 runtime-label/caching build works on the real DSi (2026-10-21). The existing Japanese `NDS移植` credits use natural no-space Japanese typesetting, rather than a missing gap; keep the current credit translation.
+- The selected-game overview header `游戏资料库` retains its x=74 anchor and icon; y moves from 46 to 53 to better align a 16px title with the 48px icon center (icon y=39..86). No layout or text change on the game list header.
+- With more than four games, keep the original 4px visible scrollbar on the far right, but reserve a 14px touch target (x=242..255). Reduce the selected row background width only in this mode so the touch gutter is unambiguous.
+- Pressing the thumb captures the gesture *without jumping*; holding and dragging shifts the 4-row viewport continuously, with a clamped selection always inside the visible window. Touching empty track space jumps proportionally. Capture remains active if the stylus leaves the gutter until the touchscreen is released.
+- Four or fewer games: no scrollbar, no 14px touch zone, original 244px-wide rows and original single/double-tap game entry. D-pad, page moves, refresh and selected-game restoration remain available for larger lists as before.
+- Acceptance: (1) with 5 games scroll thumb down until items 2..5 are visible; (2) tap item 5 once to select and again to launch; (3) hold thumb and return to 1..4; (4) test an ordinary 4-game collection; (5) confirm dual-card games still launch.
+- These are viewport interactions, not new CPyMO core commands or save formats; no file-system writes occur during a drag.
 
 ## Next functional milestone: video
 
