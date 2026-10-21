@@ -9,6 +9,8 @@ static bool nvl_read(FILE* f,void* dst,unsigned n){
  unsigned done=0;while(done<n){unsigned k=n-done;if(k>8192)k=8192;if(fread((unsigned char*)dst+done,1,k,f)!=k)return false;done+=k;nds_audio_pump_if_due();}return true;
 }
 error_t __wrap_cpymo_movie_play(cpymo_engine* e,cpymo_str name){
+ /* Probe is strictly opt-in and non-decoding; regular NVL playback is unchanged. */
+ if(nds_fvds_preflight(e,name))return CPYMO_ERR_SUCC;
  FILE* audio_verify=savefile(e->assetloader.gamedir,"nds-video-verify.flag","rb");nds_movie_audio_verify(audio_verify!=NULL);if(audio_verify)fclose(audio_verify);
  movie_state[2]++;char path[512];nds_cache_path(path,sizeof path,e->assetloader.gamedir,"video",name,".nvl");
  FILE* f=fopen(path,"rb");if(!f){movie_state[8]++;engine_state[45]++;return CPYMO_ERR_SUCC;}
