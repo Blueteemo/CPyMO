@@ -578,8 +578,11 @@ static void nds_dual_lower_background(bool ui,bool choices){
  u16 upper=RGB15(12,18,23)|BIT(15),muted=RGB15(7,12,17)|BIT(15);
  for(unsigned x=12;x<244;x++)framebuffer[7*256+x]=muted;
  for(unsigned x=12;x<38;x++)framebuffer[7*256+x]=upper;
- if(!interactive){
-  /* Native small-font controls occupy a separate low contrast footer.
+ if(!interactive && engine.say.active &&
+    !engine.input.hide_window && !engine.say.hide_window){
+  /* The 3DS lower LCD stays quiet when no dialogue is active. A compact
+     guide appears only while there is actual text to advance.
+     Native small-font controls occupy a separate low contrast footer.
      Draw BEHIND game assets, so oversized scripted text has precedence. */
   for(unsigned y=162;y<192;y++)
    for(unsigned x=0;x<256;x++)
