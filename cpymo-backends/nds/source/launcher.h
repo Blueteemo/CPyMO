@@ -20,15 +20,12 @@ static void launcher_scroll_ensure_visible(void){
 }
 static u16* launcher_sub;
 static bool launcher_about,launcher_restored,launcher_language_menu;
-/* Report the *actual* CPU environment, not a guessed console model.
- * Heap addresses are displayed separately for hardware verification. */
+/* User-facing text describes the *runtime mode*, not a guessed shell
+ * model: DSi and DSi XL/LL share the same TWL mode; a DSi can also run
+ * homebrew in NTR/DS mode. 16/4 MiB are hardware RAM capacities, not free
+ * heap sizes. Detailed heap bounds stay available in nds_runtime_state. */
 static const char* nds_runtime_mode_label(void){
- return isDSiMode() ? "TWL / DSi runtime" : "NTR / DS runtime";
-}
-static void nds_runtime_heap_label(char* dest,unsigned cap){
- unsigned long lo=(unsigned long)getHeapStart();
- unsigned long hi=(unsigned long)getHeapLimit();
- snprintf(dest,cap,"%s H:%08lX-%08lX",isDSiMode()?"TWL":"NTR",lo,hi);
+ return nds_ui(isDSiMode() ? "DSi 模式 · 16 MiB" : "DS 模式 · 4 MiB");
 }
 static unsigned launcher_language_cursor;
 static char launcher_font_path[256],launcher_icon_path[256];
@@ -315,7 +312,7 @@ static void launcher_draw(const char* message){
  else if(!strncasecmp(game->path,"fat:/",5))launcher_text("TF",220,153,accent,248);
  launcher_text(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),12,175,accent,245);}
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
- if(!launcher_count||launcher_about){char heap_line[64];nds_runtime_heap_label(heap_line,sizeof heap_line);launcher_text(heap_line,12,177,muted,245);}launcher_publish(vram);
+ if(!launcher_count||launcher_about)launcher_text(nds_runtime_mode_label(),12,177,muted,245);launcher_publish(vram);
  launcher_background();
  if(!launcher_about&&!launcher_language_menu){
   launcher_rect(0,0,256,28,RGB15(5,10,16));
