@@ -228,3 +228,56 @@ three times, risking visibly delayed LCD switching on slow flashcarts.
 - Weighted 1.2 delivery readiness stays **48%**, since FVDS real video
   reconstruction/output and the final combined NTR/DSi device visual tests
   are still open, independently of these successful UI changes.
+
+## 2026-10-22 — Local DeepSeek full FVDS decoder handoff, online independent audit
+
+Received the private `DeepSeek_FVDS_FullDecoder_Review.zip` (59 MiB
+compressed, approximately 209 MiB expanded). **No source, film frames,
+VLC tables or private licensed media were pushed into GitHub.**
+
+- Delivered: an original-host C VLC + inverse-dequantisation/4x4-IDCT
+  + I/P/motion-compensated picture decoder, `PATCH.diff` with eight new
+  source/test files, 1,908 decoded 256x192 RGB555 frames and PNGs,
+  per-frame SHA/CRC CSVs, quality report, source-level unit tests.
+- Verified here: all 1,908 RGB555 SHA-256 hashes **match** their delivered
+  manifest; 1,814 distinct pixel hashes, 92 **consecutive** still-frame
+  repeats, eight indexed I pictures, 1,900 P pictures. Sampled PNG pixels
+  exactly equal each frame's 5-bit RGB channels expanded by `<<3`.
+  Delivered CRCs refer to **G/R/B planar bytes**, not packed RGB555;
+  independently reconstructed and verified several. `crc.csv` is identical
+  to `san.csv` (internal equality, not independently rerun sanitizer).
+- Built the supplied C video dump tool with Linux GCC
+  `-std=c11 -O2 -Wall -Wextra -Werror`, and ran the supplied
+  coefficient/IDCT/motion test against actual source C successfully.
+  Eight patch paths re-applied successfully; five byte-level diffs from
+  the included flat sources are CRLF vs LF **only**.
+  Packaged baseline `fvds-bits-nds.c`, `fvds-stream-nds.c`,
+  `fvds-picture-source-nds.h` exactly match the current integration
+  branch, so rebase-interface risk is low. This is an offline host audit,
+  **not** an independent full replay from the copyrighted source FVDS
+  (source video was not in the review ZIP).
+- Found a **production hardening issue before ROM integration**:
+  `nds_fvds_vlc_fill` synthesizes zero bits at payload EOF without a
+  strict bound. A standalone 2-byte all-zero vector returns success
+  after 64 logical bits and 75 synthetic zero bits; the shipped unit
+  test explicitly allows this. Need distinguish legal final-word padding
+  from a corrupted/truncated picture and add malformed-stream tests.
+- The I-picture quantiser is parsed in the dump path but not passed to
+  `nds_fvds_decode_picture`; the actual shipped sample uses q=30.
+  Confirm support/validation for other legal quantiser values rather
+  than implying the decoder is generally format-complete.
+- `perf.csv` is byte-identical to `crc.csv` and has no durations, so
+  the reported ~0.705ms desktop mean speed cannot be recalculated
+  from this bundle. A real ARM9 12fps/NTR 4MiB test remains open.
+  Decoder local-memory estimate (~140KiB for two planes + tables + stack)
+  is not a whole-application peak RSS guarantee.
+- Third-party provenance remains to be checked before moving
+  generated VLC/bias table content into a **public AGPL repository**:
+  the original vendor encoder source is described as unlicensed.
+  Do not assume a clean-room claim automatically clears table reuse.
+- **Engineering next:** harden decoder boundary and quantiser tests;
+  stage the standalone decoder privately; implement cooperative video
+  packet/PCM dispatch and a reusable graphics presentation lease;
+  validate normal EOF/B skip/errors/lid/audio resume and the physical
+  12fps budget on both NTR 4MiB and TWL 16MiB before public 1.2.
+  No 1.2 playable FVDS ROM or hardware acceptance is claimed yet.
