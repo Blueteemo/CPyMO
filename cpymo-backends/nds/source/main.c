@@ -565,14 +565,18 @@ static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3]
  * Native RGB555 decoration sits BEHIND the game's own speaker/name/text.
  * Do not stretch a captured upper screen or allocate a second framebuffer.
  * Menus/choices use a less decorated canvas to preserve hit-test contrast. */
+static void nds_dual_canvas_audio_tick(void *unused){
+ (void)unused;
+ nds_audio_pump_if_due();
+}
 static void nds_dual_lower_background(bool ui,bool choices){
  const bool interactive=ui||choices;
  const bool dialogue_visible=engine.say.active &&
            !engine.input.hide_window && !engine.say.hide_window;
  /* Same RGB555 canvas function is compiled and pixel-tested on desktop;
     CPyMO's REAL namebox, textbox, text and menu render over it afterward. */
- nds_dual_canvas_draw(framebuffer,interactive,dialogue_visible);
- nds_audio_pump_if_due();
+ nds_dual_canvas_draw_yield(framebuffer,interactive,dialogue_visible,
+                            nds_dual_canvas_audio_tick,NULL);
  if(!interactive && dialogue_visible)
   launcher_text(nds_ui("A / 轻触：继续"),14,169,RGB15(19,25,28),248);
 }
