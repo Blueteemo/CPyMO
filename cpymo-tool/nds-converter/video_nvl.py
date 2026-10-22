@@ -6,8 +6,10 @@ by cpymo-backends/nds/source/movie-lz4-r7.h. The source is never modified.
 """
 from __future__ import annotations
 from pathlib import Path
+import functools
 import hashlib
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -22,6 +24,43 @@ RAW_RGB = WIDTH * HEIGHT * 3
 RAW_FRAME = WIDTH * HEIGHT * 2
 VIDEO_SUFFIXES = frozenset({'.mp4', '.avi', '.mpg', '.mpeg', '.mkv', '.webm',
                             '.3gp', '.wmv', '.mov', '.ogv', '.flv', '.m4v'})
+
+
+@functools.lru_cache(maxsize=8)
+def validate_ffmpeg(ffmpeg):
+    """Reject old Starter's *audio-only* FFmpeg before producing a broken video.
+
+    Probe real filter/decoder tables, not a version string. ffmpeg -version
+    succeeds even when video codecs and swscale were intentionally disabled.
+    This check is required for video conversions and Windows distribution.
+    """
+    executable = str(ffmpeg)
+    flags = 0x08000000 if os.name == 'nt' else 0
+    def capabilities(option):
+        try:
+            done = subprocess.run(
+                [executable, '-hide_banner', option],
+                capture_output=True, text=True, encoding='utf-8',
+                errors='replace', timeout=20, creationflags=flags)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise ValueError('Video-capable FFmpeg is unavailable: '+str(error)) from error
+        if done.returncode != 0:
+            raise ValueError('FFmpeg cannot list '+option+' capabilities: '+done.stderr[-400:])
+        return done.stdout
+    filters = capabilities('-filters')
+    decoders = capabilities('-decoders')
+    required = ('fps', 'scale', 'pad', 'format', 'aresample', 'apad', 'atrim')
+    available = set(re.findall(r'^\\s*[.A-Z|]{3,4}\\s+([a-z0-9_]+)\\s', filters, re.M))
+    missing = sorted(set(required) - available)
+    video_decoders = set(re.findall(r'^\\s*[A-Z.]{6}\\s+([a-z0-9_]+)\\s', decoders, re.M))
+    if not video_decoders.intersection({'h264', 'hevc', 'mpeg4', 'mjpeg', 'vp9', 'av1'}):
+        missing.append('MP4/video decoder')
+    if missing:
+        raise ValueError(
+            'This FFmpeg was built for audio only, or lacks NDS video features: '+
+            ', '.join(missing)+
+            '. Use a video-capable FFmpeg build; the old Starter audio-only ffmpeg.exe cannot convert movies.')
+    return {'filters':sorted(set(required)), 'video_decoder':True}
 
 
 def _rgb555(rgb: bytes) -> bytes:
@@ -47,6 +86,7 @@ def encode(source, destination, ffmpeg='ffmpeg', *, fps=12, audio='pcm'):
     if audio not in ('pcm', 'nar') or fps not in (6, 8, 12, 15, 20, 24):
         raise ValueError('Unsupported NDS movie FPS/audio option')
     ffmpeg = str(ffmpeg)
+    validate_ffmpeg(ffmpeg)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='nvl-', dir=destination.parent) as temp:
         temp = Path(temp)
