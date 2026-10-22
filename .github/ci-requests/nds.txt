@@ -1,1 +1,1 @@
-2026-10-22 concentrated NDS/DSi build gate: 3DS-aligned enhanced dialogue safe-area, original UI background-to-upper/menu-to-lower routing, subtle localized bottom footer, game switching reset, plus converter/geometry regression. User hardware deferred. No release/tag.
+2026-10-22 one-shot concentrated FULL NDS/DSi smoke build for 1.2 three-mode visual preview, after DeepSeek exact source handoff and progress rubric. If devkitPro package server 403, do NOT retry automatically. No release or game upload.
