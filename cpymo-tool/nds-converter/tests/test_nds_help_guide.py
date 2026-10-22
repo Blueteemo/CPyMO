@@ -65,8 +65,8 @@ class NDSHelpGuideTests(unittest.TestCase):
                       "上屏游戏 / 下屏游戏 / 增强双屏",
                       "START：快速保存", "SELECT：快速读取"):
             self.assertIn(f'{{"{value}",', section)
-        cht = self.extra.split('{"正在讀取', 1)[1].split('{"ゲーム一覧', 1)[0]
-        jap = self.extra.split('{"ゲーム一覧', 1)[1].split("static error_t jp_saved", 1)[0]
+        cht = '{"正在讀取' + self.extra.split('{"正在讀取', 1)[1].split('{"ゲーム一覧', 1)[0]
+        jap = '{"ゲーム一覧' + self.extra.split('{"ゲーム一覧', 1)[1].split("static error_t jp_saved", 1)[0]
         for localized in (cht, jap):
             self.assertEqual(len(re.findall(r'"(?:[^"\\]|\\.)*"', localized)), 70)
 
