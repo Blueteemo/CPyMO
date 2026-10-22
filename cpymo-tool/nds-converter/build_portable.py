@@ -32,6 +32,14 @@ def main():
     owned = (output/'build/Converter.spec').is_file() and (output/'helper-build.log').is_file()
     if (output.exists() and not (args.rebuild and owned)) or not ffmpeg.is_file() or not rom.is_file():
         parser.error('Use a new output directory and existing FFmpeg/engine.nds files.')
+    # Old 1.1 Starter's custom ffmpeg.exe intentionally had --disable-swscale
+    # and --disable-everything. It plays audio but can never convert MP4.
+    # Refuse to ship a deceptive 1.2 bundle even when PyInstaller succeeds.
+    from video_nvl import validate_ffmpeg
+    try:
+        validate_ffmpeg(str(ffmpeg))
+    except ValueError as error:
+        parser.error(str(error))
     release = json.loads((BACKEND/'release.json').read_text(encoding='utf8'))
     output.mkdir(parents=True, exist_ok=args.rebuild)
     build = output/'build'
