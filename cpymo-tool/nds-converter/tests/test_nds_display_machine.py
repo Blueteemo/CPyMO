@@ -111,6 +111,12 @@ int main(int argc,char**argv){
  verify_saved(argv[1],"NDSDISPLAY2 2\n");
  assert(nds_dual_state[4]==1 && !nds_dual_save_pending);
  menu_enabled=false;nds_dual_bottom_pass=false;
+ /* Initial title/boot selection is an unsplit upper-LCD scene. */
+ assert(!nds_dual_title_allow_split(&nds_title_gate));
+ assert(nds_dual_accept(cpymo_backend_image_draw_type_text_say));
+ assert(!nds_dual_title_observe(&nds_title_gate,0,0,1)); /* title choice */
+ assert(nds_dual_title_observe(&nds_title_gate,1,0,0)); /* story begins */
+ assert(nds_dual_title_allow_split(&nds_title_gate));
  assert(nds_dual_accept(cpymo_backend_image_draw_type_bg));
  assert(!nds_dual_accept(cpymo_backend_image_draw_type_text_say));
  nds_dual_bottom_pass=true;
@@ -168,6 +174,7 @@ int main(int argc,char**argv){
  assert(refresh==5 && redraw==5);
  nds_dual_load(argv[1]);
  assert(nds_display_mode==2 && !nds_dual_save_pending);
+ assert(!nds_dual_title_allow_split(&nds_title_gate)); /* next launch title */
  return 0;
 }
 """
