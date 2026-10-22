@@ -27,9 +27,18 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git submodule update --init stb endianness.h
-      - name: Install DS libraries and record SDK
+      - name: Verify bundled DS libraries; install only if absent
         run: |
-          dkp-pacman -Syu --noconfirm --needed libnds libfat-nds maxmod-nds calico ndstool
+          # This pinned image already included all five libraries when run
+          # 39704544801 passed. An unconditional pacman -Syu was touching
+          # pkg.devkitpro.org even with "nothing to do" and failing on HTTP 403.
+          # Preserve the known-good pinned SDK unless a dependency is missing.
+          if dkp-pacman -Q devkitARM libnds libfat-nds maxmod-nds calico ndstool >/dev/null 2>&1; then
+            echo "All DS/DSi build dependencies present in the pinned image; skipping network sync."
+          else
+            echo "Some pinned-image dependencies are absent; attempting SDK installation."
+            dkp-pacman -Syu --noconfirm --needed libnds libfat-nds maxmod-nds calico ndstool
+          fi
           dkp-pacman -Q devkitARM libnds libfat-nds maxmod-nds calico ndstool
       - name: Build original DS ROM
         run: python3 cpymo-backends/nds/build.py
