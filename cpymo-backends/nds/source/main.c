@@ -56,6 +56,22 @@ static bool screens_swapped;
 volatile unsigned presentation_state[9]={0x4e505232};
 #include "dual-screen-nds.h"
 #include "dual-input-nds.h"
+static nds_touch_role_tracker nds_touch_role_state;
+/* Runs BEFORE cpymo_engine_update snapshots input as prev_input.
+ * Do not allow a pen already pressing story-A to become a new click
+ * when CPyMO opens a touch-controlled choice or menu (or vice versa). */
+static void nds_touch_prepare_input(unsigned held){
+ unsigned coords=nds_touch_uses_coordinates(nds_display_mode,
+   nds_dual_active(),cpymo_ui_enabled(&engine),nds_dual_has_choice());
+ unsigned boundary=nds_touch_role_step(&nds_touch_role_state,
+                                       coords,!!(held&KEY_TOUCH));
+ if(!boundary)return;
+ cpymo_input_ignore_next_mouse_button_event(&engine);
+ engine.input.ok=!!(held&KEY_A);
+ engine.input.mouse_button=false;
+ engine.input.mouse_position_useable=false;
+ if(boundary==2)nds_touch_blocked=true;
+}
 volatile unsigned engine_state[46]={0x4350454e};
 /* magic, image loads, total/max load us, draws, total/max draw us, loop pixels, omitted pixels */
 volatile unsigned perf_state[9]={0x4e505246};
@@ -776,7 +792,9 @@ int main(int argc,char** argv){
  free(scene_verify_pixels);scene_verify_pixels=NULL;FILE* verify_flag=savefile(game_dir,"nds-scene-verify.flag","rb");if(verify_flag){fclose(verify_flag);scene_verify_pixels=malloc(sizeof framebuffer);scene_state[7]=scene_verify_pixels!=NULL;}
  FILE* mask_flag=savefile(game_dir,"nds-maskbench.flag","rb");if(mask_flag){fclose(mask_flag);run_mask_bench();for(;;)swiWaitForVBlank();}
  FILE* bench_flag=savefile(game_dir,"nds-renderbench.flag","rb");if(bench_flag){fclose(bench_flag);run_render_bench();for(;;)swiWaitForVBlank();}
- nds_playing=true;nds_display_start();nds_aux_refresh();
+ nds_playing=true;nds_display_start();
+ nds_touch_role_state=(nds_touch_role_tracker){0};
+ nds_aux_refresh();
  if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\n%s\n",nds_runtime_mode_label());}else launcher_play_panel(NULL);
  // Count actual display interrupts; include missed frames during decoding/drawing.
  irqSet(IRQ_VBLANK,on_vblank);irqEnable(IRQ_VBLANK);
@@ -789,6 +807,9 @@ int main(int argc,char** argv){
     classic scene top -> classic scene bottom -> enhanced split -> repeat. */
  if(keysDown()&KEY_L)nds_display_cycle();
  nds_aux_poll();
+ /* UI/choice changes may alter pen semantics while it is still down.
+    Resolve the boundary before the core copies its previous input. */
+ nds_touch_prepare_input((unsigned)keysHeld());
  nds_clock_poll();
  if(keysDown()&KEY_START){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
  if((keysDown()&KEY_SELECT)&&!(keysHeld()&KEY_L)){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
