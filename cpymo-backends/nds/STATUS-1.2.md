@@ -99,3 +99,15 @@
 同时坚持**互不覆盖**：DeepSeek 仅改独立视频 decoder/CLI/tests，不动 `main.c`、`dual-screen-nds.h`、`audio-nds.c`、ROM Banner/版本号/存档，不直接向仓库 push；云端主线继续完成三态双屏视觉/触控和 ARM7/显存/游戏 `#movie` 接入。原播放器授权不明，禁止移植/复制未授权源码。解码结果只有被独立复核并合入后才计入正式进度。
 
 **综合交付准备度仍为 48%**：委派任务与生成开发包本身不增加实际完成度。新版三态双屏 DSi 实验 ROM 在 [完整 CI #39704544801](https://github.com/Blueteemo/CPyMO/actions/runs/39704544801) 构建通过且可选实机体验，**并不需要等待 FVDS 全片解码**。后续只有证据门槛突破才更新百分比。
+
+
+## 2026-10-22 10:28+08 — 云端并行：三态双屏触控修复、状态机回归
+
+本地 DeepSeek 已启动其**完整 FVDS 视频画面解码专项**，当前本集成分支**不**开发或修改独立视频 VLC / I/P / IDCT 解码器，以免重复劳动和代码冲突。本轮集中改进用户能够更早在 DSi 上感受到的三态交互：
+
+- 新增 `source/dual-input-nds.h`，并在实际 `source/main.c` 的 `cpymo_input_snapshot()` 中调用。使用**物理下屏**为触控基准：经典上屏以触控作为 A；经典下屏按游戏真实坐标点击；增强双屏菜单／剧情选项转游戏逻辑坐标以供核心热区判断，叙述状态触控作为 A；Y 隐藏后的唤醒触控另由现有遮罩阻止穿透。不同原作分辨率及 letterbox 偏移统一计算。
+- 修复 `source/dual-screen-nds.h` 的 **L 三态切换＋仍按住触控笔**：标记 `nds_touch_blocked` 并调用 `cpymo_input_ignore_next_mouse_button_event()`，直到物理抬笔，不允许旧模式的触控释放在新模式中误选菜单/选项。保持普通 A 键可用，不动旧版 R7。
+- 新增 `test_nds_dual_touch.py` 与 `test_nds_display_machine.py`：前者直接 GCC/UBSan 编译生产触控映射，覆盖三态、菜单、选项、唤醒、按键、letterbox；后者带有限宿主桩编译**真实** `dual-screen-nds.h`，循环三个模式并检查 `NDSDISPLAY2` 实际存档、上下屏类别归属及触控锁定。通过 [独立 NDS UI 主机 CI #39712825259](https://github.com/Blueteemo/CPyMO/actions/runs/39712825259)。
+- 本轮**没有修改 RGB555 下屏底色、原作对白框、姓名框及画面布局**，因此没有全新游戏视觉截图或合法的画质对比图。过去的源码底层效果仍为有效参考，真实整体画面仍要以新版 .nds 实机 NDSPIX1 抓帧验收。
+- **48% 综合准备度暂不提高**：按权重计分，这轮属于三态稳定性与验收准备，尚未增加 FVDS 可用画面或 DSi 新版实机通过记录。R7 稳定分支与原版 MV 播放逻辑没有改动。新三态测试 ROM 可在合并 CI 验证后提供，且不要求用户立刻上机。
+
