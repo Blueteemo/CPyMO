@@ -28,11 +28,12 @@ class NDSHelpGuideTests(unittest.TestCase):
                     "B：按住隐藏文字", "Y：隐藏／唤回辅助屏",
                     "R：快进 · L：切换模式",
                     "上屏游戏 / 下屏游戏 / 增强双屏",
-                    "START：快速保存", "SELECT：快速读取"):
+                    "START：快速保存  SELECT：快速读取"):
             self.assertIn(f'nds_ui("{msg}")', panel, msg)
         self.assertNotRegex(panel, r'%u/3|[123]/3')
         self.assertNotIn("存档1", panel)
-        self.assertIn('launcher_text(message?message:nds_ui("SELECT：快速读取")', panel)
+        self.assertIn('if(message && *message)launcher_text(nds_ui(message),12,176,accent,245)', panel)
+        self.assertNotIn('launcher_text(nds_ui("SELECT：快速读取")', panel)
         self.assertNotIn('显示、字号、音量：X 菜单', panel)
 
     def test_landmarks_and_conservative_clip_areas_unchanged(self):
@@ -63,7 +64,7 @@ class NDSHelpGuideTests(unittest.TestCase):
         for value in ("A / DOWN：继续", "UP：历史对话",
                       "R：快进 · L：切换模式",
                       "上屏游戏 / 下屏游戏 / 增强双屏",
-                      "START：快速保存", "SELECT：快速读取"):
+                      "START：快速保存  SELECT：快速读取", "SELECT：快速读取"):
             self.assertIn(f'{{"{value}",', section)
         cht = '{"正在讀取' + self.extra.split('{"正在讀取', 1)[1].split('{"ゲーム一覧', 1)[0]
         jap = '{"ゲーム一覧' + self.extra.split('{"ゲーム一覧', 1)[1].split("static error_t jp_saved", 1)[0]
