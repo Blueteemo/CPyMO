@@ -15,9 +15,15 @@ choices, quicksave/load and L/Y/X operation are included. Source script
 is byte-identical after conversion; 0 unknown directives, 0 missing assets,
 0 unconverted videos. No dummy padding or commercial test media.
 
-Final integrated [CI #39865200187](https://github.com/Blueteemo/CPyMO/actions/runs/39865200187)
+Final integrated [CI #39865964204](https://github.com/Blueteemo/CPyMO/actions/runs/39865964204)
 **all jobs success**: game generation/verification, separate NTR and TWL
-compiled-memory-profile ROMs, bundled ZIP with SHA256 for all 59 files.
+compiled-memory-profile ROMs, combined ZIP with per-file SHA256 for 84 files.
+The review ZIP contains an **additional compact CPYMO12_NVA1_CHECK game**
+produced with the same public converter in `--video-mode nva1`, with an
+original audiovisual 2-second movie and silent 3-second movie. The main
+39.37 MiB game remains strictly NVL1. This lets the user's final DSpico
+and R4 sessions also validate the independently implemented NVA1/NAR2
+video path without duplicating the entire long-form dataset.
 The actual combined artifact is
 `CPyMO-1.2-DSpico-TWL-R4-NTR-FINAL-STRESS-REVIEW`. Original ROMs
 use devkitPro Calico's DSi-compatible header unit code `2` in
@@ -30,7 +36,7 @@ checklist: [VALIDATION-1.2-DUALCARD-FINAL.md](VALIDATION-1.2-DUALCARD-FINAL.md).
 **Important:** This is a test candidate, NOT physical validation or a
 public release. Physical two-card, GUI acceptance, public licences/
 corresponding FFmpeg source, 1.2 version bump/changelog, and
-experimentally optional NVA1 scope still require release decisions.
+NVA1 physical acceptance through the supplied sidecar still require release decisions.
 Stable 1.1 and R7 remain untouched.
 
 ## 2026-10-23 — First actual Windows video-converter EXE accepted
