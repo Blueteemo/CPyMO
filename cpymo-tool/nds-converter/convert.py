@@ -43,7 +43,10 @@ UI_CODEPOINTS = (
     36716,36731,36733,36807,36816,36820,36827,36864,36873,36895,36914,36938,36984,37096,37197,37325,37327,38291,
     38388,38543,38544,38577,38656,38899,38917,39033,39057,65292,65306,65311,
 )
-UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)'))))
+# All three mode names are engine UI, not game script dialogue. Always embed
+# them in newly converted games even when their novels never use these glyphs.
+# The ROM fallback font independently covers already-converted game caches.
+UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)增强双屏增強雙強化画面操控モむ'))))
 
 def sha(path):
     h = hashlib.sha256()
