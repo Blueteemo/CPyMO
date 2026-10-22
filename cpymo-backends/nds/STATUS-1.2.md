@@ -330,3 +330,37 @@ been staged **privately** and treated as input, not as a merged ROM feature.
   EOF, errors, lid, BGM and script continuation; then benchmark actual
   NTR and DSi hardware. This M1 is deliberately not called a video-playing
   `.nds` and does not increase the accepted 48% integrated release readiness.
+
+## 2026-10-23 — Public GitHub 1.2 release protection (required)
+
+After user requested that FVDS integration must **remain publicly publishable**,
+audited the private DeepSeek handoff generator. Its
+`tests/gen_vlc_tables.py` reads upstream
+`Gericom.FastVideoDS/VlcTables.cs` (`TableA`, `TableB`,
+`TableARefLinear`) and emits the decoder's ~84 KiB VLC lookup header.
+The vendor Player/Encoder repositories have **no declared licence**
+(GitHub API returned `license:null` as of 2026-10-23), and licence
+request [#15](https://github.com/Gericom/FastVideoDSPlayer/issues/15)
+was **open**. Therefore the private full decoder + M1 bridge is
+**not yet suitable for redistribution inside AGPL-3.0 source or ROMs**.
+"Independently written" C glue does not cure vendor-data provenance.
+
+Created mandatory
+[`RELEASE-LICENSE-GATE-1.2.md`](RELEASE-LICENSE-GATE-1.2.md)
+and an opt-in-host/full-converter
+`test_nds_fvds_release_gate.py` that blocks known quarantined
+received source files, VLC signature constants and named private media.
+It is a safeguard, not complete legal verification and not a blanket
+ban on FVDS as a format. The targeted
+[NDS UI host workflow #39826200756](https://github.com/Blueteemo/CPyMO/actions/runs/39826200756)
+passed with the gate enabled; the regular NDS converter workflow
+discovers the same test on its next requested build.
+
+Future open-release path: obtain an explicit AGPL-compatible
+source/lookup-table grant **or** independently replace the affected
+codec internals with documented clean provenance and review. Work on
+generic A/V scheduling/PCM/VRAM/EOF/B skip may continue without those
+tables. Existing independently developed NVL1/NVA1 remains an
+optional releasable fallback if codec permissions cannot be resolved.
+Do not tag or advertise public FVDS playback using an unreviewed
+decoder. R7/1.1.0 untouched; overall accepted v1.2 readiness still 48%.
