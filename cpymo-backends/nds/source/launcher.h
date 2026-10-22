@@ -302,10 +302,10 @@ static void launcher_play_panel(const char* message){
  launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,104,white,183);
  launcher_text(nds_ui("R：快进 · L：切换模式"),12,122,white,245);
  launcher_text(nds_ui("上屏游戏 / 下屏游戏 / 增强双屏"),12,140,accent,245);
- launcher_text(nds_ui("START：快速保存"),12,158,muted,245);
- /* The final row temporarily hosts save/load confirmation, whose text
-    continues to identify slot 1. Keep that explicit only on action. */
- launcher_text(message?message:nds_ui("SELECT：快速读取"),12,176,muted,245);
+ /* The two shortcuts fit on one line in the native small bitmap font;
+    leave a calm last row, used only for save/load/action feedback. */
+ launcher_text(nds_ui("START：快速保存  SELECT：快速读取"),12,158,muted,245);
+ if(message && *message)launcher_text(nds_ui(message),12,176,accent,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
  if(!nds_aux_clock_suppressed)nds_clock_paint(framebuffer,196,96,RGB15(21,24,27));clock_state[6]++;
  launcher_publish(launcher_sub);
