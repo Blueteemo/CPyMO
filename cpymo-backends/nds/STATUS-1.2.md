@@ -3,6 +3,54 @@
 更新时间：2026-10-22。性质：实验分支动态状态表；**不是**发行说明或完成声明。
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
+
+## 2026-10-23 — User-approved release-first scope and immediate UI hardware gate
+
+**Priority order has changed by explicit owner instruction:**
+1. **3DS-like enhanced dual-screen UI acceptance now.** Hand over a
+   fresh DSi/TWL ROM from the present integration branch; visually verify
+   scene on physical top, authored textbox/name/text/menu/choices below,
+   touch hit-testing, L 0→1→2→0 cycling, Y hide/reveal, return to
+   launcher/game, saved mode and responsiveness. Use actual DSi
+   observations and optional pixel-exact NDSPIX1 captures; do not keep
+   adjusting visual appearance from synthetic previews or unverified
+   source-level theories.
+2. **Ship real game video support with the converter.** The NDS runtime
+   already has experimental NVL1/NVA1 playback and B-skip paths, but
+   `cpymo-tool/nds-converter` **currently omits videos by default**.
+   A public 1.2 video feature is not accepted until an ordinary user
+   can convert their own game's allowed source video via the supplied
+   converter, play it from `#movie`, and reach story content again
+   after EOF/B skip/error with BGM restored. Prefer an existing
+   independently developed reproducible video format; do not make
+   unlicensed private FVDS tables a dependency of 1.2.
+3. **Consolidated release candidate**: SDK/build + converter tests,
+   NTR (4MiB)/TWL (16MiB) hardware regression, source/asset
+   licence gate, game save safety, one clearly packaged public 1.2.
+   Earlier accepted R7 remains the rollback.
+4. **Deferred beyond the release-critical path**: extra FVDS encoding
+   size/bitrate/ADPCM optimisation, exotic format sweeps, broad
+   profiling unrelated to user-visible breakage, repeated per-commit
+   ROM distributions. First make the current features complete.
+
+**This turn's immediate hardware candidate:** targeted Nintendo DS
+workflow [#39827066654](https://github.com/Blueteemo/CPyMO/actions/runs/39827066654),
+commit `e2b712c37a1f897db8f2d439ce9eb819d50146b6`.
+The DSi/TWL ROM is real, has header unit code 2 and passes the ROM SDK
+build; the independent converter job may finish later and is not
+needed to start **UI-only** acceptance. A single-ROM private review ZIP
+includes a short Chinese guide and optional four-scene capture flag,
+rather than piling up multiple obsolete candidate ROMs. No new
+hardware pass is claimed until the user reports experience.
+
+**Release scope is not conditional on FVDS codec compression progress.**
+If the vendor-table license/provenance issue stays unresolved, do not
+smuggle the received private decoder into public AGPL source or ROM;
+deliver video via legitimate existing NVL1/NVA1 and a supported
+converter workflow, or explicitly keep the video milestone open.
+Development readiness percentages remain separate from UI hardware
+acceptance and may be reweighted after concrete results.
+
 ## 1.2 加权进度（开发者估算，非自动百分比）
 
 **当前综合估算：48%（2026-10-22）**。这是面向“可正式发布的 1.2”的**交付准备度估算**，而非完成代码行数、功能个数、GitHub commit 数、工时或自动统计结果。只有新证据通过（主机、SDK 编译或实机）才调整百分比；不随时间自然增长。**不能解释为只剩 52% 工作量**，因为画面逆解码和 ARM7 播放可能存在非线性风险。
