@@ -827,10 +827,22 @@ int main(int argc,char** argv){
   nds_clock_sync_aux_visibility();
   DC_FlushRange(framebuffer,sizeof framebuffer);
   dmaCopy(framebuffer,vram,sizeof framebuffer);engine_state[29]++;
+  /* In classic-lower mode the sub BG lives on the PHYSICAL upper LCD.
+     Snapshot the original help/clock VRAM first, then this exact main
+     framebuffer on the lower LCD. No extra 96 KiB staging allocation. */
+  if(nds_capture_armed && nds_display_mode==1 && screens_swapped &&
+     launcher_sub && !cpymo_ui_enabled(&engine) && !nds_dual_has_choice() &&
+     engine.say.active && !engine.say.hide_window && !engine.input.hide_window){
+   FILE* classic=nds_capture_begin(4,launcher_sub);
+   nds_capture_finish(classic,4,framebuffer);
+  }
   if(nds_dual_active() && launcher_sub){
    /* Save the exact rendered pixels only when explicitly armed by a file
       in this game's save directory. Never render synthetic preview data. */
+   /* Capture story choices separately: a selection may coexist with the
+      previous dialogue state, but its true touch targets belong below. */
    unsigned capture_kind=cpymo_ui_enabled(&engine)?2:
+     nds_dual_has_choice()?3:
      (engine.say.active&&!engine.say.hide_window&&
       !engine.input.hide_window)?1:0;
    FILE* capture=nds_capture_begin(capture_kind,framebuffer);
