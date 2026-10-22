@@ -58,6 +58,28 @@ int main(void){
  /* All absent input yields a completely inert neutral snapshot. */
  s=project(1,1,1,1,0,0,0,128,96,1.f,0,0);
  CHECK(!s.ok && !s.mouse_button);
+ /* The same held stylus cannot become a fresh menu/choice click merely
+    because an interpreter state changed during this contact. */
+ nds_touch_role_tracker state={0};
+ CHECK(nds_touch_role_step(&state,0,0)==0);
+ CHECK(nds_touch_role_step(&state,0,1)==0); /* narrative begins */
+ CHECK(nds_touch_role_step(&state,1,1)==2); /* narrative -> choice */
+ CHECK(nds_touch_role_step(&state,1,1)==0); /* remains blocked by caller */
+ CHECK(nds_touch_role_step(&state,1,0)==0); /* lift clears global block */
+ CHECK(nds_touch_role_step(&state,1,1)==0); /* fresh menu tap allowed */
+ CHECK(nds_touch_role_step(&state,0,0)==1); /* UI -> story on release */
+ CHECK(nds_touch_role_step(&state,0,1)==0); /* next story tap allowed */
+ CHECK(nds_touch_role_step(&state,1,0)==1); /* pen lifted on role edge */
+ CHECK(nds_touch_role_step(&state,0,0)==0); /* no contact, no block */
+ CHECK(nds_touch_role_step(&state,1,1)==0); /* fresh tap after UI opens */
+ CHECK(nds_touch_role_step(NULL,0,1)==0);
+ /* Real modes 0 and 1 remain invariant across UI/selection changes. */
+ for(unsigned mode=0;mode<2;mode++){
+  unsigned expected=mode==1;
+  for(unsigned ui=0;ui<2;ui++)
+   for(unsigned choice=0;choice<2;choice++)
+    CHECK(nds_touch_uses_coordinates(mode,1,ui,choice)==expected);
+ }
  return 0;
 }
 """
