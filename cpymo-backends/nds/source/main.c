@@ -823,6 +823,14 @@ int main(int argc,char** argv){
   engine_state[7]=!strcmp(name,"MENU")?10:0;
  }
  if(redraw){unsigned image_before=perf_state[5],text_before=text_us,fill_before=fill_us;u64 draw_start=tickGetCount();for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);nds_dual_bottom_pass=false;nds_engine_draw(&engine);if(scene_verify_pixels){memcpy(scene_verify_pixels,framebuffer,sizeof framebuffer);for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);unsigned saved_bits=render_bits;bool saved_copy=native_row_copy,saved_fast=renderer_fast;render_bits=0;native_row_copy=false;renderer_fast=false;cpymo_engine_draw(&engine);render_bits=saved_bits;native_row_copy=saved_copy;renderer_fast=saved_fast;scene_state[5]++;if(memcmp(scene_verify_pixels,framebuffer,sizeof framebuffer))scene_state[6]++;}
+  /* Brief save/load or settings feedback while enhanced owns the lower
+     LCD. The regular auxiliary panel still owns classic-mode toasts.
+     Draw only on the upper GAME canvas, after the source scene and its
+     optional verification; never bake this overlay into cached scene data. */
+  if(nds_dual_active() && presentation_state[2] && nds_toast_text[0]){
+   launcher_rect(0,0,256,24,RGB15(3,5,8));
+   launcher_text(nds_toast_text,10,4,RGB15(31,31,31),246);
+  }
   // DMA reads main memory, not the ARM9 data cache. Publish the whole frame.
   nds_clock_sync_aux_visibility();
   DC_FlushRange(framebuffer,sizeof framebuffer);
