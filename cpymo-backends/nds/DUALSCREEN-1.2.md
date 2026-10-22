@@ -108,3 +108,32 @@ The user asked for visual proof when an untested 1.2 UI change is made and expli
 `python cpymo-backends/nds/tools/nds-dual-canvas-preview.py --output <directory>` builds that actual C function with a normal GCC host compiler, executes it for dialogue/menu/idle states, and converts its RGB555 buffers into three native 256×192 PNG images using the existing checked `nds-capture-to-png.py` logic. The separate SDK-free UI CI uploads these files as a visual artifact only at a manually requested checkpoint.
 
 **Accurate scope:** the three PNGs show ONLY the screen's underlying gradient, accents and dialogue footer band, *not* the user's actual PyMO game textbox, Chinese font glyphs or character sprite. They are exact source-executed backdrop pixels but emphatically **not NDS game screenshots**, and may not be labeled or presented as complete enhanced-screen visuals. The complete result still requires the user's or emulator's first real `NDSPIX1` capture from the actual game. This design preserves an honest source-driven visual preview now while deferring full visual acceptance to the already-planned concentrated device round.
+
+## 2026-10-22 — one-session NDSPIX1 physical display evidence for the three-mode trial
+
+The opt-in `nds-visual-capture.flag` now collects **four** first-occurrence,
+pixel-exact physical screen pairs during game redraws:
+
+| Kind | Output (.ndsraw, in the same save directory) | Trigger |
+| --- | --- | --- |
+| 1 | `nds-capture-dialogue.ndsraw` | Enhanced split: original visible dialogue |
+| 2 | `nds-capture-menu.ndsraw` | Enhanced split: core UI/menu |
+| 3 | `nds-capture-choice.ndsraw` | Enhanced split: active story choices (priority over lingering dialogue) |
+| 4 | `nds-capture-classic-lower.ndsraw` | Classic lower: visible dialogue, physical upper help panel and lower game frame |
+
+The latter explicitly writes **sub VRAM as physical TOP and main framebuffer as
+physical BOTTOM**, since `lcdSwap()` reverses their physical assignments.
+Enhanced captures still write the published main scene TOP and actual
+lower UI BOTTOM. Every file remains one `NDSPIX1` header plus two native
+256x192 RGB555 buffers; the converter accepts all four kinds without
+rescaling. The C exporter and PNG converter have expanded synthetic
+round-trip regression tests. These fixtures are **not** gameplay screenshots.
+
+This enables comparison of layout and touch target position within one
+optional DSi session; no capture occurs without the explicit flag. Each
+192-KiB snapshot is an intentional synchronous FAT diagnostic and may cause
+momentary pauses, so remove the flag during performance/audio measurements.
+A missing state will not fabricate an image. Neither the two previously
+compiled ROMs nor any user's saves or stable R7 binaries are modified by
+this source-level change. Rebuild and then verify true captures on hardware;
+do not claim actual 3DS-equivalent quality from synthetic tests.
