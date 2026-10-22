@@ -50,9 +50,9 @@ def validate_ffmpeg(ffmpeg):
     filters = capabilities('-filters')
     decoders = capabilities('-decoders')
     required = ('fps', 'scale', 'pad', 'format', 'aresample', 'apad', 'atrim')
-    available = set(re.findall(r'^\\s*[.A-Z|]{3,4}\\s+([a-z0-9_]+)\\s', filters, re.M))
+    available = set(re.findall(r'^\s*[.A-Z|]{3,4}\s+([a-z0-9_]+)\s', filters, re.M))
     missing = sorted(set(required) - available)
-    video_decoders = set(re.findall(r'^\\s*[A-Z.]{6}\\s+([a-z0-9_]+)\\s', decoders, re.M))
+    video_decoders = set(re.findall(r'^\s*[A-Z.]{6}\s+([a-z0-9_]+)\s', decoders, re.M))
     if not video_decoders.intersection({'h264', 'hevc', 'mpeg4', 'mjpeg', 'vp9', 'av1'}):
         missing.append('MP4/video decoder')
     if missing:
