@@ -156,3 +156,37 @@
 - **修复增强双屏下快速存档/读档反馈不可见**：以前 `launcher_toast` 只重绘经典辅助屏，而增强模式禁止重绘辅助屏，导致成功/失败提示在增强模式看不到。现在增强模式使用现有画布，在上屏短暂绘制文案；2 秒后请求刷新，避免剧情静止时残留。下屏对白/选项仍保持独立，经典模式保留原辅助面板提示。代码未触碰 FVDS 视频解码器。
 - 实际证据：输入/视觉主机回归 [NDS UI Host #39717449670](https://github.com/Blueteemo/CPyMO/actions/runs/39717449670) **通过**；包含上述两处修复的 [Nintendo DS SDK + converter #39717849111](https://github.com/Blueteemo/CPyMO/actions/runs/39717849111) **build / converter 双作业均通过**，提交 `fc1c02cff267a22f3b125bf349b5b4c21f093efa`。产出了 NDS 和 DSi 实验 ROM；尚未经过 DSi 新版硬件触控/画面反馈验收。
 - **总体开发者交付准备度仍记 48%**，不把编译成功当作实机验收；R7 稳定分支与公开 1.1.0 保持不变。下一门槛是集中实机确认切换触控、菜单/剧情选项位置、对白与短暂提示；FVDS 全片解码继续由本地 DeepSeek 独立开发，待提交审查。
+
+## 2026-10-22 — Held stylus: enhanced narrative ↔ choices/menu role boundary
+
+This session fixed a *different* ghost touch from the previously completed L-mode
+switch: the SAME uninterrupted lower-LCD pen contact can span the moment an
+enhanced narrative (`touch → OK`) changes into engine UI or scripted choices
+(`touch → mouse coordinates`) or vice versa. Without handling this boundary,
+the old contact can be interpreted as a new selection/click or a synthetic
+A-release in the next CPyMO input update.
+
+- Added production portable `nds_touch_role_tracker` and
+  `nds_touch_role_step` in `source/dual-input-nds.h`. It detects whether a
+  previously held pen crosses between narrative and coordinate-hit-test roles;
+  fresh touches arriving after a UI transition are left untouched.
+- Integrated `nds_touch_prepare_input` into `source/main.c` **before**
+  `cpymo_engine_update` copies `engine.input` to `prev_input`. At a real
+  contact boundary it neutralizes the OLD pen-derived OK/mouse fields, preserves
+  the actual physical A state and blocks a continuing pen until release.
+  Existing independent L mode-switch and Y auxiliary wake guard remains.
+- Added real-header GCC/UBSan regression sequences for story → choice/menu,
+  mouse → narrative with release, continuous vs fresh contact, no-contact
+  transitions and invariant classic-top / classic-bottom routing.
+- The first focused host run #39718806455 failed at compile-time in a new
+  test fixture (`NULL` used without `<stddef.h>`); this was fixed and the
+  repeated host gate [#39718909521](https://github.com/Blueteemo/CPyMO/actions/runs/39718909521)
+  **passed**.
+- The concentrated [NDS/DSi SDK + converter run #39718962687](https://github.com/Blueteemo/CPyMO/actions/runs/39718962687)
+  **passed both build and converter** on commit
+  `a1b7f972d3cdef4a703b83e0958e7fbf1d585186` and produced both ROM
+  artifacts. These are source/compiler test results, **not real DSi/NTR
+  acceptance**. No public v1.2 release; R7 remains unchanged and the
+  parallel DeepSeek FVDS decoding work is untouched.
+- Overall weighted deliverable readiness remains **48%** until actual
+  enhanced UI acceptance and real decoded FVDS playback integration occur.
