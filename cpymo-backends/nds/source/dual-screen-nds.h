@@ -8,6 +8,7 @@
 #define CPYMO_NDS_DUALSCREEN_H
 #include "display-mode-prefs-nds.h"
 #include "dual-layout-nds.h"
+#include "dual-title-nds.h"
 /* Defined later in main.c, declared here for enhanced geometry. */
 static float display_scale(void);
 static float display_y(void);
@@ -17,6 +18,7 @@ static float display_y(void);
  * 2: enhanced scene top / dialogue or menu bottom. */
 static unsigned nds_display_mode;
 static bool nds_dual_mode, nds_dual_bottom_pass;
+static nds_dual_title_gate nds_title_gate;
 /* Do not synchronously write FAT on every L press. Coalesce a burst of
  * three-mode cycling and persist once it settles, or on game exit. */
 static bool nds_dual_save_pending;
@@ -26,7 +28,10 @@ static u64 nds_dual_save_after;
 volatile unsigned nds_dual_state[9]={0x4e445332};
 
 static bool nds_dual_active(void){
- return nds_dual_mode && nds_playing && !error_ui_active && !nds_aux_hidden();
+ /* A boot/title selection is a complete original game screen.
+    Split only after the story has reached its first real #say. */
+ return nds_dual_mode && nds_dual_title_allow_split(&nds_title_gate) &&
+        nds_playing && !error_ui_active && !nds_aux_hidden();
 }
 static bool nds_dual_is_say(enum cpymo_backend_image_draw_type type){
  return type==cpymo_backend_image_draw_type_text_say ||
@@ -74,6 +79,7 @@ static void nds_dual_filename(char* path,size_t size,const char* gamedir){
  snprintf(path,size,"%s/save/nds-dualscreen-mode.txt",gamedir);
 }
 static void nds_dual_load(const char* gamedir){
+ nds_dual_title_reset(&nds_title_gate);
  nds_dual_save_pending=false;
  nds_dual_save_after=0;
  nds_display_mode=0;
