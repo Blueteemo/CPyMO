@@ -4,6 +4,14 @@
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
 
+## 2026-10-23 — DSi video demo hardware feedback and multilingual font correction
+
+User reports the independent 1.2 DSi video conversion demo **runs without observed gameplay issues**. This is first physical confirmation of the actual source-MP4 → NVL1/NVA1 converter-backed #movie demo (including its user-facing playback flow), not a broad compatibility or NTR performance certificate.
+
+User then identified a locale-dependent auxiliary help bug: simplified "增强双屏" printed as "？？？屏" in demo and Japanese "強化2画面" as "？化2画面" in other games. Root cause confirmed by comparing ROM `ui_fallback_codes` and the converter's game-specific pixel-font subsets: codepoints 增/强/双 and 強 (plus five other published UI literal characters) had never been inserted into the built-in fallback ROM table; behavior depended on incidental glyphs in each game's own cache.
+
+Fixed both layers without touching video, scripts, or UI geometry: ROM's OFL Fusion/Unifont glyph arrays include all nine missing official UI glyphs (for existing games without reconversion), converter's mandatory `UI_CODEPOINTS` includes them for future conversions. New `test_nds_ui_font_coverage.py` enforces all published four-language UI string coverage even with an empty game cache. [Host regression #39855409830](https://github.com/Blueteemo/CPyMO/actions/runs/39855409830) **success**; [NTR/TWL SDK + full converter #39855507624](https://github.com/Blueteemo/CPyMO/actions/runs/39855507624) **both jobs success**. Fresh DSi/TWL font-fix ROM built and packaged for optional device confirmation; that exact patched ROM has **not yet** been independently hardware inspected. Legacy converted source/saves need no replacement.
+
 ## 2026-10-23 — First real ordinary-media NVL1/NVA1 converter milestone
 
 **Public, independently implemented video encoder integrated on this 1.2
