@@ -298,9 +298,9 @@ static void launcher_play_panel(const char* message){
  launcher_text(nds_ui("UP：历史对话"),12,50,white,183);
  launcher_text(nds_ui("X：菜单 · B：返回"),12,68,white,183);
  if(launcher_count)launcher_game_icon(&launcher_games[launcher_selected],196,40,true);
- launcher_text(nds_ui("B长按：隐藏文字 · R：快进"),12,86,white,245);
+ launcher_text(nds_ui("B：按住隐藏文字"),12,86,white,183);
  launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,104,white,183);
- launcher_text(nds_ui("L：切换显示模式"),12,122,white,245);
+ launcher_text(nds_ui("R：快进 · L：切换模式"),12,122,white,245);
  launcher_text(nds_ui("上屏游戏 / 下屏游戏 / 增强双屏"),12,140,accent,245);
  launcher_text(nds_ui("START：快速保存"),12,158,muted,245);
  /* The final row temporarily hosts save/load confirmation, whose text
