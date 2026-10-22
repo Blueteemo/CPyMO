@@ -4,6 +4,41 @@
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
 
+## 2026-10-23 — First actual Windows video-converter EXE accepted
+
+**Critical release blocker discovered and fixed:** original Windows Starter's
+\`tools/build-ffmpeg-audio.sh\` built FFmpeg with video decoding and swscale
+disabled; the new source-video encoder could not possibly work in such a
+portable package. \`video_nvl.validate_ffmpeg\` now interrogates the FFmpeg
+filter/decoder tables (not \`-version\`) and refuses audio-only builds before
+writing a new video. \`build_portable.py\` runs the same gate **before packaging**
+to prevent false "MP4 supported" products. The validator accepts differences
+in FFmpeg 8 filter flag table widths / stderr output and has independent
+mocked tests. Original 1.1 packages and games are not changed.
+
+**Actual Windows executable:** a new opt-in GitHub Actions Windows
+PyInstaller job packages the same-run NTR ROM and a video-capable FFmpeg,
+then invokes the *frozen* \`Converter.exe --job\` on an original synthetic
+PyMO game including an audiovisual MP4. Real result on Windows:
+\`frozen_worker=PASS\`, \`ffmpeg_video=PASS\`,
+\`format=NVL1\`, \`frames=14\`,
+\`rom_pair=MATCH\`, \`source_preservation=PASS\`.
+Cache manifest, scripts, NDS ROM hash and source preservation are checked
+by the smoke script. All three jobs **success**:
+[CI #39860993871](https://github.com/Blueteemo/CPyMO/actions/runs/39860993871),
+with a 14-day development artifact
+\`CPyMO-1.2-Windows-Portable-VIDEO-REVIEW-NOT-RELEASE\`.
+NTR/TWL ROMs and full Linux converter suite passed in the same run.
+
+The temporary CI artifact is **not the public 1.2 release**. It has only a
+headless frozen worker smoke test, not a human GUI acceptance or independent
+R4/NTR video performance test. Before public binary redistribution attach
+all appropriate FFmpeg third-party licensing/notice and corresponding-source
+materials, audit the distribution layout/launcher, finish NTR/DSi game/save
+regression and consolidated versioning. Keep public version at 1.1.0 until
+release gates close. Do not require the owner to keep retesting every
+small UI-only patch.
+
 ## 2026-10-23 — Unified opening title + compact save/load help
 
 Owner requested two additional UI decisions after the successful DSi video
