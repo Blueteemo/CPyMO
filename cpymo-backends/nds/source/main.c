@@ -822,7 +822,23 @@ int main(int argc,char** argv){
  unsigned interval_us=(now_tick-observed_tick)*1000000/TICK_FREQ;observed_tick=now_tick;
  engine_state[33+(interval_us<=20000?0:interval_us<=34000?1:interval_us<=50000?2:interval_us<=100000?3:4)]++;
  u64 update_start=tickGetCount();loaded_image=false;
- err=cpymo_engine_update(&engine,dt,&redraw);if(!err)enforce_text_readability();if(skip_override)engine.config_skip_already_read_only=saved_skip_policy;engine_state[1]=err;engine_state[2]++;
+ err=cpymo_engine_update(&engine,dt,&redraw);
+ if(!err){
+  enforce_text_readability();
+  /* Only narrative dialogue ends the opening/title screen. No script-name
+     heuristic, input remap, or changes to PyMO's authored title assets. */
+  unsigned title_ended=nds_dual_title_observe(&nds_title_gate,
+      engine.say.active,cpymo_ui_enabled(&engine),
+      engine.select_img.selections!=NULL);
+  if(title_ended && nds_display_mode==2){
+   /* Previous sub LCD held auxiliary help. The upcoming split pass will
+      replace it with the real CPyMO dialogue on the same frame. */
+   nds_aux_refresh();
+   cpymo_engine_request_redraw(&engine);
+   redraw=true;
+  }
+ }
+ if(skip_override)engine.config_skip_already_read_only=saved_skip_policy;engine_state[1]=err;engine_state[2]++;
  nds_preferences_sync();
  /* Rebuild UI objects after their updater returns, never from a setter while
     its data is still in use. Recreate the parent menu too, so Back is localized. */
