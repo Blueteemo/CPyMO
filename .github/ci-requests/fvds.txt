@@ -1,1 +1,1 @@
-FVDS stream adapter targeted diagnosis: print exact failed C assertion and exercise full host container/PCM regressions once. No NDS SDK build. 2026-10-22.
+Targeted exact FVDS word position instrumented test for compressed packet->audio boundary. Isolate first failing 16-bit word; host only 2026-10-22.
