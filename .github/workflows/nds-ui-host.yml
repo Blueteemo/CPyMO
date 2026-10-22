@@ -19,6 +19,7 @@ jobs:
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_rom_banner.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_visual_capture.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_visual_capture_c.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_canvas.py' -v
       - name: Render real C-source lower-screen backdrops to native 256x192 PNG
         run: |
           python cpymo-backends/nds/tools/nds-dual-canvas-preview.py --output dist/native-lcd-canvas
