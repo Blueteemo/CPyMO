@@ -190,3 +190,41 @@ A-release in the next CPyMO input update.
   parallel DeepSeek FVDS decoding work is untouched.
 - Overall weighted deliverable readiness remains **48%** until actual
   enhanced UI acceptance and real decoded FVDS playback integration occur.
+
+## 2026-10-22 — Three-mode L-switch responsiveness and mode-aware classic helper
+
+Unlike the earlier touch correctness fixes, this milestone addresses an
+unnecessary synchronous FAT write **on every L screen-mode switch**.
+Previously `nds_display_cycle()` called `nds_dual_save()` immediately.
+Fast 0→1→2→0 cycling therefore opened/wrote/closed the same game save file
+three times, risking visibly delayed LCD switching on slow flashcarts.
+
+- `dual-screen-nds.h` now records the selected mode immediately in memory,
+  redraws the chosen display without saving synchronously, and schedules a
+  single per-game preference write after **750 ms since the LAST L press**.
+- `main.c` calls `nds_dual_poll_mode()` from the existing frame loop. On
+  gameplay exit `nds_display_restore_launcher()` flushes pending state
+  **before the active engine frees its game-directory string**, preserving a
+  last-second choice; each game starts with a cleared pending flag.
+- The portable host state-machine regression exercises real emitted bytes,
+  premature poll/no file, repeated L postponement, one final mode-2 save,
+  subsequent persisted mode-0 save, one coalesced two-switch sequence,
+  immediate exit flush and reload of its chosen game mode. No game save
+  slots, RAM scene cache, R7 code or FVDS codec files were altered.
+- The classic auxiliary panel displays mode **1/3** or **2/3**, and classic
+  LOWER uses a distinct "A continue / touch to control the game" hint
+  rather than implying that its physical lower-screen coordinate input is
+  always the virtual-A helper. The new text has English, simplified/traditional
+  Chinese and Japanese translations; enhanced mode retains its authored
+  lower-screen dialogue/menu canvas.
+- Evidence: [UI Host Regression #39720443566](https://github.com/Blueteemo/CPyMO/actions/runs/39720443566)
+  **passed**. [Nintendo DS full SDK + converter #39720506030](https://github.com/Blueteemo/CPyMO/actions/runs/39720506030)
+  **passed both original NDS and DSi/TWL builds and converter regression**,
+  exact tested commit `5c7a6c59fa56b2959e17e662bc4cdad2c952d79d`.
+- Scope: this removes *redundant writes*, not the single actual persistence
+  write; FAT timing and the enhanced visual result still require optional
+  hardware acceptance. Existing R3 is an earlier ROM and does **not** contain
+  this change. No R4 test claimed and no 1.2 release made.
+- Weighted 1.2 delivery readiness stays **48%**, since FVDS real video
+  reconstruction/output and the final combined NTR/DSi device visual tests
+  are still open, independently of these successful UI changes.
