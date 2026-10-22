@@ -46,11 +46,20 @@ def validate_ffmpeg(ffmpeg):
             raise ValueError('Video-capable FFmpeg is unavailable: '+str(error)) from error
         if done.returncode != 0:
             raise ValueError('FFmpeg cannot list '+option+' capabilities: '+done.stderr[-400:])
-        return done.stdout
+        # FFmpeg builds/terminal platforms sometimes put capability tables on
+        # stderr. Collect both while keeping the check fully read-only.
+        return done.stdout + '\n' + done.stderr
     filters = capabilities('-filters')
     decoders = capabilities('-decoders')
     required = ('fps', 'scale', 'pad', 'format', 'aresample', 'apad', 'atrim')
-    available = set(re.findall(r'^\s*[.A-Z|]{3,4}\s+([a-z0-9_]+)\s', filters, re.M))
+    # Do NOT match a fixed-width flag prefix: FFmpeg has changed its filter
+    # capability indicators across releases (e.g. three vs five columns).
+    # Instead identify named filters followed by their V->V/A->A signature.
+    available = set()
+    for line in filters.splitlines():
+        fields = line.split()
+        if len(fields) >= 3 and '->' in fields[2]:
+            available.add(fields[1])
     missing = sorted(set(required) - available)
     video_decoders = set(re.findall(r'^\s*[A-Z.]{6}\s+([a-z0-9_]+)\s', decoders, re.M))
     if not video_decoders.intersection({'h264', 'hevc', 'mpeg4', 'mjpeg', 'vp9', 'av1'}):
