@@ -139,3 +139,12 @@
   review, but is **not a new visual acceptance nor a new FVDS decoder**.
   Keep weighted delivery readiness at **48%**, pending host CI, ROM SDK
   compilation and genuine DSi NDSPIX1 captures.
+
+### 四场景诊断验收结果与实验 ROM（2026-10-22）
+
+- 主机 NDS UI 回归 [#39715235344](https://github.com/Blueteemo/CPyMO/actions/runs/39715235344) **成功**，覆盖生产 C NDSPIX1 writer、Python PNG converter、三态显示与触控、layout、banner 等原有测试。
+- 精确代码提交 `55aa190a5cc81c6dfc2d070c35eb6f8d1e117d14` 的 [Nintendo DS #39715423370](https://github.com/Blueteemo/CPyMO/actions/runs/39715423370) **build 与 converter 均成功**；生成普通 NDS 与 DSi/TWL 实验 ROM。
+- 已检查 DSi ROM：820,224 B，SHA-256 `8df84303df19aa1ba3808eaf87eb80738bcd0cf89219bd8cbf536945b2c61e66`；Banner 六个语言槽含 `CPyMO for NDS / 1.1.0 / 千岚之夏`，NDS unit code=2，保持实验构建的真实版本。
+- 单 ROM 自包含体验包 `CPyMO_1.2_DSi_三态四场景体验版_20261022.zip` 包括 DSi 构建、中文验收说明和 SHA-256 校验。它是可选测试资产，不覆盖 R7、不正式发布、不意味着 DSi 实机已通过。
+- 上机时应优先检查 **L 三态/触控精确选项、上下屏真实画面、X 菜单、Y 隐藏、切游戏恢复**，可用四个 `nds-capture-*.ndsraw` 一次性交付实际像素。待用户方便时集中验证，不要求立即测试。
+- **综合准备度仍为 48%**，新增回归和可用测试构建不等于 FVDS 解码成果或实机视觉验收。
