@@ -6,6 +6,7 @@
 #ifndef CPYMO_NDS_DUAL_CANVAS_H
 #define CPYMO_NDS_DUAL_CANVAS_H
 #include <stdint.h>
+#include <stddef.h>
 #define NDS_DUAL_CANVAS_W 256
 #define NDS_DUAL_CANVAS_H 192
 
