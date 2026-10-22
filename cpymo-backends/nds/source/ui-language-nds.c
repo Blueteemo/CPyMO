@@ -95,7 +95,9 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"SELECT: 语言 / B: 返回","SELECT: Language / B: Back"},
  /* Runtime profile: native mode detection, not a console-model guess. */
  {"DSi 模式 · 16 MiB","DSi mode · 16 MiB"},
- {"DS 模式 · 4 MiB","DS mode · 4 MiB"}
+ {"DS 模式 · 4 MiB","DS mode · 4 MiB"},
+ /* Classic-lower: the stylus now targets game coordinates, not virtual A. */
+ {"A：继续 · 触屏操控","A: Next / Touch: Game"}
 };
 #include "ui-language-extra.h"
 int nds_language_choice_get(void){return preference;}
