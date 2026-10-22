@@ -17,6 +17,31 @@ static inline unsigned nds_touch_uses_coordinates(unsigned mode,
   unsigned enhanced_visible,unsigned ui,unsigned choice){
  return mode==1 || (mode==2 && enhanced_visible && (ui||choice));
 }
+/* A physical pen contact must keep the meaning it had on touch-down.
+ * PyMO can enter a script choice or menu while that same contact is held;
+ * enhanced narrative touch=A would otherwise become menu mouse=pressed.
+ * Conversely a menu->story transition could synthesize an A release.
+ * Return 0 (no boundary), 1 (sanitize previous input), or 2 (sanitize
+ * previous input and block the continuing pen until it is lifted).
+ * A fresh pen-down AFTER a UI transition is always accepted normally. */
+typedef struct {
+ unsigned valid,coordinate_role,physical_held;
+} nds_touch_role_tracker;
+
+static inline unsigned nds_touch_role_step(nds_touch_role_tracker* state,
+                                           unsigned coordinate_role,
+                                           unsigned physical_held){
+ if(!state)return 0;
+ coordinate_role=!!coordinate_role;
+ physical_held=!!physical_held;
+ unsigned crossing=state->valid && state->coordinate_role!=coordinate_role
+                   && state->physical_held;
+ state->valid=1;
+ state->coordinate_role=coordinate_role;
+ state->physical_held=physical_held;
+ return crossing?(physical_held?2u:1u):0u;
+}
+
 static inline nds_touch_sample nds_touch_project(unsigned mode,
  unsigned enhanced_visible,unsigned ui,unsigned choice,
  unsigned physical_touch,unsigned blocked,unsigned key_a,
