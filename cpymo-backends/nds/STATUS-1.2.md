@@ -281,3 +281,52 @@ VLC tables or private licensed media were pushed into GitHub.**
   validate normal EOF/B skip/errors/lid/audio resume and the physical
   12fps budget on both NTR 4MiB and TWL 16MiB before public 1.2.
   No 1.2 playable FVDS ROM or hardware acceptance is claimed yet.
+
+## 2026-10-23 — FVDS private integration M1, owned entirely by this project
+
+The user asked the online CPyMO team to continue the implementation without
+outsourcing later steps to local DeepSeek. The received full-decoder work has
+been staged **privately** and treated as input, not as a merged ROM feature.
+
+- Built and tested a concrete `fvds-playback-bridge-nds.[ch]` joining the
+  existing FVDS stream reader to the provided I/P picture decoder. Its per-frame
+  callback contract carries a rational microsecond PTS and the decoded planar
+  G/R/B bytes; it decodes existing 264-byte FVDS ADPCM pairs via the already
+  public `nds_fvds_adpcm_pair` into 256-frame interleaved stereo PCM blocks.
+  This is a host-side operational callback boundary, **not ARM7 sound playback**.
+- Verified an entirely synthetic 3-picture **I→P→I** FVDS container through
+  the real C packet reader, VLC, IDCT, motion/reference chain, ADPCM decoder
+  and callback bridge. Regressions also cover natural EOF, early user skip,
+  unsupported q (reject q!=30 rather than misdecode), a truncated I payload,
+  malformed ADPCM index, pixel-channel packing, and preservation of packet
+  audio/video boundaries. Compiler uses `-Wall -Wextra -Werror`, the bridge
+  run uses AddressSanitizer/UBSan, and both new bridge and the adjusted native
+  coefficient tests pass locally.
+- Tightened the *private* VLC coefficient decode: consuming more than the
+  physical picture payload plus 15 legitimate terminal pad bits now yields a
+  truncated error, preventing the observed two-byte synthetic zero-fill
+  false success. This is not yet independently checked against the original
+  full 1908-frame FVDS source, which was not present in the decoder review ZIP.
+- Corrected a material decoder memory accounting error in the handoff:
+  `2 * 3 * 256 * 192 = 294,912 bytes` (288 KiB) for two triple-plane
+  reference frames, NOT 100,368 bytes. VLC lookup constants separately use
+  about 35 KiB. Allow for audio queue, original engine and runtime stack on
+  NTR 4 MiB; no assertion of completed NTR allocation acceptance yet.
+- The supplied host `.rgb555` files encode red in the **high** five bits.
+  Actual libnds `RGB15(r,g,b)` places red in the **low** five bits and blue
+  in the high five. A direct planar → existing CPyMO framebuffer conversion
+  (with bit15 set) is verified; there is no third full-frame RGB555 buffer.
+- The private handoff `CPyMO_1.2_FVDS_私有集成M1_源码与回归_20261023.zip`
+  contains the self-contained C prototype, synthetic unit tests and delta.
+  No copyrighted movie content and no new decoder VLC-derived tables were
+  uploaded to GitHub. Original stable R7 and 1.1.0 remain unchanged.
+- The FastVideoDS Player/Encoder public repositories have no clear root
+  code-merging licence; upstream license-request issue #15 was still open
+  during this review. Before pushing vendor-derived table data into public
+  AGPL code, provenance/permission must be resolved.
+- **Next milestone (M2):** schedule the decoded PCM using the existing
+  pre-roll queue and rational 12fps clock, implement safe ARM9 display and
+  VRAM lease plus ROM-local `#movie` transition, with one cleanup path for B,
+  EOF, errors, lid, BGM and script continuation; then benchmark actual
+  NTR and DSi hardware. This M1 is deliberately not called a video-playing
+  `.nds` and does not increase the accepted 48% integrated release readiness.
