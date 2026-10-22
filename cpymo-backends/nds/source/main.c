@@ -560,39 +560,21 @@ static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3]
 #include "launcher.h"
 #include "aux-screen-nds.h"
 #include "visual-capture-nds.h"
+#include "dual-canvas-nds.h"
 /* Refined lower-LCD presentation for the 1.2 enhanced screen.
  * Native RGB555 decoration sits BEHIND the game's own speaker/name/text.
  * Do not stretch a captured upper screen or allocate a second framebuffer.
  * Menus/choices use a less decorated canvas to preserve hit-test contrast. */
 static void nds_dual_lower_background(bool ui,bool choices){
  const bool interactive=ui||choices;
- /* Native RGB555 backdrop rather than a magnified copy of the top LCD.
-    Low-contrast dusk gradient preserves the actual PyMO game dialogue art. */
- for(unsigned y=0;y<192;y++){
-  unsigned band=y/48;
-  u16 col=band==0?RGB15(5,9,13):
-          band==1?RGB15(4,7,11):
-          band==2?RGB15(3,6,9):RGB15(2,4,7);
-  for(unsigned x=0;x<256;x++)framebuffer[y*256+x]=col|BIT(15);
-  if((y&31u)==0)nds_audio_pump_if_due();
- }
- u16 upper=RGB15(12,18,23)|BIT(15),muted=RGB15(7,12,17)|BIT(15);
- for(unsigned x=12;x<244;x++)framebuffer[7*256+x]=muted;
- for(unsigned x=12;x<38;x++)framebuffer[7*256+x]=upper;
- if(!interactive && engine.say.active &&
-    !engine.input.hide_window && !engine.say.hide_window){
-  /* The 3DS lower LCD stays quiet when no dialogue is active. A compact
-     guide appears only while there is actual text to advance.
-     Native small-font controls occupy a separate low contrast footer.
-     Draw BEHIND game assets, so oversized scripted text has precedence. */
-  for(unsigned y=162;y<192;y++)
-   for(unsigned x=0;x<256;x++)
-    framebuffer[y*256+x]=RGB15(3,6,9)|BIT(15);
-  for(unsigned x=12;x<244;x++)framebuffer[162*256+x]=muted;
+ const bool dialogue_visible=engine.say.active &&
+           !engine.input.hide_window && !engine.say.hide_window;
+ /* Same RGB555 canvas function is compiled and pixel-tested on desktop;
+    CPyMO's REAL namebox, textbox, text and menu render over it afterward. */
+ nds_dual_canvas_draw(framebuffer,interactive,dialogue_visible);
+ nds_audio_pump_if_due();
+ if(!interactive && dialogue_visible)
   launcher_text(nds_ui("A / 轻触：继续"),14,169,RGB15(19,25,28),248);
-  /* The current narrative owns the lower screen; keep game-authored
-     textbox/speaker above this footer without introducing another box. */
- }
 }
 static PmEventCookie sleep_cookie;
 static u64 sleep_started;
