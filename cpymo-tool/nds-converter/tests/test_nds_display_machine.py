@@ -30,7 +30,7 @@ typedef struct {
  struct {void *msgbox,*name,*namebox; int msgbox_h,msgbox_w;}say;
  struct {void *selections;}select_img;
  struct {const char *gamedir;}assetloader;
- struct {bool mouse_button;}input;
+ struct {bool ok,mouse_button,mouse_position_useable;}input;
  bool ignore_next_mouse_button_flag;
 } cpymo_engine;
 static cpymo_engine engine;
@@ -39,6 +39,7 @@ static bool nds_touch_blocked=false,screens_swapped=false,menu_enabled=false,aux
 static volatile unsigned presentation_state[9];
 static int keys=0,remap=0,refresh=0,redraw=0,ignored=0;
 #define KEY_TOUCH 1
+#define KEY_A 2
 static int keysHeld(void){return keys;}
 static void lcdMainOnTop(void){remap=0;}
 static void lcdSwap(void){remap=!remap;}
@@ -81,6 +82,7 @@ int main(int argc,char**argv){
  nds_display_cycle();
  assert(nds_display_mode==1 && screens_swapped && remap==1);
  assert(nds_touch_blocked && ignored==1 && engine.ignore_next_mouse_button_flag);
+ assert(!engine.input.mouse_button && !engine.input.mouse_position_useable);
  assert(refresh==1 && redraw==1);
  verify_saved(argv[1],"NDSDISPLAY2 1\n");
  /* Releasing stylus lets the real input poll clear touch_blocked. */
@@ -110,12 +112,33 @@ int main(int argc,char**argv){
  nds_display_cycle();
  assert(nds_display_mode==0 && !nds_dual_mode && remap==0);
  verify_saved(argv[1],"NDSDISPLAY2 0\n");
+ /* Reproduce real ghost-A: classic-upper turns held TOUCH into OK, not
+    mouse_button. An unsanitized old OK generates JUST_RELEASED in the
+    subsequent core update, advancing a story from a mode-only L press. */
+ keys=KEY_TOUCH;
+ engine.input.ok=true;
+ engine.input.mouse_button=false;
+ engine.input.mouse_position_useable=false;
+ nds_display_cycle();
+ assert(nds_display_mode==1 && nds_touch_blocked);
+ assert(!engine.input.ok && !engine.input.mouse_button);
+ assert(!engine.input.mouse_position_useable);
+ verify_saved(argv[1],"NDSDISPLAY2 1\n");
+ /* Physical A is preserved while the obsolete stylus input is discarded. */
+ keys=KEY_TOUCH|KEY_A;
+ engine.input.ok=true;
+ engine.input.mouse_button=true;
+ engine.input.mouse_position_useable=true;
+ nds_display_cycle();
+ assert(nds_display_mode==2 && engine.input.ok);
+ assert(!engine.input.mouse_button && !engine.input.mouse_position_useable);
+ keys=0;
  nds_dual_load(argv[1]);
- assert(nds_display_mode==0);
+ assert(nds_display_mode==2);
  nds_aux_override=true;
  nds_display_restore_launcher();
  assert(!nds_aux_override && !nds_dual_bottom_pass && remap==0);
- assert(refresh==3 && redraw==3);
+ assert(refresh==5 && redraw==5);
  return 0;
 }
 """
