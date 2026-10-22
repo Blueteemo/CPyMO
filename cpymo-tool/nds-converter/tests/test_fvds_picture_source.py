@@ -15,7 +15,7 @@ C_TEST=r"""
 #include "fvds-picture-source-nds.h"
 #include <stdlib.h>
 #include <stdint.h>
-#define CHECK(x) do{if(!(x))abort();}while(0)
+#define CHECK(x) do{if(!(x)){fprintf(stderr,"FVDS stream test line %d failed: %s\\n",__LINE__,#x);abort();}}while(0)
 int main(int argc,char **argv){
  CHECK(argc==2);
  nds_fvds_stream movie;
@@ -76,5 +76,6 @@ class FVDSReaderAdapterTests(unittest.TestCase):
                    str(SRC/"fvds-bits-nds.c"),
                    str(code),"-o",str(exe)],
                   check=True,capture_output=True,text=True)
-   subprocess.run([str(exe),str(fixture)],check=True,
-                  capture_output=True,text=True)
+   result=subprocess.run([str(exe),str(fixture)],
+                          capture_output=True,text=True)
+   self.assertEqual(result.returncode,0,result.stderr)
