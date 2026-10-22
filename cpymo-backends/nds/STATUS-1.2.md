@@ -4,6 +4,36 @@
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
 
+## 2026-10-23 — Unified opening title + compact save/load help
+
+Owner requested two additional UI decisions after the successful DSi video
+exercise, without another immediate device test:
+
+- Classic auxiliary LCD shows **START：快速保存  SELECT：快速读取**
+  together on line y=158, with y=176 left empty unless an action/status
+  toast arrives. Translated English/Japanese strings deliberately use shorter
+  labels to fit 256×192. Original clock (x196,y96), title/icon (x196,y40),
+  game mode labels, and save-slot indication in *action feedback* retained.
+- **Enhanced dual-screen does not split the game's opening/title menu.**
+  The startup authored image/selection remains entirely on upper LCD with
+  lower auxiliary help until first real story dialogue (#say, without
+  overlaid core UI or choice). Then existing top-scene/bottom-dialogue
+  dual-screen routing takes over. This is deliberately session-based rather
+  than hardcoding any PyMO script filename. It does not edit original scripts,
+  input mappings, mode persistence, actual story choices, or saves.
+  A game with unusual title scripts that display narrative-style #say
+  before the title may need separate follow-up evidence, rather than a
+  claim of universal menu detection.
+
+**Evidence:** standalone production-C title gate, host state-machine test
+and updated full production display-mode/ghost-click regression.
+[UI host #39857531941](https://github.com/Blueteemo/CPyMO/actions/runs/39857531941)
+**passed**. [NTR/TWL SDK plus complete converter
+#39857605866](https://github.com/Blueteemo/CPyMO/actions/runs/39857605866)
+**both jobs passed**. These exact small UI changes have not undergone a
+fresh DSi visual acceptance; bundle into later meaningful 1.2 hardware
+candidate instead of sending successive minor ROMs.
+
 ## 2026-10-23 — DSi video demo hardware feedback and multilingual font correction
 
 User reports the independent 1.2 DSi video conversion demo **runs without observed gameplay issues**. This is first physical confirmation of the actual source-MP4 → NVL1/NVA1 converter-backed #movie demo (including its user-facing playback flow), not a broad compatibility or NTR performance certificate.
