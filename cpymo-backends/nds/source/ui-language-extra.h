@@ -1,5 +1,5 @@
 /* Additional NDS UI translations; AGPL-3.0-or-later. */
-static const char* const extra_ui[2][63]={
+static const char* const extra_ui[2][64]={
 {"正在讀取遊戲列表...",
 "遊戲資料庫",
 "選擇遊戲",
@@ -62,7 +62,8 @@ static const char* const extra_ui[2][63]={
 "語言設定已儲存",
 "SELECT: 語言 / B: 返回",
 "DSi 模式 · 16 MiB",
-"DS 模式 · 4 MiB"},
+"DS 模式 · 4 MiB",
+"A：繼續 · 觸控遊戲"},
 {"ゲーム一覧を読み込み中...",
 "ゲームライブラリ",
 "ゲーム選択",
@@ -125,7 +126,8 @@ static const char* const extra_ui[2][63]={
 "言語設定を保存しました",
 "SELECT: 言語 / B: 戻る",
 "DSi mode · 16 MiB",
-"DS mode · 4 MiB"},
+"DS mode · 4 MiB",
+"A：続ける／タッチで操作"},
 };
 static error_t jp_saved(char** out,int i){*out=malloc(96);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"スロット%dにセーブしました",i);return CPYMO_ERR_SUCC;}
 static error_t jp_failed(char** out,error_t e){const char* s=cpymo_error_message(e);*out=malloc(strlen(s)+64);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"セーブ失敗: %s",s);return CPYMO_ERR_SUCC;}
