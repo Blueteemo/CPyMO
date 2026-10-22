@@ -17,6 +17,10 @@ static float display_y(void);
  * 2: enhanced scene top / dialogue or menu bottom. */
 static unsigned nds_display_mode;
 static bool nds_dual_mode, nds_dual_bottom_pass;
+/* Do not synchronously write FAT on every L press. Coalesce a burst of
+ * three-mode cycling and persist once it settles, or on game exit. */
+static bool nds_dual_save_pending;
+static u64 nds_dual_save_after;
 /* magic, selected, enabled, toggles, saves, save failures, bottom draws,
  * skipped top, skipped bottom */
 volatile unsigned nds_dual_state[9]={0x4e445332};
@@ -70,6 +74,8 @@ static void nds_dual_filename(char* path,size_t size,const char* gamedir){
  snprintf(path,size,"%s/save/nds-dualscreen-mode.txt",gamedir);
 }
 static void nds_dual_load(const char* gamedir){
+ nds_dual_save_pending=false;
+ nds_dual_save_after=0;
  nds_display_mode=0;
  nds_dual_mode=false;
  nds_dual_bottom_pass=false;
@@ -95,6 +101,16 @@ static void nds_dual_save(const char* gamedir){
  nds_dual_state[4]++;
  if(!ok)nds_dual_state[5]++;
 }
+static void nds_dual_flush_mode(void){
+ if(!nds_dual_save_pending)return;
+ /* The game's assetloader still owns gamedir before engine teardown. */
+ nds_dual_save_pending=false;
+ nds_dual_save(engine.assetloader.gamedir);
+}
+static void nds_dual_poll_mode(void){
+ if(nds_dual_save_pending && tickGetCount()>=nds_dual_save_after)
+  nds_dual_flush_mode();
+}
 static void nds_display_start(void){
  nds_dual_mode=nds_display_mode==2;
  nds_dual_bottom_pass=false;
@@ -107,6 +123,7 @@ static void nds_display_start(void){
  nds_dual_state[1]=nds_display_mode;
 }
 static void nds_display_restore_launcher(void){
+ nds_dual_flush_mode();
  /* Launcher always owns the regular upper-game/lower-helper assignment.
     Do not leak per-game LCD routing, split drawing or hidden helper state. */
  nds_dual_mode=false;
@@ -150,7 +167,11 @@ static void nds_display_cycle(void){
  nds_aux_refresh();
  nds_dual_state[1]=nds_display_mode;
  nds_dual_state[3]++;
- nds_dual_save(engine.assetloader.gamedir);
+ /* 0.75s after the *last* switch: a 0→1→2 sequence writes only mode 2.
+    This keeps rapid L cycling responsive on slow flashcart storage while
+    still persisting the chosen state during ordinary play. */
+ nds_dual_save_pending=true;
+ nds_dual_save_after=tickGetCount()+(TICK_FREQ*3u)/4u;
  cpymo_engine_request_redraw(&engine);
 }
 #endif
