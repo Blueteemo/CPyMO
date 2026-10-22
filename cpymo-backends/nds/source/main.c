@@ -806,6 +806,8 @@ int main(int argc,char** argv){
  /* Three screen modes by a single L press:
     classic scene top -> classic scene bottom -> enhanced split -> repeat. */
  if(keysDown()&KEY_L)nds_display_cycle();
+ /* Persist only the final L-cycled mode, not every transient selection. */
+ nds_dual_poll_mode();
  nds_aux_poll();
  /* UI/choice changes may alter pen semantics while it is still down.
     Resolve the boundary before the core copies its previous input. */
