@@ -15,6 +15,7 @@ CODE=r"""
 #include "dual-input-nds.h"
 #include <assert.h>
 #include <math.h>
+#include <stddef.h>
 #define CHECK(x) assert(x)
 static nds_touch_sample project(unsigned mode,unsigned visible,unsigned ui,
                                 unsigned choice,unsigned held,unsigned block,
