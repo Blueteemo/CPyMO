@@ -52,6 +52,17 @@ int main(int argc,char**argv){
  CHECK(shot);
  nds_capture_finish(shot,2,bottom);
  CHECK(nds_capture_taken==3 && nds_capture_error==0);
+ shot=nds_capture_begin(3,top);
+ CHECK(shot);
+ nds_capture_finish(shot,3,bottom);
+ CHECK(nds_capture_taken==7 && nds_capture_error==0);
+ shot=nds_capture_begin(4,top);
+ CHECK(shot);
+ nds_capture_finish(shot,4,bottom);
+ CHECK(nds_capture_taken==15 && nds_capture_error==0);
+ CHECK(!nds_capture_begin(4,top));
+ CHECK(!nds_capture_begin(0,top));
+ CHECK(!nds_capture_begin(5,top));
  return 0;
 }
 """
@@ -69,7 +80,8 @@ class RealFramebufferWriterTests(unittest.TestCase):
                    "-o",str(binary)],check=True,capture_output=True,text=True)
    subprocess.run([str(binary),str(game)],check=True,
                   capture_output=True,text=True)
-   for kind,name in ((1,"dialogue"),(2,"menu")):
+   for kind,name in ((1,"dialogue"),(2,"menu"),
+                     (3,"choice"),(4,"classic-lower")):
     path=game/"save"/f"nds-capture-{name}.ndsraw"
     self.assertEqual(path.stat().st_size,capture.EXPECTED_BYTES)
     actual_kind,(top,bottom)=capture.decode_capture(path.read_bytes())
