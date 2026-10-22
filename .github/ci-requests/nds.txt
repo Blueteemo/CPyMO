@@ -1,1 +1,1 @@
-2026-10-22 one-shot concentrated FULL NDS/DSi smoke build for 1.2 three-mode visual preview, after DeepSeek exact source handoff and progress rubric. If devkitPro package server 403, do NOT retry automatically. No release or game upload.
+2026-10-22 one concentrated NDS/DSi full SDK milestone: compile 1.2 three-mode physical touch input, L stylus ghost-click lockout and source-executed LCD state machine; run converter tests; produce optional updated DSi UX preview ROM with old R7 untouched. If devkitPro 403, do not retry automatically. No 1.2 release.
