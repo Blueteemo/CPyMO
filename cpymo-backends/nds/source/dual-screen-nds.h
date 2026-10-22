@@ -117,6 +117,13 @@ static void nds_display_restore_launcher(void){
  presentation_state[1]=0;
 }
 static void nds_display_cycle(void){
+ /* A stylus held while L switches touch-routing modes must not become a
+    synthetic mouse-release click on the newly selected screen. Ignore
+    this contact until the stylus has actually been lifted. */
+ if(keysHeld()&KEY_TOUCH){
+  nds_touch_blocked=true;
+  cpymo_input_ignore_next_mouse_button_event(&engine);
+ }
  unsigned next=(nds_display_mode+1)%3;
  /* LCD swap applies only to classic lower-game. Enhanced always has
     the scene on the physical upper LCD and interactive UI below. */
