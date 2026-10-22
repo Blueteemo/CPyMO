@@ -1,1 +1,1 @@
-2026-10-22 source-executed NDS enhanced 256x192 dialogue/menu/idle canvas PNG review, pixel-exact C shared function, screenshot writer, display preferences and banner regression. Run once SDK-free; no NDS build or user hardware test requested.
+2026-10-22 source-executed 256x192 LCD pixel preview plus six-per-frame audio service cadence, screenshot writer, 3DS-like geometry, display preferences and ROM banner. One SDK-independent regression milestone, no NDS SDK build.
