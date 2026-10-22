@@ -121,3 +121,21 @@
 - **综合交付准备度仍 48%**。本轮对用户体验和构建可靠性有实质改进，但新三态界面未经过实机验证，也没有来自本地 DeepSeek 的 FVDS 解码合格成果，按原计分体系暂不增加进度数字。
 - **预计剩余 2～3 轮集中上机（目标非承诺）**：① 已具备新版三态触控／视觉可选体验 ROM，② 等 FVDS 全帧播放再测音画及 B 跳过，③ 按需要综合候选版与 NTR 4 MiB 回归。现阶段不催用户立刻复制或测试。
 
+## 2026-10-22 — physical LCD evidence coverage expansion (this session)
+
+- The integration branch now expands the strictly opt-in `NDSPIX1` capture
+  contract from 2 to 4 one-time events per game: **enhanced dialogue,
+  enhanced UI/menu, enhanced script choices, and classic-lower dialogue**.
+  The fourth event records the swapped physical upper auxiliary framebuffer
+  first, then the main game framebuffer physically displayed below.
+- Native 256x192 RGB555 output is unchanged, as are the actual scene/layout
+  renderers, UI widgets, key bindings, game resources and saved modes.
+  The first choices capture takes precedence over a lingering dialogue
+  state, so comparing interactive sprites to touch targets is possible.
+- Added C writer / Python decoder test coverage for capture kinds 3 and 4,
+  including exactly one write per kind, physical screen order, and malformed
+  kind rejection. Tests use **synthetic pixels only**, not screenshots.
+- This work directly prepares the first concentrated three-mode hardware
+  review, but is **not a new visual acceptance nor a new FVDS decoder**.
+  Keep weighted delivery readiness at **48%**, pending host CI, ROM SDK
+  compilation and genuine DSi NDSPIX1 captures.
