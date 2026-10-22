@@ -1,1 +1,1 @@
-2026-10-22 final host FVDS elementary picture reader milestone after corrected two-word synthetic fixture: 16-bit little-endian MSB-first stream, 512-byte boundary, video-to-ADPCM packet boundary, and existing PCM/WAV regressions. No NDS SDK build.
+2026-10-22 consolidated checkpoint: production C FVDS coded-picture index auditor and synthetic corruption tests, word-boundary VLC input regressions, stereo PCM decode/queue and WAV output. Build picture auditor host artifact for private 159s corpus verification. No full NDS/DSi SDK build and no real hardware action.
