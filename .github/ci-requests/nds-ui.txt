@@ -1,1 +1,1 @@
-2026-10-22 source-executed 256x192 LCD pixel preview plus six-per-frame audio service cadence, screenshot writer, 3DS-like geometry, display preferences and ROM banner. One SDK-independent regression milestone, no NDS SDK build.
+2026-10-22 one host UI regression retry after adding missing stddef.h in shared native RGB555 canvas header; assert 256x192 pixels, six audio yield callbacks, C writer and PNG exporter. No devkitPro SDK build.
