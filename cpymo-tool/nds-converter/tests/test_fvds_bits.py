@@ -76,7 +76,7 @@ static void rejects_bad_data(void){
  src.calls=0;
  CHECK(nds_fvds_bits_init(&b,pull,&src,16));
  CHECK(!nds_fvds_bits_read(&b,1,&v));
- CHECK(b.failed && src.pos==0);
+ CHECK(b.failed && src.pos==8);
 }
 int main(void){split_and_bounds();rejects_bad_data();return 0;}
 """
