@@ -16,6 +16,11 @@ C_PROGRAM=r"""
 #include <stddef.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
+typedef uint64_t u64;
+#define TICK_FREQ 1000u
+static u64 fake_ticks;
+static u64 tickGetCount(void){return fake_ticks;}
 enum cpymo_backend_image_draw_type{
  cpymo_backend_image_draw_type_bg=0,
  cpymo_backend_image_draw_type_text_say,
@@ -55,6 +60,12 @@ static float display_scale(void){return .8f;}
 static float display_y(void){return 0.f;}
 #include "dual-screen-nds.h"
 
+static void verify_not_saved(const char *dir){
+ char p[512];
+ snprintf(p,sizeof p,"%s/save/nds-dualscreen-mode.txt",dir);
+ FILE *f=fopen(p,"rb");
+ assert(!f);
+}
 static void verify_saved(const char *dir,const char *want){
  char p[512],actual[80]={0};
  snprintf(p,sizeof p,"%s/save/nds-dualscreen-mode.txt",dir);
@@ -84,13 +95,21 @@ int main(int argc,char**argv){
  assert(nds_touch_blocked && ignored==1 && engine.ignore_next_mouse_button_flag);
  assert(!engine.input.mouse_button && !engine.input.mouse_position_useable);
  assert(refresh==1 && redraw==1);
- verify_saved(argv[1],"NDSDISPLAY2 1\n");
+ assert(nds_dual_save_pending && nds_dual_state[4]==0);
+ verify_not_saved(argv[1]);
+ /* If the user cycles quickly, each L resets the FAT-write cooldown. */
+ fake_ticks=500;nds_dual_poll_mode();
+ verify_not_saved(argv[1]);
  /* Releasing stylus lets the real input poll clear touch_blocked. */
  keys=0;nds_touch_blocked=false;
  nds_display_cycle();
  assert(nds_display_mode==2 && nds_dual_mode && !screens_swapped && remap==0);
  assert(refresh==2 && redraw==2);
+ fake_ticks=1200;nds_dual_poll_mode();
+ verify_not_saved(argv[1]); /* new deadline is 1250 ticks */
+ fake_ticks=1250;nds_dual_poll_mode();
  verify_saved(argv[1],"NDSDISPLAY2 2\n");
+ assert(nds_dual_state[4]==1 && !nds_dual_save_pending);
  menu_enabled=false;nds_dual_bottom_pass=false;
  assert(nds_dual_accept(cpymo_backend_image_draw_type_bg));
  assert(!nds_dual_accept(cpymo_backend_image_draw_type_text_say));
@@ -111,7 +130,10 @@ int main(int argc,char**argv){
  /* Three-state return, new game reloads its own preference. */
  nds_display_cycle();
  assert(nds_display_mode==0 && !nds_dual_mode && remap==0);
+ verify_saved(argv[1],"NDSDISPLAY2 2\n"); /* not yet written */
+ fake_ticks=2010;nds_dual_poll_mode();
  verify_saved(argv[1],"NDSDISPLAY2 0\n");
+ assert(nds_dual_state[4]==2);
  /* Reproduce real ghost-A: classic-upper turns held TOUCH into OK, not
     mouse_button. An unsanitized old OK generates JUST_RELEASED in the
     subsequent core update, advancing a story from a mode-only L press. */
@@ -123,7 +145,9 @@ int main(int argc,char**argv){
  assert(nds_display_mode==1 && nds_touch_blocked);
  assert(!engine.input.ok && !engine.input.mouse_button);
  assert(!engine.input.mouse_position_useable);
- verify_saved(argv[1],"NDSDISPLAY2 1\n");
+ verify_saved(argv[1],"NDSDISPLAY2 0\n"); /* still coalescing */
+ fake_ticks=2250;nds_dual_poll_mode();
+ assert(nds_dual_state[4]==2);
  /* Physical A is preserved while the obsolete stylus input is discarded. */
  keys=KEY_TOUCH|KEY_A;
  engine.input.ok=true;
@@ -133,12 +157,17 @@ int main(int argc,char**argv){
  assert(nds_display_mode==2 && engine.input.ok);
  assert(!engine.input.mouse_button && !engine.input.mouse_position_useable);
  keys=0;
- nds_dual_load(argv[1]);
- assert(nds_display_mode==2);
+ /* Exit must persist even before the 750ms threshold; never lose last
+    selected mode because the story completed quickly. */
+ assert(nds_dual_save_pending && nds_dual_state[4]==2);
  nds_aux_override=true;
  nds_display_restore_launcher();
+ assert(nds_dual_state[4]==3 && !nds_dual_save_pending);
+ verify_saved(argv[1],"NDSDISPLAY2 2\n");
  assert(!nds_aux_override && !nds_dual_bottom_pass && remap==0);
  assert(refresh==5 && redraw==5);
+ nds_dual_load(argv[1]);
+ assert(nds_display_mode==2 && !nds_dual_save_pending);
  return 0;
 }
 """
