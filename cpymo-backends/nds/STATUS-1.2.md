@@ -4,6 +4,35 @@
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
 
+## 2026-10-23 — Final DSpico (TWL) / R4 (NTR) shared-game candidate
+
+The user approved the final *two genuine runtime modes* acceptance plan:
+DSpico via DSi/TWL and R4 via DS/NTR. We built a **single 39.37 MiB original
+PyMO stress game** with 12 scene panoramas, four sprites, eight ~83s BGM
+tracks, voice/SE and four FFmpeg-derived NVL1 clips (2/9/3 silent/24s).
+Full title selection, first-story dual-screen transition, subsequent
+choices, quicksave/load and L/Y/X operation are included. Source script
+is byte-identical after conversion; 0 unknown directives, 0 missing assets,
+0 unconverted videos. No dummy padding or commercial test media.
+
+Final integrated [CI #39865200187](https://github.com/Blueteemo/CPyMO/actions/runs/39865200187)
+**all jobs success**: game generation/verification, separate NTR and TWL
+compiled-memory-profile ROMs, bundled ZIP with SHA256 for all 59 files.
+The actual combined artifact is
+`CPyMO-1.2-DSpico-TWL-R4-NTR-FINAL-STRESS-REVIEW`. Original ROMs
+use devkitPro Calico's DSi-compatible header unit code `2` in
+**both** compile modes; this flag alone does not show TWL execution.
+The real acceptance must see runtime `DSi 模式 · 16 MiB` via DSpico
+and `DS 模式 · 4 MiB` via R4. The two ROM binaries differ in SHA,
+with the same data copied to two cards. Detailed six-step human
+checklist: [VALIDATION-1.2-DUALCARD-FINAL.md](VALIDATION-1.2-DUALCARD-FINAL.md).
+
+**Important:** This is a test candidate, NOT physical validation or a
+public release. Physical two-card, GUI acceptance, public licences/
+corresponding FFmpeg source, 1.2 version bump/changelog, and
+experimentally optional NVA1 scope still require release decisions.
+Stable 1.1 and R7 remain untouched.
+
 ## 2026-10-23 — First actual Windows video-converter EXE accepted
 
 **Critical release blocker discovered and fixed:** original Windows Starter's
