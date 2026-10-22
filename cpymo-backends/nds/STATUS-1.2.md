@@ -1,8 +1,40 @@
 # CPyMO for NDS — 1.2 全局进度与发布门槛
 
-更新时间：2026-10-22。性质：实验分支动态状态表；**不是**发行说明或完成声明。
+更新时间：2026-10-23。性质：实验分支动态状态表；**不是**发行说明或完成声明。
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
+
+## 2026-10-23 — DSi hardware UI acceptance and next release gate
+
+**Owner hardware confirmation:** the custom interactive three-mode DSi demo
+played normally and every exercised input/layout scenario passed.
+This establishes a *real DSi acceptance baseline for the pre-polish 1.2
+UI*, including story, touch choices, X menu and L-mode cycling. Do not
+repeat that old claim that enhanced three-state UI is untested.
+
+**Post-acceptance changes actually committed:** follow-up owner-approved
+guide text (UP/DOWN, R/L and three named modes, short START/SELECT help)
+plus A+B subtle integer RGB555 gradient with an intentionally empty
+lower half. The game icon remains at x=196,y=40; help LCD clock at
+x=196,y=96; menu clock routing and save-slot action toast retained.
+No change to original CPyMO dialogue coordinates or input semantics.
+Host test now verifies four-language alignment, LCD reserved x ranges,
+the real C renderer, and six cooperative audio ticks per frame:
+[UI CI #39847351976](https://github.com/Blueteemo/CPyMO/actions/runs/39847351976)
+**success**. NTR + TWL SDK ROM builds and existing converter suite:
+[NDS CI #39847457104](https://github.com/Blueteemo/CPyMO/actions/runs/39847457104)
+**success** (both jobs). This fine polish **has not itself undergone a
+second hardware visual test**; avoid demanding a new device session for
+every cosmetic adjustment.
+
+**Next release-critical engineering milestone:** create a legitimate,
+reproducible source video → NVL1/NVA1 workflow backed by ordinary FFmpeg,
+integrate into converter CLI + Windows helper with bounded output,
+independent test media and exact video/audio packet checks; test game's
+existing `#movie` EOF/B skip/error/BGM restore with converted assets on
+NTR and TWL. This is **not** a demand for further FVDS codec optimisation.
+Any real 1.2 release claim remains blocked until converter playback,
+source licensing and final regression pass.
 
 ## 2026-10-23 — User-approved release-first scope and immediate UI hardware gate
 
@@ -58,10 +90,10 @@ acceptance and may be reweighted after concrete results.
 | 工作包 | 1.2 权重 | 包内估算 | 加权贡献 | 状态与主要限制 |
 | --- | ---: | ---: | ---: | --- |
 | 已验证 R7 基础和兼容 | 20% | 95% | 19% | DSi 已验证；还需 NTR 和新分支防回归 |
-| 三态双屏与 3DS 风格视觉 | 20% | 65% | 13% | 源码、主机验证与背景预览具备；三态新版未实机 |
+| 三态双屏与 3DS 风格视觉 | 20% | 65% | 13% | 源码、主机验证与背景预览具备；三态首版 DSi 实机全部通过；后续外观精修待合并验收 |
 | FVDS 真正视频画面解码 | 30% | 20% | 6% | 包结构、I/P、bitreader 具备；I 帧 VLC/IDCT/P 运动补偿未完成 |
 | FVDS 音频、播放时序与游戏内整合 | 20% | 35% | 7% | 独立 ADPCM/WAV/PCM 环具备；ARM7 混音及完整 #movie 未接入 |
-| 版本品质、ROM 集成、许可与发布 | 10% | 30% | 3% | Banner/说明和静态测试；正式 ARM 编译、双平台验收和发布尚缺 |
+| 版本品质、ROM 集成、许可与发布 | 10% | 30% | 3% | Banner/说明和静态测试；NTR/TWL 已成功构建；视频转换、最终设备回归和发布尚缺 |
 | **总计** | **100%** | — | **48%** | **开发估算，不是自动测量** |
 
 **缩短体感空档的交付原则**：将「双屏/交互体验构建」与「FVDS 底层播放器」拆成不同验收关卡。双屏的新三态不必无限等待 FVDS 完成才交给用户：只要 SDK 编译成功并排除明显的崩溃，就准备一次集中的、明确标注“非正式版”的三态视觉测试（含原生 256×192 抓帧）。视频仍由独立研究/实现推进，不得把音频流或 I/P 解析当成画面已解码。
