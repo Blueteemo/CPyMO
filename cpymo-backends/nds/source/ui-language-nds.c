@@ -101,7 +101,7 @@ static const struct {const char* zh;const char* en;} strings[]={
  /* 1.2 clean dual-screen guide: controller lettering and explicit mode names. */
  {"A / DOWN：继续","A / DOWN: Continue"},
  {"UP：历史对话","UP: History"},
- {"B长按：隐藏文字 · R：快进","Hold B: Hide text / R: Skip"},
+ {"R：快进 · L：切换模式","R: Skip / L: Cycle modes"},
  {"上屏游戏 / 下屏游戏 / 增强双屏","Game top / Game bottom / Dual screen"},
  {"START：快速保存","START: Quick save"},
  {"SELECT：快速读取","SELECT: Quick load"}
