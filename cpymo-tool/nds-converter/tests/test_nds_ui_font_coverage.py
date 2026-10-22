@@ -5,14 +5,33 @@ Regression for the confirmed DSi symptoms:
   日本語:   上画面 / 下画面 / ?化2画面
 """
 from pathlib import Path
+import ast
 import re
 import unittest
-import sys
 
 ROOT=Path(__file__).resolve().parents[3]
 NDS=ROOT/'cpymo-backends/nds/source'
-sys.path.insert(0,str(ROOT/'cpymo-tool/nds-converter'))
-from convert import UI_CODEPOINTS
+
+
+def source_ui_codepoints():
+    """Read the converter's literal set without importing Pillow on UI CI."""
+    code=(ROOT/'cpymo-tool/nds-converter/convert.py').read_text(encoding='utf-8')
+    numeric=set()
+    for node in ast.parse(code).body:
+        if not isinstance(node,ast.Assign) or not any(
+                isinstance(t,ast.Name) and t.id=='UI_CODEPOINTS'
+                for t in node.targets):
+            continue
+        if isinstance(node.value,ast.Tuple):
+            numeric.update(int(t.value) for t in node.value.elts
+                           if isinstance(t,ast.Constant) and isinstance(t.value,int))
+        else:
+            for expr in ast.walk(node.value):
+                if isinstance(expr,ast.Constant) and isinstance(expr.value,str):
+                    numeric.update(map(ord,expr.value))
+    return numeric
+
+UI_CODEPOINTS=source_ui_codepoints()
 
 CJK_LABELS=(
     '上屏游戏 / 下屏游戏 / 增强双屏',
