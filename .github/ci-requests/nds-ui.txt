@@ -1,1 +1,1 @@
-2026-10-22 one host UI regression retry after adding missing stddef.h in shared native RGB555 canvas header; assert 256x192 pixels, six audio yield callbacks, C writer and PNG exporter. No devkitPro SDK build.
+2026-10-22 DS/DSi three-state touch safety gate: test the production display-mode state machine, exact on-card NDSDISPLAY2 save bytes, stylus L-switch ghost-click suppression, bottom UI/choice draw routing, physical touch coordinates, letterboxing, visual capture and original ROM banner. Host-only checkpoint; no devkitPro build.
