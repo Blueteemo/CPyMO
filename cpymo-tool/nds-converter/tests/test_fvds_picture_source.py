@@ -29,6 +29,10 @@ int main(int argc,char **argv){
  CHECK(nds_fvds_bits_read(&bits,1,&b) && b==0);
  CHECK(nds_fvds_bits_read(&bits,6,&b) && b==30);
  CHECK(nds_fvds_bits_read(&bits,9,&b) && b==15);
+ /* Consume the second storage word's leading 1 before aligning over its
+    remaining 15 padding bits. The previous test aligned at the boundary
+    *before* this word, erroneously expecting a zero next. */
+ CHECK(nds_fvds_bits_read(&bits,1,&b) && b==1);
  CHECK(nds_fvds_bits_align16(&bits));
  for(unsigned i=2;i<255;i++){
   int ok=nds_fvds_bits_read(&bits,16,&b);
