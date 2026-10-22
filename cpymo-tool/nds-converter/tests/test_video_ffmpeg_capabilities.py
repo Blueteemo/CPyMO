@@ -38,6 +38,19 @@ class VideoFFmpegCapabilityTests(unittest.TestCase):
             self.assertEqual(video_nvl.validate_ffmpeg('known-full-ffmpeg.exe'),result)
             self.assertEqual(calls,['-filters','-decoders'])
 
+    def test_ffmpeg_new_filter_flag_width_and_stderr_tables(self):
+        # New FFmpeg variants expose more flag columns, and some platforms
+        # send the capability listing to stderr rather than stdout.
+        names='fps scale pad format aresample apad atrim'.split()
+        table=''.join(f' TSC.. {name} V->V supported\\n' for name in names)
+        def output(argv,**kwargs):
+            if argv[-1]=='-filters':
+                return subprocess.CompletedProcess(argv,0,stdout='',stderr=table)
+            return subprocess.CompletedProcess(argv,0,
+                stdout=' VFS..D h264 supported\\n',stderr='')
+        with mock.patch.object(video_nvl.subprocess,'run',side_effect=output):
+            self.assertTrue(video_nvl.validate_ffmpeg('ffmpeg8.exe')['video_decoder'])
+
     def test_bad_executable_or_timeout_fails_before_output_creation(self):
         with mock.patch.object(video_nvl.subprocess,'run',side_effect=OSError('missing')):
             with self.assertRaisesRegex(ValueError,'unavailable'):
