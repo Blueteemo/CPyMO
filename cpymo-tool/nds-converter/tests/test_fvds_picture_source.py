@@ -30,8 +30,14 @@ int main(int argc,char **argv){
  CHECK(nds_fvds_bits_read(&bits,6,&b) && b==30);
  CHECK(nds_fvds_bits_read(&bits,9,&b) && b==15);
  CHECK(nds_fvds_bits_align16(&bits));
- for(unsigned i=2;i<255;i++)
-  CHECK(nds_fvds_bits_read(&bits,16,&b)&&b==0);
+ for(unsigned i=2;i<255;i++){
+  int ok=nds_fvds_bits_read(&bits,16,&b);
+  if(!ok || b!=0){
+   fprintf(stderr,"word=%u value=%08x ok=%d fetched=%u remaining=%u used=%u\\n",
+     i,(unsigned)b,ok,bits.fetched_bytes,bits.remaining_bits,bits.consumed_bits);
+   abort();
+  }
+ }
  CHECK(nds_fvds_bits_read(&bits,16,&b)&&b==0x7fffu);
  CHECK(nds_fvds_bits_read(&bits,16,&b)&&b==0xadcau);
  /* Its remaining final 2 bytes are padding and must NOT spill into audio. */
