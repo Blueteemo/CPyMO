@@ -94,6 +94,7 @@ int main(int argc,char**argv){
  assert(!nds_dual_accept(cpymo_backend_image_draw_type_text_say));
  nds_dual_bottom_pass=true;
  assert(nds_dual_accept(cpymo_backend_image_draw_type_text_say));
+ assert(nds_dual_say_offset() < 0.f);
  assert(!nds_dual_accept(cpymo_backend_image_draw_type_bg));
  /* Narrative selection images MUST route to the touch LCD. */
  engine.select_img.selections=(void*)1;
