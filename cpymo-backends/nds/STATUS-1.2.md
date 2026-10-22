@@ -4,6 +4,46 @@
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
 
+## 2026-10-23 — First real ordinary-media NVL1/NVA1 converter milestone
+
+**Public, independently implemented video encoder integrated on this 1.2
+branch** (not the private FVDS decoder): \`video_nvl.py\` invokes FFmpeg
+to decode ordinary input MP4/AVI/MKV/MOV/etc to stream-bounded 256×192
+RGB555, normalized 12 FPS by default, with native NVL1-compatible packet
+framing, four-second reset/key pictures, optional LZ4 XOR delta frames,
+and the **Adler32 of the reconstructed complete RGB555 frame**. Exact
+22,050-Hz mono PCM sample alignment after explicit *pre-trim* resampling;
+optional public NAR2 lossless compression gives NVA1. Source with no audio
+receives deterministic silence.
+
+**Converter and Windows helper actually wired:** opt-in CLI
+\`--video-mode nvl1\` / \`nva1\` and \`--video-fps 12\`; GUI has explicit
+video codec choice, with old default "skip" to preserve 1.1 compatibility.
+Writes \`nds-cache/video/<2-letter-hash>/<full-hash>.nvl\`; original
+\`#movie\` instruction unchanged; hashes and full manifests validated;
+unconverted movie references still reported. Video conversion never
+touches source script, original game, or user saves. Invalid/non-media
+inputs fail rather than silently producing an empty video.
+
+**Host evidence:** original 2 s synthetic audiovisual MP4 converted into
+both NVL1 and NVA1, frame-by-frame complete *decode back to identical
+RGB555* via independent Python LZ4, checksum, packet and audio bounds
+audited; silent MP4 and deliberately invalid source exercised. Actual
+synthetic PyMO \`#movie\` game converted twice and verified with 0 skipped
+movie commands, byte-identical source hashes/script. Full GitHub Actions
+[run #39851339676](https://github.com/Blueteemo/CPyMO/actions/runs/39851339676)
+**success**, including NTR+TWL dual SDK ROM builds and entire Python
+converter suite. No unlicensed FVDS tables or vendor video codec copied.
+
+**Next release blocking gate is the physical movie experience:** built a
+separate DSi video review game \`CPYMO12_VIDEO_CHECK\` using the actual
+compiled 1.2 ROM and separately converted original SHORT (2 s with
+sound), SKIP (8 s with B interruption), and SILENT (1.5 s without source
+audio). Normal EOF, skip, error/bad-input behavior, post-playback scene,
+BGM reentry, display and touch preservation **must be verified on DSi**
+before claiming a finished 1.2 video player. NTR memory and performance
+remain open. Mainline 1.1 and known-good R7 unchanged.
+
 ## 2026-10-23 — DSi hardware UI acceptance and next release gate
 
 **Owner hardware confirmation:** the custom interactive three-mode DSi demo
