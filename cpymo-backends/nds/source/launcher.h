@@ -291,18 +291,21 @@ static void launcher_play_panel(const char* message){
  u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  /* Physical touch is a native game coordinate only in classic-lower.
-    Don't claim that the classic help panel itself is a virtual A here. */
- launcher_text(nds_ui(nds_display_mode==1?"A：继续 · 触屏操控":"A / 轻触：继续"),12,32,white,183);
- launcher_text(nds_ui("X：菜单 · B：返回"),12,50,white,183);
- launcher_text(nds_ui("B：按住隐藏文字"),12,68,white,183);
+    Do not imply the help LCD is a universal virtual A button. D-pad
+    story shortcuts use the physical controller's UP/DOWN labels.
+    Keep the game icon at x=196,y=40 and clock at x=196,y=96 untouched. */
+ launcher_text(nds_ui("A / DOWN：继续"),12,32,white,183);
+ launcher_text(nds_ui("UP：历史对话"),12,50,white,183);
+ launcher_text(nds_ui("X：菜单 · B：返回"),12,68,white,183);
  if(launcher_count)launcher_game_icon(&launcher_games[launcher_selected],196,40,true);
- char mode_hint[96];
- snprintf(mode_hint,sizeof mode_hint,"%s  %u/3",nds_ui("L：切换显示模式"),nds_display_mode+1);
- launcher_text(nds_ui("R：按设置快进"),12,86,white,245);
- launcher_text(mode_hint,12,104,white,245);
- launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,122,white,245);
- launcher_text(nds_ui("START：快速保存到存档1"),12,140,muted,245);launcher_text(nds_ui("SELECT：快速读取存档1"),12,158,muted,245);
- launcher_text(message?message:nds_ui("显示、字号、音量：X 菜单"),12,176,accent,245);
+ launcher_text(nds_ui("B长按：隐藏文字 · R：快进"),12,86,white,245);
+ launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,104,white,183);
+ launcher_text(nds_ui("L：切换显示模式"),12,122,white,245);
+ launcher_text(nds_ui("上屏游戏 / 下屏游戏 / 增强双屏"),12,140,accent,245);
+ launcher_text(nds_ui("START：快速保存"),12,158,muted,245);
+ /* The final row temporarily hosts save/load confirmation, whose text
+    continues to identify slot 1. Keep that explicit only on action. */
+ launcher_text(message?message:nds_ui("SELECT：快速读取"),12,176,muted,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
  if(!nds_aux_clock_suppressed)nds_clock_paint(framebuffer,196,96,RGB15(21,24,27));clock_state[6]++;
  launcher_publish(launcher_sub);
