@@ -1,1 +1,1 @@
-2026-10-22 host FVDS end-to-end elementary-picture adapter milestone: verify native 16-bit word bitreader, 512-byte boundaries, q30 I-picture prefix, reading stage video without consuming ADPCM, corruption behavior and all existing container/PCM/WAV regressions. One explicit host workflow only; do not trigger NDS SDK build.
+FVDS stream adapter targeted diagnosis: print exact failed C assertion and exercise full host container/PCM regressions once. No NDS SDK build. 2026-10-22.
