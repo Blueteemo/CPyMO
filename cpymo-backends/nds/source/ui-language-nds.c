@@ -103,7 +103,7 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"UP：历史对话","UP: History"},
  {"R：快进 · L：切换模式","R: Skip / L: Cycle modes"},
  {"上屏游戏 / 下屏游戏 / 增强双屏","Game top / Game bottom / Dual screen"},
- {"START：快速保存","START: Quick save"},
+ {"START：快速保存  SELECT：快速读取","START: Save / SELECT: Load"},
  {"SELECT：快速读取","SELECT: Quick load"}
 };
 #include "ui-language-extra.h"
