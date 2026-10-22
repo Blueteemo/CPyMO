@@ -126,8 +126,9 @@ class NDSDisplayMachineTests(unittest.TestCase):
    game=base/"game";(game/"save").mkdir(parents=True)
    src=base/"mode.c";src.write_text(C_PROGRAM,encoding="utf-8")
    exe=base/"mode"
-   subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
-                   "-fsanitize=undefined","-I",str(SRC),str(src),
-                   "-o",str(exe)],check=True,capture_output=True,text=True)
+   result=subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
+                          "-fsanitize=undefined","-I",str(SRC),str(src),
+                          "-o",str(exe)],capture_output=True,text=True)
+   self.assertEqual(result.returncode,0,result.stderr)
    subprocess.run([str(exe),str(game)],check=True,
                   capture_output=True,text=True)
