@@ -120,10 +120,19 @@ static void nds_display_cycle(void){
  /* A stylus held while L switches touch-routing modes must not become a
     synthetic mouse-release click on the newly selected screen. Ignore
     this contact until the stylus has actually been lifted. */
- if(keysHeld()&KEY_TOUCH){
-  nds_touch_blocked=true;
-  cpymo_input_ignore_next_mouse_button_event(&engine);
- }
+ unsigned held=keysHeld();
+ if(held&KEY_TOUCH)nds_touch_blocked=true;
+ /* The core snapshots engine.input as prev_input on the next update.
+    Scrub the OLD stylus edge before that snapshot: classic-upper and
+    enhanced narrative taps are mapped to "ok", not "mouse_button".
+    Ignoring only mouse-release leaves a false A-release at L transitions
+    that can advance text or select a highlighted script choice.
+    Preserve a genuinely held physical A button; invalidate the stylus
+    mouse coordinate, which belongs to the PREVIOUS screen mapping. */
+ cpymo_input_ignore_next_mouse_button_event(&engine);
+ engine.input.ok=!!(held&KEY_A);
+ engine.input.mouse_button=false;
+ engine.input.mouse_position_useable=false;
  unsigned next=(nds_display_mode+1)%3;
  /* LCD swap applies only to classic lower-game. Enhanced always has
     the scene on the physical upper LCD and interactive UI below. */
