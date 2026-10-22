@@ -67,13 +67,22 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r cpymo-tool/nds-converter/requirements.txt
-      - name: Use hosted FFmpeg when available, install only if missing
+      - name: Use hosted FFmpeg or pip wheel (no apt mirror dependency)
         run: |
           if command -v ffmpeg >/dev/null 2>&1; then
             ffmpeg -version | head -n 1
           else
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
+            python -m pip install 'imageio-ffmpeg==0.6.0'
+            python - <<'PY'
+          import os
+          from pathlib import Path
+          import imageio_ffmpeg
+          link=Path(os.environ['RUNNER_TEMP'])/'ffmpeg'
+          link.symlink_to(imageio_ffmpeg.get_ffmpeg_exe())
+          with open(os.environ['GITHUB_PATH'],'a',encoding='utf8') as stream:
+              stream.write(str(link.parent)+'\n')
+          print('CI FFmpeg wheel binary:',link.resolve())
+          PY
           fi
       - run: python -m unittest discover -s cpymo-tool/nds-converter/tests -v
 
@@ -81,7 +90,9 @@ jobs:
     # Opt in explicitly: only runs when the CI request commit contains
     # [portable]. All ordinary DS/DSi builds remain fast and unchanged.
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[portable]')
-    needs: [build, converter]
+    # Linux apt/mirror availability must not hold the independent Windows
+    # frozen-worker proof hostage. Full converter suite is a separate gate.
+    needs: [build]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
