@@ -34,6 +34,8 @@ static unsigned launcher_language_cursor;
 static char launcher_font_path[256],launcher_icon_path[256];
 static u16 selected_icon[48*48];static bool selected_icon_ok;
 static u64 toast_started;
+/* Enhanced split cannot show the classic aux-panel toast on its touch LCD. */
+static char nds_toast_text[128];
 /* magic, about, font reads, title reads, restore success, selection writes, write errors */
 volatile unsigned frontend_state[7]={0x4e465231};
 /* magic, visible, presentations, completed library presentations */
@@ -304,8 +306,26 @@ static void nds_clock_poll(void){
  if(nds_aux_hidden()){clock_state[8]++;return;}
  if(!nds_menu_clock_visible)nds_clock_patch_aux(true);
 }
-static void launcher_toast(const char* message){toast_started=tickGetCount();presentation_state[2]=1;presentation_state[3]++;presentation_state[5]=0;launcher_play_panel(nds_ui(message));}
-static void launcher_update_toast(void){if(presentation_state[2]){u64 elapsed=tickGetCount()-toast_started;presentation_state[5]=elapsed*1000/TICK_FREQ;if(elapsed>=2*TICK_FREQ){presentation_state[2]=0;presentation_state[4]++;launcher_play_panel(NULL);}}}
+static void launcher_toast(const char* message){
+ const char* localized=nds_ui(message?message:"");
+ snprintf(nds_toast_text,sizeof nds_toast_text,"%s",localized?localized:"");
+ toast_started=tickGetCount();presentation_state[2]=1;presentation_state[3]++;presentation_state[5]=0;
+ /* Only the split mode owns both screens as gameplay. Redraw a brief
+    upper-scene feedback banner rather than destroying its lower dialogue. */
+ if(nds_dual_active())cpymo_engine_request_redraw(&engine);
+ else launcher_play_panel(nds_toast_text);
+}
+static void launcher_update_toast(void){
+ if(!presentation_state[2])return;
+ u64 elapsed=tickGetCount()-toast_started;presentation_state[5]=elapsed*1000/TICK_FREQ;
+ if(elapsed>=2*TICK_FREQ){
+  presentation_state[2]=0;presentation_state[4]++;
+  /* Force repaint to remove the actual upper-scene overlay; relying on
+     script activity can leave a stale success message over a static CG. */
+  if(nds_dual_active())cpymo_engine_request_redraw(&engine);
+  else launcher_play_panel(NULL);
+ }
+}
 /* Error rendering is ROM-only: it never consults game fonts or FAT. */
 volatile unsigned error_ui_state[8]={0x4e455231};
 static unsigned launcher_rom_width(const char* text,bool large){
