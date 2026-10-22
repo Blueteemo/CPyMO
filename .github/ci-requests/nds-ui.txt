@@ -1,1 +1,1 @@
-2026-10-22 native RGB555 visual capture milestone: test actual C buffer writer, opt-in zero-default capture, magic/header dimensions, source-accurate two-screen PNG converter, and earlier 3DS-like UI layout/config/banner host regressions. No devkitPro build, no user hardware action.
+2026-10-22 source-executed NDS enhanced 256x192 dialogue/menu/idle canvas PNG review, pixel-exact C shared function, screenshot writer, display preferences and banner regression. Run once SDK-free; no NDS build or user hardware test requested.
