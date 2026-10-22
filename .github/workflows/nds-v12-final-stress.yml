@@ -100,8 +100,13 @@ jobs:
           from pathlib import Path
           n=Path('cpymo-backends/nds/engine.nds')
           t=Path('cpymo-backends/nds/cpymo-dsi-experiment.nds')
-          assert n.read_bytes()[0x12] in (0,1), 'NTR ROM header invalid'
-          assert t.read_bytes()[0x12]==2,'TWL ROM header invalid'
+          # Current Calico/ndstool marks BOTH CPyMO output headers as TWL-compatible.
+          # This field does NOT attest that the engine is running in TWL mode.
+          # The two builds use different compiled memory profiles; real NTR/TWL
+          # is determined at runtime by libnds systemIsTwlMode/isDSiMode.
+          assert n.read_bytes()[0x12]==2,'Unexpected compatible ROM header'
+          assert t.read_bytes()[0x12]==2,'Unexpected DSi experimental ROM header'
+          assert n.read_bytes()!=t.read_bytes(),'NTR/TWL memory-profile binaries unexpectedly identical'
           print('NTR ROM bytes:',n.stat().st_size)
           print('TWL ROM bytes:',t.stat().st_size)
           PY
@@ -141,7 +146,8 @@ jobs:
           ntr=next(x for x in roms if x.name=='engine.nds')
           twl=next(x for x in roms if x.name=='cpymo-dsi-experiment.nds')
           assert twl.read_bytes()[0x12]==2
-          assert ntr.read_bytes()[0x12] in (0,1)
+          assert ntr.read_bytes()[0x12]==2  # both SDK headers are DSi-compatible
+          assert ntr.read_bytes()!=twl.read_bytes()
           shutil.copytree(game,root/'pymo/games/CPYMO12_STRESS')
           for src,dst in [
               (ntr,root/'ROM/R4_DS_NTR/CPyMO_1.2_NTR.nds'),
@@ -158,6 +164,8 @@ jobs:
           ② R4：使用 ROM/R4_DS_NTR/CPyMO_1.2_NTR.nds
              在 R4 卡的 fat:/pymo/games/CPYMO12_STRESS 放置相同的游戏目录。
              启动页/关于须显示「DS 模式 · 4 MiB」。
+             注意：Calico 当前给两种 ROM 都标记了 DSi 兼容文件头；文件头 unit=2
+             并不代表 R4 在 DSi 模式运行。实际运行标签才是验收依据。
           ③ 两卡依次测试完整标题选单（第三态开始时不拆分）、12 幕剧情切换、
              人物透明遮罩、长音乐、BGM/SE/VO、剧情分支及触控。
              再验证视频一正常结束；视频二运行中按 B 跳过；视频三无源音轨；
