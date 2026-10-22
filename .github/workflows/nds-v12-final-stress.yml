@@ -43,6 +43,11 @@ jobs:
           mkdir -p pymo/games
           python cpymo-tool/nds-converter/convert.py convert /tmp/cpymo12stress pymo/games/CPYMO12_STRESS --ffmpeg ffmpeg --cache-only --audio-lossless voice --missing-glyph-policy box --video-mode nvl1 --video-fps 12
           python cpymo-tool/nds-converter/convert.py verify pymo/games/CPYMO12_STRESS
+      - name: Generate and independently convert 2-clip NVA1 supplemental game
+        run: |
+          python cpymo-tool/nds-converter/tests/make_release_nva1_sidecar.py /tmp/cpymo12stress /tmp/cpymo12nva1
+          python cpymo-tool/nds-converter/convert.py convert /tmp/cpymo12nva1 pymo/games/CPYMO12_NVA1_CHECK --ffmpeg ffmpeg --cache-only --audio-lossless voice --missing-glyph-policy box --video-mode nva1 --video-fps 12
+          python cpymo-tool/nds-converter/convert.py verify pymo/games/CPYMO12_NVA1_CHECK
       - name: Verify meaningful size, four video manifests and source integrity
         run: |
           python - <<'PY'
@@ -64,6 +69,16 @@ jobs:
           total=sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
           assert 28*1024*1024<=total<=160*1024*1024,total
           assert len(list((root/'nds-cache/video').rglob('*.nvl')))==4
+          companion=Path('pymo/games/CPYMO12_NVA1_CHECK')
+          nva=json.loads((companion/'nds-cache/manifest.json').read_text())
+          assert len(nva['videos'])==2,nva['videos']
+          assert {v['name'] for v in nva['videos']}=={'OPENING','SILENT'}
+          assert all(v['format']=='NVA1' for v in nva['videos'])
+          assert not nva['audit']['unsupported_video_commands']
+          assert not nva['audit']['unknown_commands']
+          assert not nva['audit']['missing_resource_references']
+          assert len(list((companion/'nds-cache/video').rglob('*.nvl')))==2
+          assert not (companion/'video').exists()
           audit={'converted_game_bytes':total,'MiB':round(total/1048576,2),
                  'videos':[{'name':x['name'],'format':x['format'],
                             'frames':x['frames'],'bytes':x['bytes']} for x in videos],
@@ -149,6 +164,10 @@ jobs:
           assert ntr.read_bytes()[0x12]==2  # both SDK headers are DSi-compatible
           assert ntr.read_bytes()!=twl.read_bytes()
           shutil.copytree(game,root/'pymo/games/CPYMO12_STRESS')
+          companion=Path('source-game/games/CPYMO12_NVA1_CHECK')
+          if not companion.is_dir():companion=Path('source-game/pymo/games/CPYMO12_NVA1_CHECK')
+          assert (companion/'nds-cache/manifest.json').is_file(),companion
+          shutil.copytree(companion,root/'pymo/games/CPYMO12_NVA1_CHECK')
           for src,dst in [
               (ntr,root/'ROM/R4_DS_NTR/CPyMO_1.2_NTR.nds'),
               (twl,root/'ROM/DSpico_DSi_TWL/CPyMO_1.2_TWL.nds')]:
@@ -158,11 +177,11 @@ jobs:
           
           ① DSpico 标准版：使用 ROM/DSpico_DSi_TWL/CPyMO_1.2_TWL.nds
              在你的 DSi/TWL 能正常启动的路径放 ROM，游戏放到该启动器实际读取的
-             sd:/pymo/games/CPYMO12_STRESS 或 fat:/pymo/games/CPYMO12_STRESS。
+             sd:/pymo/games/ 或 fat:/pymo/games/ 中的两个游戏目录。
              启动页/关于须显示「DSi 模式 · 16 MiB」。若显示 DS 模式，
              则这次启动不算 TWL 实机验证，请检查 Loader 运行模式。
           ② R4：使用 ROM/R4_DS_NTR/CPyMO_1.2_NTR.nds
-             在 R4 卡的 fat:/pymo/games/CPYMO12_STRESS 放置相同的游戏目录。
+             在 R4 卡的 fat:/pymo/games/ 放置相同的两个游戏目录。
              启动页/关于须显示「DS 模式 · 4 MiB」。
              注意：Calico 当前给两种 ROM 都标记了 DSi 兼容文件头；文件头 unit=2
              并不代表 R4 在 DSi 模式运行。实际运行标签才是验收依据。
@@ -170,6 +189,9 @@ jobs:
              人物透明遮罩、长音乐、BGM/SE/VO、剧情分支及触控。
              再验证视频一正常结束；视频二运行中按 B 跳过；视频三无源音轨；
              视频四 24 秒连续播放。每段返回后均确认对白/BGM继续。
+             完成大型游戏后，还可进入附加游戏 CPYMO12_NVA1_CHECK：
+             其 2 秒有声 + 3 秒静音影片都由正式转换器生成 NVA1，
+             用于验证「压缩音轨」在 DS/NTR 和 DSi/TWL 上也能播放。
           ④ 依次用 L 轮换「上屏游戏/下屏游戏/增强双屏」，Y 辅助屏开关；
              X 打开菜单，检查时钟。START 快速保存、SELECT 快速读取（槽位1）。
              再返回主画面/重新启动，确认存档有效。
