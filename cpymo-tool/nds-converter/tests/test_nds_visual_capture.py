@@ -61,9 +61,17 @@ class NativeLCDCaptureTests(unittest.TestCase):
         self.assertEqual(parse_png(capture.png_rgb(256,192,top)),top)
         self.assertEqual(parse_png(capture.png_rgb(256,192,bottom)),bottom)
 
+    def test_four_capture_kinds_and_screen_order(self):
+        for kind in (1, 2, 3, 4):
+            with self.subTest(kind=kind):
+                actual_kind, (top, bottom) = capture.decode_capture(fixture(kind))
+                self.assertEqual(actual_kind, kind)
+                self.assertEqual(top[:3], bytes((255, 0, 0)))
+                self.assertEqual(bottom[:3], bytes((0, 0, 255)))
+
     def test_reject_truncated_and_corrupt(self):
         cases=[fixture()[:-1],fixture()+b"x",b"X"+fixture()[1:],
-               fixture(kind=99)]
+               fixture(kind=0),fixture(kind=5),fixture(kind=99)]
         for blob in cases:
             with self.subTest(length=len(blob)):
                 with self.assertRaises(ValueError):
