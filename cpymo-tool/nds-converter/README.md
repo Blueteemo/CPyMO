@@ -25,6 +25,37 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 `nds-cache/manifest.json` 及转换结果中。GUI 默认缺字显示 □ 并记录，脚本文字不改。
 加密/打包脚本和其他游戏引擎不支持。
 
+## 1.2 集成分支：可播放视频转换（开发验收功能）
+
+**1.1.0 正式版不受影响。** 原有默认行为仍然是省略视频、原样保留脚本；
+1.2 集成分支新提供可选的 **NVL1**（22050 Hz PCM16）与 **NVA1**（NAR2
+无损压缩音频）视频转换，在 GUI 的“游戏视频”下拉框中选择。默认
+12 FPS、256×192 RGB555；保留原始画面比例，居中补黑边，不随意拉伸。
+字幕、脚本与存档策略不改；无音轨视频补零音频。
+
+CLI 用法（在正式发布前需搭配同分支 ROM）：
+
+
+
+```sh
+python cpymo-tool/nds-converter/convert.py convert 原游戏目录 新输出目录 --video-mode nvl1 --cache-only --missing-glyph-policy box
+# 压缩视频音轨（更省空间，但建议先做实机性能验证）
+python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目录 --video-mode nva1 --video-fps 12
+```
+
+识别游戏目录内的 \`video/\`、\`movie/\`、\`videos/\`、\`movies/\`
+普通视频（FFmpeg 支持的 MP4/AVI/MKV/MOV 等）。输出为
+\`nds-cache/video/<哈希前缀>/<视频名哈希>.nvl\`；原 PyMO \`#movie\` 指令
+无需修改。全程校验帧的 Adler32 与像素还原，音轨严格按视频帧数对齐；
+不支持的视频会在审计中继续标注为未转换。单段视频受现有 NDS 播放器
+10 分钟限制。生成缓存及主机验证通过**不等于** NTR/DSi 实机视频性能、
+跳过恢复、所有原始游戏视频的兼容性已验收。
+
+新的 \`video_nvl.py\` 和本路径下的 NVL 视频转换测试不使用
+Gericom/FastVideoDSPlayer 的专有或未授权查表。FVDS 独立解码仍存在
+发布许可门槛，不能混入公共 1.2 源码或 ROM。
+
+
 ## 从源码运行与构建
 
 Python 3.10+，安装 requirements.txt，另备 FFmpeg；完整仓库内运行 `python app.py`。
