@@ -24,6 +24,15 @@
 
 每次回答用户时报告 **48% 或按真实里程碑更新后的新分数**，附最新通过的门槛、下一待突破门槛、是否产生了新的可测试构建。来源文档：本文件。开发中的小修补不自动加分；后续依照相同权重和标准复估，并注明主观性。没有设置自动实时监控，不可暗示数字每秒自动刷新。
 
+## 2026-10-22 — 本地 DeepSeek 并行交接及三态体验构建
+
+- **当前综合进度仍为 48%**。新一次编译通过使近期双屏视觉测试具备了实际 ROM，不等于新版三态已实机验收或 FVDS 真正播放，暂不为小成果加分。
+- 完整源码离线开发快照来自 **`d5be738231570ba16071507a3aa01ffe4b6ba276`**，GitHub Actions [开发交接快照](https://github.com/Blueteemo/CPyMO/actions/runs/39703898561) 通过。交接 ZIP 包私有地组合了原 159s j1 FVDS、1s/3s 合成截取样片、既有研究证据和 DeepSeek 提示词，**私有游戏媒体未推送至 GitHub**。
+- 本地 DeepSeek **单独负责第一张 I 帧独立 VLC/IDCT 解码**，不得修改 `main.c`、`dual-screen-nds.h` 或 `audio-nds.c`，不得未经许可复用 FastVideoDSPlayer。成果以隔离 patch + 自动测试 + 真实像素/失败证据返回；云端主线负责审查、三态 UI、音频/VRAM、游戏 `#movie` 接口。
+- **一次完整 NDS 和 DSi SDK 编译、所有转换器测试均通过**：[Nintendo DS #39704544801](https://github.com/Blueteemo/CPyMO/actions/runs/39704544801)。这次 devkitPro 服务可用；构建输出为 `engine.nds` 和 `cpymo-dsi-experiment.nds`。后者已经打包为“DSi 三态双屏视觉体验版”，保留独立文件名和 R7 回退，**明确尚未上机验证**。
+- **不再绑定视频解码完成才测试三态双屏。** 已经有可选的三态体验包，用户可在方便时进行一次集中视觉/触控验收，并提供 `NDSPIX1` 实际画面；FVDS 由本地 DeepSeek 并行研究，直到真正输出 RGB555 画面才宣布视频进入显示阶段。
+- 成功全构建 **只证明可编译**，不证明真实 3DS 风格上下屏在每款游戏都无错、正常 DS/NTR 性能达标或 FVDS 视频播放成功。仍不发布 1.2.0。
+
 ## 总目标和证据分层
 
 1. **R7 不倒退**：DSi/TWL 16 MiB、DS/NTR 4 MiB 两种环境及启动器；游戏库、滚动和触控；DSpico TF → DSi 机身 SD 游戏跨卡读取；资源缓存、正常原版 PyMO 脚本；旧版 NVL1/NVA1 视频、B 跳过和 BGM 恢复。
