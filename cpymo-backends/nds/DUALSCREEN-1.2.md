@@ -99,3 +99,12 @@ A new optional **NDSPIX1** capture facility provides this without bundling an em
 - The current environment has no accessible running DS emulator. **No actual 1.2 enhanced-mode image has yet been captured**, and nothing in this toolchain should be described as an authentic visual preview until the raw pixel dump comes from the physical DSi or from a running emulator.
 
 This capture feature will be folded into the user's already-planned first concentrated UI/visual acceptance round; no separate immediate hardware testing is requested. Stable R7 is not changed.
+
+
+## Source-executed lower-LCD visual preview (without game art)
+
+The user asked for visual proof when an untested 1.2 UI change is made and explicitly prohibited AI image generation. The lower-LCD RGB555 backdrop has therefore been extracted from `main.c` into **the exact same production** `source/dual-canvas-nds.h` static C function used at runtime. `main.c` calls it before rendering the game's original namebox, textbox, glyphs, choices and menu.
+
+`python cpymo-backends/nds/tools/nds-dual-canvas-preview.py --output <directory>` builds that actual C function with a normal GCC host compiler, executes it for dialogue/menu/idle states, and converts its RGB555 buffers into three native 256×192 PNG images using the existing checked `nds-capture-to-png.py` logic. The separate SDK-free UI CI uploads these files as a visual artifact only at a manually requested checkpoint.
+
+**Accurate scope:** the three PNGs show ONLY the screen's underlying gradient, accents and dialogue footer band, *not* the user's actual PyMO game textbox, Chinese font glyphs or character sprite. They are exact source-executed backdrop pixels but emphatically **not NDS game screenshots**, and may not be labeled or presented as complete enhanced-screen visuals. The complete result still requires the user's or emulator's first real `NDSPIX1` capture from the actual game. This design preserves an honest source-driven visual preview now while deferring full visual acceptance to the already-planned concentrated device round.
