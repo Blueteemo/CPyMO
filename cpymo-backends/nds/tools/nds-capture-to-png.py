@@ -28,7 +28,7 @@ def decode_capture(data: bytes) -> tuple[int, tuple[bytes, bytes]]:
     magic, width, height, frames, kind = HEADER.unpack_from(data)
     if magic != MAGIC or (width, height, frames) != (WIDTH, HEIGHT, 2):
         raise ValueError("Not an NDSPIX1 256x192 two-screen RGB555 capture")
-    if kind not in (1, 2):
+    if kind not in (1, 2, 3, 4):
         raise ValueError("Unsupported display capture kind")
     result = []
     for start in (HEADER.size, HEADER.size + FRAME_BYTES):
