@@ -55,6 +55,7 @@ static bool screens_swapped;
 /* magic, swapped, toast active/shown/expired/age ms, icon loaded, metadata lines, touch samples */
 volatile unsigned presentation_state[9]={0x4e505232};
 #include "dual-screen-nds.h"
+#include "dual-input-nds.h"
 volatile unsigned engine_state[46]={0x4350454e};
 /* magic, image loads, total/max load us, draws, total/max draw us, loop pixels, omitted pixels */
 volatile unsigned perf_state[9]={0x4e505246};
@@ -504,15 +505,15 @@ cpymo_input cpymo_input_snapshot(){
     Classic lower-game: accurate PyMO coordinates including menus/choices.
     Enhanced: story area = A; core menus drawn below = real coordinates.
     A wake-up touch is blocked by nds_aux_poll when Y hid the sub LCD. */
- bool touch=!nds_touch_blocked&&(k&KEY_TOUCH);
- bool screen_coords=nds_display_mode==1||
-       (nds_dual_active() &&
-        (cpymo_ui_enabled(&engine) || nds_dual_has_choice()));
- in.ok=(k&KEY_A)||(touch&&!screen_coords);
- in.mouse_button=touch&&screen_coords;
+ nds_touch_sample touch_sample=nds_touch_project(nds_display_mode,
+   nds_dual_active(),ui,nds_dual_has_choice(),
+   !!(k&KEY_TOUCH),nds_touch_blocked,!!(k&KEY_A),
+   t.px,t.py,display_scale(),display_x(),display_y());
+ in.ok=touch_sample.ok;
+ in.mouse_button=touch_sample.mouse_button;
  in.mouse_position_useable=in.mouse_button;
- in.mouse_x=in.mouse_position_useable?(t.px-display_x())/display_scale():0;
- in.mouse_y=in.mouse_position_useable?(t.py-display_y())/display_scale():0;
+ in.mouse_x=touch_sample.x;
+ in.mouse_y=touch_sample.y;
  return in;
 }
 static FILE* savefile(const char* dir,const char* name,const char* mode){char path[512];snprintf(path,sizeof path,"%s/save/%s",dir,name);return fopen(path,mode);}
