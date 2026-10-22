@@ -101,3 +101,15 @@ The user rejected fabricated high-resolution AI art as unusable for judging CPyM
 - The most recent .nds for this exact capture instrumentation remains **unbuilt/unverified** because full NDS CI previously hit devkitPro package-index HTTP 403; no running emulator is available in the current execution environment. An authentic image preview can be claimed only after the opt-in pixels have been recorded by the actual DSi or working emulator in the user's next already-planned concentrated UI test, **not** from synthetic fixtures.
 
 No update to 1.1.0 / stable R7; no new user test requested now. Continue FVDS video frame decoder work separately.
+
+
+## 2026-10-22 — FVDS elementary picture-bitstream milestone (no new visual change)
+
+The main 1.2 FVDS feature has advanced from preflight+audio stages to independently authored **word-accurate compressed picture-bitstream I/O**, using the actual NDS C source in CI:
+
+- `source/fvds-bits-nds.[ch]`: 16-bit little-endian stored video words, MSB-first bit consumption; bounded 512-byte refill, crossed-word reads, image-payload limits and failure on short storage reads. In the 159-second user j1 movie, the first video word `0x3c0f` represents an I-picture with q30; the format's byte layout is not equivalent to bytewise MSB-first decoding.
+- `source/fvds-picture-source-nds.h`: makes the bit reader consume only the video portion of a validated `FVDS` packet before audio reading. No video/audio boundary overflow and no excessive frame allocation.
+- New production-C host tests `test_fvds_bits.py` and `test_fvds_picture_source.py`: 512-byte crossing, q30 I-frame prefix, failed/truncated reads, 516-byte synthetic picture + ADPCM, packet sequence and EOF. Successful green [FVDS host run 39701191274](https://github.com/Blueteemo/CPyMO/actions/runs/39701191274). Initial adapter test failed because its *synthetic fixture incorrectly omitted consuming a 16-bit word*; it was fixed without changing the production bit reader.
+- Nothing in the user's original 1.2 UI source was visually changed in this milestone. Do **not** recycle the previous RGB555-only background preview as a new game screenshot. The exact lower-screen canvas and capture infrastructure remain intact, and no new hardware test is requested.
+
+Remaining 1.2 critical path: decode VLC quantized 4×4 coefficient syntax and reconstruct I frame pixels, then P-frame motion/IDCT, then frame presentation and original ARM7/Maxmod audio ownership, without breaking the R7 legacy modes. This commit is **not** full video decode, a screen-capture result, an NDS SDK build, or a hardware acceptance. Keep all future demos sourced from real emulator/DSi framebuffers, not generated images.
