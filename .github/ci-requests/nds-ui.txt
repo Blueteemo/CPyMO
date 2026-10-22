@@ -1,1 +1,3 @@
 2026-10-23 post-hardware UI fine polish acceptance: preserve original X-menu clock at (196,96) and 48x48 game icon (196,40), label story shortcut UP/DOWN, remove transient mode counter and persistent save-slot 1 label, retain explicit save-slot in action toast, enumerate top/bottom/enhanced cycles, and validate A+B quiet RGB555 bottom canvas with no lower fake footer. Source C tests, localization 70-element alignment, actual RGB555 PNG preview; no changes to stable R7 or published 1.1.
+
+Retry UI validation after fixing test-only translated-array parser: the first language string was omitted by the test's split prefix; source arrays have 70 entries each.
