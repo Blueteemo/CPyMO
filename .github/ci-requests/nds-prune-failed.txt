@@ -1,1 +1,0 @@
-One-time cleanup authorized by repository owner: delete only 14 completed failures from 2026-10-22 (UTC) on codex/nds-v1.2-integration. Preserve successes, source history, published artifacts, other branches and current runs.
