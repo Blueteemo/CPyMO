@@ -1,0 +1,1 @@
+2026-10-22 one consolidated DS/DSi SDK and full converter check after host UI run #39720443566 passed: 750ms coalesced per-game mode preference write with guaranteed game-exit flush; updated classic-lower touch semantics; 4-language UI lookup arrays and mode x/3 indicator. Keep 1.1.0 release + R7 untouched, no FVDS changes, no public release.

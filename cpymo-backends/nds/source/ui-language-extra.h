@@ -1,5 +1,5 @@
 /* Additional NDS UI translations; AGPL-3.0-or-later. */
-static const char* const extra_ui[2][63]={
+static const char* const extra_ui[2][64]={
 {"正在讀取遊戲列表...",
 "遊戲資料庫",
 "選擇遊戲",
@@ -8,7 +8,7 @@ static const char* const extra_ui[2][63]={
 "X：選單 · B：返回",
 "B：按住隱藏文字",
 "R：依設定快進",
-"L：交換上下螢幕",
+"L：切換顯示模式",
 "Y：隱藏／喚回輔助畫面",
 "START：快速儲存至存檔1",
 "SELECT：快速讀取存檔1",
@@ -62,7 +62,8 @@ static const char* const extra_ui[2][63]={
 "語言設定已儲存",
 "SELECT: 語言 / B: 返回",
 "DSi 模式 · 16 MiB",
-"DS 模式 · 4 MiB"},
+"DS 模式 · 4 MiB",
+"A：繼續 · 觸控遊戲"},
 {"ゲーム一覧を読み込み中...",
 "ゲームライブラリ",
 "ゲーム選択",
@@ -71,7 +72,7 @@ static const char* const extra_ui[2][63]={
 "X: メニュー / B: 戻る",
 "B長押し: 文章を隠す",
 "R: 設定に従ってスキップ",
-"L: 上下画面を入れ替え",
+"L: 画面モード切替",
 "Y: 補助画面の表示切替",
 "START: スロット1へセーブ",
 "SELECT: スロット1をロード",
@@ -125,7 +126,8 @@ static const char* const extra_ui[2][63]={
 "言語設定を保存しました",
 "SELECT: 言語 / B: 戻る",
 "DSi mode · 16 MiB",
-"DS mode · 4 MiB"},
+"DS mode · 4 MiB",
+"A：続ける／タッチで操作"},
 };
 static error_t jp_saved(char** out,int i){*out=malloc(96);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"スロット%dにセーブしました",i);return CPYMO_ERR_SUCC;}
 static error_t jp_failed(char** out,error_t e){const char* s=cpymo_error_message(e);*out=malloc(strlen(s)+64);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"セーブ失敗: %s",s);return CPYMO_ERR_SUCC;}

@@ -58,7 +58,7 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"游戏资料库","Game library"},{"选择游戏","Select a game"},{"关于与许可","About and licenses"},
  {"A / 轻触：继续","A / Touch: Continue"},{"X：菜单 · B：返回","X: Menu / B: Back"},
  {"B：按住隐藏文字","Hold B: Hide text"},{"R：按设置快进","R: Skip (per settings)"},
- {"L：交换上下屏","L: Swap screens"},{"Y：隐藏／唤回辅助屏","Y: Toggle info screen"},
+ {"L：切换显示模式","L: Cycle display mode"},{"Y：隐藏／唤回辅助屏","Y: Toggle info screen"},
  {"START：快速保存到存档1","START: Save to slot 1"},{"SELECT：快速读取存档1","SELECT: Load slot 1"},
  {"显示、字号、音量：X 菜单","Display, font, audio: X"},
  {"已快速保存到存档1","Saved to slot 1"},{"已快速读取存档1","Loaded slot 1"},
@@ -95,7 +95,9 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"SELECT: 语言 / B: 返回","SELECT: Language / B: Back"},
  /* Runtime profile: native mode detection, not a console-model guess. */
  {"DSi 模式 · 16 MiB","DSi mode · 16 MiB"},
- {"DS 模式 · 4 MiB","DS mode · 4 MiB"}
+ {"DS 模式 · 4 MiB","DS mode · 4 MiB"},
+ /* Classic-lower: the stylus now targets game coordinates, not virtual A. */
+ {"A：继续 · 触屏操控","A: Next / Touch: Game"}
 };
 #include "ui-language-extra.h"
 int nds_language_choice_get(void){return preference;}

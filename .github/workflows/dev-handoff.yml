@@ -1,0 +1,43 @@
+name: CPyMO NDS 1.2 Developer Handoff
+on:
+  push:
+    branches: ['codex/nds-v1.2-integration']
+    paths: ['.github/ci-requests/dev-handoff.txt']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 1
+      - name: Create exact HEAD development source ZIP
+        run: |
+          python - <<'PY'
+          import hashlib, pathlib, subprocess, zipfile
+          root=pathlib.Path(".")
+          out=pathlib.Path("artifacts")
+          out.mkdir(exist_ok=True)
+          head=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()
+          paths=subprocess.check_output(["git","ls-files","-z"]).decode().split("\0")
+          paths=[p for p in paths if p and pathlib.Path(p).is_file()]
+          archive=out/"CPyMO-1.2-integration-source-snapshot.zip"
+          with zipfile.ZipFile(archive,"w",zipfile.ZIP_DEFLATED,compresslevel=7) as z:
+            for path in sorted(paths):
+              z.write(path,arcname="CPyMO-v1.2-source/"+path)
+            z.writestr("CPyMO-v1.2-source/HANDOFF_BASE_COMMIT.txt",
+                       head+"\nSource branch: codex/nds-v1.2-integration\n")
+          with zipfile.ZipFile(archive) as z:
+            assert z.testzip() is None
+          print("SNAPSHOT_SHA=",head)
+          print("FILES=",len(paths),"ZIP_BYTES=",archive.stat().st_size)
+          print("SHA256=",hashlib.sha256(archive.read_bytes()).hexdigest())
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-NDS-v1.2-DeepSeek-source-snapshot
+          path: artifacts/CPyMO-1.2-integration-source-snapshot.zip
+          retention-days: 14
+          if-no-files-found: error

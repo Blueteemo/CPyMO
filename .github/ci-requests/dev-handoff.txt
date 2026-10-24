@@ -1,0 +1,1 @@
+2026-10-22 one-off development source snapshot for user's LOCAL DeepSeek to implement independent FVDS I-picture decoding. No NDS compiler, no repo writes, no release or tag. Include exact current commit and files.

@@ -34,6 +34,8 @@ static unsigned launcher_language_cursor;
 static char launcher_font_path[256],launcher_icon_path[256];
 static u16 selected_icon[48*48];static bool selected_icon_ok;
 static u64 toast_started;
+/* Enhanced split cannot show the classic aux-panel toast on its touch LCD. */
+static char nds_toast_text[128];
 /* magic, about, font reads, title reads, restore success, selection writes, write errors */
 volatile unsigned frontend_state[7]={0x4e465231};
 /* magic, visible, presentations, completed library presentations */
@@ -283,12 +285,22 @@ static void nds_clock_sync_aux_visibility(void){
  nds_aux_clock_suppressed=suppress;nds_clock_patch_aux(!suppress);
 }
 static void launcher_play_panel(const char* message){
+ /* Enhanced mode owns the sub LCD; never repaint it with the classic help UI. */
+ if(nds_dual_active())return;
  if(nds_aux_hidden()){if(launcher_sub)dmaFillHalfWords(BIT(15),launcher_sub,256*192*2);return;}
  u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
- launcher_text(nds_ui("A / 轻触：继续"),12,32,white,183);launcher_text(nds_ui("X：菜单 · B：返回"),12,50,white,183);launcher_text(nds_ui("B：按住隐藏文字"),12,68,white,183);
+ /* Physical touch is a native game coordinate only in classic-lower.
+    Don't claim that the classic help panel itself is a virtual A here. */
+ launcher_text(nds_ui(nds_display_mode==1?"A：继续 · 触屏操控":"A / 轻触：继续"),12,32,white,183);
+ launcher_text(nds_ui("X：菜单 · B：返回"),12,50,white,183);
+ launcher_text(nds_ui("B：按住隐藏文字"),12,68,white,183);
  if(launcher_count)launcher_game_icon(&launcher_games[launcher_selected],196,40,true);
- launcher_text(nds_ui("R：按设置快进"),12,86,white,245);launcher_text(nds_ui("L：交换上下屏"),12,104,white,245);launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,122,white,245);
+ char mode_hint[96];
+ snprintf(mode_hint,sizeof mode_hint,"%s  %u/3",nds_ui("L：切换显示模式"),nds_display_mode+1);
+ launcher_text(nds_ui("R：按设置快进"),12,86,white,245);
+ launcher_text(mode_hint,12,104,white,245);
+ launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,122,white,245);
  launcher_text(nds_ui("START：快速保存到存档1"),12,140,muted,245);launcher_text(nds_ui("SELECT：快速读取存档1"),12,158,muted,245);
  launcher_text(message?message:nds_ui("显示、字号、音量：X 菜单"),12,176,accent,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
@@ -297,12 +309,31 @@ static void launcher_play_panel(const char* message){
 }
 static void nds_clock_poll(void){
  nds_clock_sample();if(!nds_clock_pending)return;nds_clock_pending=false;
+ if(nds_dual_active())return; /* sub LCD belongs to enhanced dialogue/UI */
  if(nds_menu_clock_visible&&cpymo_ui_enabled(&engine))cpymo_engine_request_redraw(&engine);
  if(nds_aux_hidden()){clock_state[8]++;return;}
  if(!nds_menu_clock_visible)nds_clock_patch_aux(true);
 }
-static void launcher_toast(const char* message){toast_started=tickGetCount();presentation_state[2]=1;presentation_state[3]++;presentation_state[5]=0;launcher_play_panel(nds_ui(message));}
-static void launcher_update_toast(void){if(presentation_state[2]){u64 elapsed=tickGetCount()-toast_started;presentation_state[5]=elapsed*1000/TICK_FREQ;if(elapsed>=2*TICK_FREQ){presentation_state[2]=0;presentation_state[4]++;launcher_play_panel(NULL);}}}
+static void launcher_toast(const char* message){
+ const char* localized=nds_ui(message?message:"");
+ snprintf(nds_toast_text,sizeof nds_toast_text,"%s",localized?localized:"");
+ toast_started=tickGetCount();presentation_state[2]=1;presentation_state[3]++;presentation_state[5]=0;
+ /* Only the split mode owns both screens as gameplay. Redraw a brief
+    upper-scene feedback banner rather than destroying its lower dialogue. */
+ if(nds_dual_active())cpymo_engine_request_redraw(&engine);
+ else launcher_play_panel(nds_toast_text);
+}
+static void launcher_update_toast(void){
+ if(!presentation_state[2])return;
+ u64 elapsed=tickGetCount()-toast_started;presentation_state[5]=elapsed*1000/TICK_FREQ;
+ if(elapsed>=2*TICK_FREQ){
+  presentation_state[2]=0;presentation_state[4]++;
+  /* Force repaint to remove the actual upper-scene overlay; relying on
+     script activity can leave a stale success message over a static CG. */
+  if(nds_dual_active())cpymo_engine_request_redraw(&engine);
+  else launcher_play_panel(NULL);
+ }
+}
 /* Error rendering is ROM-only: it never consults game fonts or FAT. */
 volatile unsigned error_ui_state[8]={0x4e455231};
 static unsigned launcher_rom_width(const char* text,bool large){
@@ -347,8 +378,10 @@ static void launcher_failure_hint(const char* message,int error,const char* hint
 static void launcher_failure(const char* message,int error){launcher_failure_hint(message,error,"按 B 返回游戏资料库");}
 static void launcher_library_clock(u16* pixels,bool erase){
  /* Header-only minute patch: never re-read game metadata or repaint the list. */
- if(erase)for(int y=4;y<22;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
- nds_clock_paint_impl(pixels,200,4,RGB15(26,28,30),false);
+ /* Center the time numerals on the same visible baseline as the heading.
+     Only modify this 48x18 patch, leaving the R7 list geometry unchanged. */
+ if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
+ nds_clock_paint_impl(pixels,200,6,RGB15(26,28,30),false);
 }
 static void launcher_draw(const char* message){
  launcher_scroll_ensure_visible();

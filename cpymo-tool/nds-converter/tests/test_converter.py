@@ -64,6 +64,57 @@ class ConverterTests(unittest.TestCase):
             self.assertFalse(list((dst/'nds-cache/bgm').rglob('*.nar')))
             convert.verify(dst)
 
+    @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),
+                         'FFmpeg required')
+    def test_optin_fvds_passthrough_and_default_omission(self):
+        from test_fvds_inspect import sample
+        ffmpeg=os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);src=base/'game';original_script=fixture(src,'s60v3')
+            media=sample()
+            (src/'video/omitted.fv').write_bytes(media)
+            before=hashes(src)
+            dst=base/'converted'
+            opts=argparse.Namespace(source=src,destination=dst,ffmpeg=ffmpeg,font=None,
+                 jobs=1,missing_glyph_policy='box',cache_only=True,video_fvds=True)
+            convert.convert(opts)
+            hashed=convert.key('omitted')
+            actual=dst/'nds-cache/video'/hashed[:2]/(hashed+'.fv')
+            self.assertEqual(actual.read_bytes(),media)
+            self.assertEqual((dst/'script/START.txt').read_bytes(),original_script)
+            self.assertEqual(hashes(src),before)
+            self.assertFalse((dst/'video').exists())
+            manifest=json.loads((dst/'nds-cache/manifest.json').read_text(encoding='utf8'))
+            self.assertEqual(manifest['format'],6)
+            self.assertEqual(manifest['fvds_videos'][0]['frames'],3)
+            self.assertEqual(manifest['fvds_videos'][0]['bytes'],len(media))
+            self.assertNotIn('video/omitted.fv',{r['path'] for r in manifest['omitted_files']})
+            self.assertIn('video/omitted.mp4',{r['path'] for r in manifest['omitted_files']})
+            convert.verify(dst)
+            default=base/'default'
+            opts.destination=default
+            opts.video_fvds=False
+            convert.convert(opts)
+            self.assertFalse((default/'nds-cache/video').exists())
+            self.assertEqual(json.loads((default/'nds-cache/manifest.json').read_text())['fvds_videos'],[])
+            self.assertIn('video/omitted.fv',
+                          {r['path'] for r in json.loads((default/'nds-cache/manifest.json').read_text())['omitted_files']})
+            convert.verify(default)
+
+    @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),
+                         'FFmpeg required')
+    def test_fvds_reject_invalid_preencoded_input(self):
+        from test_fvds_inspect import sample
+        ffmpeg=os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);src=base/'game';fixture(src,'s60v3')
+            (src/'video/omitted.fv').write_bytes(sample(tail=True))
+            opts=argparse.Namespace(source=src,destination=base/'bad',ffmpeg=ffmpeg,font=None,
+                                    jobs=1,missing_glyph_policy='box',video_fvds=True)
+            with self.assertRaises(ValueError):
+                convert.convert(opts)
+            self.assertFalse((base/'bad').exists())
+
     def test_unsafe_archive_paths_are_rejected(self):
         for name in ['../escape','/absolute','C:/escape','a/../../escape']:
             with self.assertRaises(ValueError):helper_core.checked_name(name)

@@ -1,0 +1,33 @@
+name: NDS UI Host Regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/nds-v1.2-integration]
+    paths:
+      - .github/ci-requests/nds-ui.txt
+permissions:
+  contents: read
+jobs:
+  ui-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Test 3DS-inspired NDS geometry, display preferences and ROM banner
+        run: |
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_layout.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_display_mode_prefs.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_rom_banner.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_visual_capture.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_visual_capture_c.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_canvas.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_touch.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_display_machine.py' -v
+      - name: Render real C-source lower-screen backdrops to native 256x192 PNG
+        run: |
+          python cpymo-backends/nds/tools/nds-dual-canvas-preview.py --output dist/native-lcd-canvas
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-native-c-source-canvas-preview-not-a-game-screenshot
+          path: dist/native-lcd-canvas/*.png
+          retention-days: 14
+          if-no-files-found: error

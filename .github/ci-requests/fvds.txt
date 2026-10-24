@@ -1,0 +1,1 @@
+2026-10-22 consolidated checkpoint: production C FVDS coded-picture index auditor and synthetic corruption tests, word-boundary VLC input regressions, stereo PCM decode/queue and WAV output. Build picture auditor host artifact for private 159s corpus verification. No full NDS/DSi SDK build and no real hardware action.
