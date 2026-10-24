@@ -1,6 +1,6 @@
 """Native bitmap subset generator (MIT); font data retains upstream OFL licenses."""
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import gzip, struct, shutil, hashlib
 
 def read_bdf(path, codes=None):
@@ -54,6 +54,26 @@ def pixel_font_cache(codes, target, missing_policy='error'):
     for name,path,nominal,baseline,reader in sources:
         glyphs=reader(path,set(codes))
         missing=[c for c in codes if c not in glyphs]
+        fallback=[]
+        # Preserve native Fusion pixels; use the existing licensed Noto face
+        # only for uncovered CJK characters, never guess private-use mappings.
+        noto=Path(__file__).parent/'fonts/NotoSansCJKsc-Regular.otf'
+        if name=='small' and any(0x3400<=c<=0x9fff for c in missing):
+            font=ImageFont.truetype(str(noto),13)
+            absent=bytes(font.getmask(chr(0x10ffff)))
+            for code in missing:
+                if not 0x3400<=code<=0x9fff or bytes(font.getmask(chr(code)))==absent: continue
+                image=Image.new('L',(13,14))
+                ImageDraw.Draw(image).text((0,11),chr(code),font=font,fill=255,anchor='ls')
+                rows=[0,0]+[sum(1<<x for x in range(13) if image.getpixel((x,y))>=100) for y in range(14)]
+                advance=min(13,round(font.getlength(chr(code))))
+                if not any(rows) or not advance: continue
+                glyphs[code]=(advance,rows);fallback.append(code)
+            missing=[c for c in missing if c not in glyphs]
+            if fallback:
+                license_dir=target/'font-licenses/Noto';license_dir.mkdir(parents=True,exist_ok=True)
+                shutil.copy2(noto.parent/'OFL.txt',license_dir/'OFL.txt')
+                print('INFO: small Noto fallback glyphs: '+','.join(f'U+{c:04X}' for c in fallback),flush=True)
         if missing:
             if missing_policy != 'box':
                 raise ValueError(f'{name} pixel font lacks {len(missing)} characters: '+','.join(f'U+{c:04X}' for c in missing[:16]))
@@ -66,9 +86,12 @@ def pixel_font_cache(codes, target, missing_policy='error'):
             advance,rows=glyphs[code]
             data+=struct.pack('<IB3x16H',code,advance,*rows)
         (target/f'font-{name}.bin').write_bytes(data)
-        report.append({'name':name,'nominal_pixels':nominal,'glyphs':len(codes),'source_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'missing_glyph_policy':missing_policy,'boxed_codepoints':[f'U+{c:04X}' for c in missing]})
+        report.append({'name':name,'nominal_pixels':nominal,'glyphs':len(codes),'source_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'missing_glyph_policy':missing_policy,'boxed_codepoints':[f'U+{c:04X}' for c in missing],
+                       'fallback_codepoints':[f'U+{c:04X}' for c in fallback],
+                       'fallback_source':'Noto Sans CJK SC 13px, OFL-1.1' if fallback else None,
+                       'fallback_source_sha256':hashlib.sha256(noto.read_bytes()).hexdigest() if fallback else None})
     shutil.copytree(fonts/'Fusion/LICENSES',target/'font-licenses/Fusion/LICENSES',dirs_exist_ok=True)
     shutil.copy2(fonts/'Fusion/OFL.txt',target/'font-licenses/Fusion/OFL.txt')
     shutil.copytree(fonts/'Unifont',target/'font-licenses/Unifont',ignore=shutil.ignore_patterns('*.gz'),dirs_exist_ok=True)
-    (target/'font-licenses/NOTICE.txt').write_text('Small: Fusion Pixel 2026.09.25 zh_Hans, TakWolf and contributors. https://github.com/TakWolf/fusion-pixel-font\nLarge: GNU Unifont 17.0.05, Unifont contributors. https://unifoundry.com/unifont/\nNPF1 files are unscaled bitmap subsets prepared for CPyMO NDS, under SIL OFL 1.1. Names of upstream font families are attribution, not names of a new font family.\n',encoding='utf8')
+    (target/'font-licenses/NOTICE.txt').write_text('Small: Fusion Pixel 2026.09.25 zh_Hans, TakWolf and contributors. https://github.com/TakWolf/fusion-pixel-font\nLarge: GNU Unifont 17.0.05, Unifont contributors. https://unifoundry.com/unifont/\nUncovered small CJK glyphs, if listed in manifest: Noto Sans CJK SC 13px, Google and contributors, SIL OFL 1.1. Original font and OFL.txt accompany converter sources.\nNPF1 files are bitmap subsets prepared for CPyMO NDS, under SIL OFL 1.1. Names of upstream font families are attribution, not names of a new font family.\n',encoding='utf8')
     return report

@@ -1,7 +1,32 @@
 {
-  "version": "1.0.0",
-  "cache_format": 1,
-  "video_policy": "omit-and-skip",
+  "version": "1.1.0",
+  "cache_format": 6,
+  "video_policy": "experimental NVL1/NVA1; helper omits video; safe skip on missing/invalid",
   "baseline": "0.5.6.3-test",
-  "core_commit": "5a746bc72a4a8c127e0aee7deb20bf415c385ae2"
+  "core_commit": "5a746bc72a4a8c127e0aee7deb20bf415c385ae2",
+  "audio_policy": "lossless NAR2 voice with NAR1/PCM compatibility; default BGM and SE remain PCM",
+  "base_release": "1.0.0 input-fixed",
+  "cache_format_compatibility": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "cache_layout": "two-hex prefix directories in format 6; formats 1-5 remain flat",
+  "ui_additions": "Single visible gameplay clock: auxiliary normally, inside engine menu while open; library header clock; Chinese default and ink-centered names",
+  "ui_languages": [
+    "zh-Hans",
+    "zh-Hant",
+    "en",
+    "ja"
+  ],
+  "language_menu_order": [
+    "Auto",
+    "简体中文",
+    "繁體中文",
+    "English",
+    "日本語"
+  ]
 }

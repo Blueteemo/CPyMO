@@ -6,11 +6,12 @@ No game names, chapters, translated text, or machine-specific paths are assumed.
 """
 from __future__ import annotations
 import argparse, concurrent.futures, hashlib, io, json, os, shutil, struct
-import subprocess, sys, uuid
+import subprocess, sys, uuid, re
 from dataclasses import dataclass
 from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw, __version__ as pillow_version
 from pixel_font import pixel_font_cache
+import lossless
 
 from release_info import VERSION
 CORE_COMMANDS = frozenset(['add', 'album', 'anime_off', 'anime_on', 'bg', 'bgm', 'bgm_stop', 'call', 'change', 'chara', 'chara_anime', 'chara_cls', 'chara_down', 'chara_pos', 'chara_quake', 'chara_scroll', 'chara_up', 'chara_y', 'config', 'date', 'fade_in', 'fade_out', 'flash', 'goto', 'if', 'label', 'load', 'movie', 'music', 'quake', 'rand', 'ret', 'say', 'scroll', 'se', 'se_stop', 'sel', 'select_img', 'select_imgs', 'select_text', 'select_var', 'set', 'sub', 'text', 'text_off', 'textbox', 'title', 'title_dsp', 'vo', 'wait', 'wait_se', 'waitkey'])
@@ -139,6 +140,7 @@ def audit(scripts, collections):
     mapping={'bg':'bg','bgm':'bgm','se':'se','vo':'voice'}
     for path in scripts:
         for line_number,line in enumerate(path.read_text(encoding='utf-8-sig').splitlines(),1):
+            line=line.lstrip()
             if not line.startswith('#'): continue
             parts=line[1:].split(None,1);command=parts[0] if parts else '';args=parts[1] if len(parts)>1 else ''
             if command and command not in CORE_COMMANDS: unknown.append({'script':path.name,'line':line_number,'command':command,'behavior':'upstream skips unknown directive; review before distribution'})
@@ -163,7 +165,7 @@ def verify(destination):
     for item in manifest.get('omitted_files',[]):
         rel=Path(item['path'])
         if rel.is_absolute() or '..' in rel.parts: raise ValueError('Unsafe omitted path')
-        if (destination/rel).exists(): raise ValueError(f'Omitted video remains: {rel}')
+        if (destination/rel).exists(): raise ValueError(f'Omitted source asset remains: {rel}')
     print(f'VERIFIED {len(manifest["original_files"])} original files and {len(manifest["cache_files"])} cache files')
 
 def inspect_source(src):
@@ -245,6 +247,12 @@ def convert(args):
     stage=dst.parent/('.'+dst.name+'.partial-'+uuid.uuid4().hex)
     stage.mkdir(parents=True)
     print('Staging:',stage,flush=True)
+    cache_only=getattr(args,'cache_only',False)
+    if cache_only:
+        media_ext={'.jpg','.jpeg','.png','.bmp','.webp','.mp3','.wav','.ogg','.flac','.pcm','.pak'}
+        dropped=[item for item in originals if Path(item['path']).parts[0] in ('bg','bgm','chara','se','voice','system') and Path(item['path']).suffix.lower() in media_ext]
+        omitted.extend(dict(item,bytes=(src/item['path']).stat().st_size,reason='redundant original media; NDS cache generated and verified') for item in dropped)
+        drop_names={x['path'] for x in dropped};originals=[item for item in originals if item['path'] not in drop_names]
     for item in originals:
         target=stage/item['path'];target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src/item['path'],target)
     (stage/'save').mkdir(exist_ok=True)
@@ -286,6 +294,8 @@ def convert(args):
         meta=mask_cache(asset,target('mask',name,'.nmt'),min(256,max(1,round(width*scale))),min(192,max(1,round(height*scale))))
         masks.append({'name':name,**meta})
     audio_jobs=[]
+    audio_mode=getattr(args,'audio_lossless','off')
+    if audio_mode not in ('off','voice','all'):raise ValueError('Unknown lossless audio mode')
     for kind in ('bgm','se','voice'):
         for name,asset in folders[kind].items(): audio_jobs.append((kind,name,asset,target(kind,name,'.pcm')))
     def audio_job(job):
@@ -295,9 +305,21 @@ def convert(args):
         try:
             subprocess.run([ffmpeg,'-nostdin','-hide_banner','-loglevel','error','-threads','1','-y',*input_flags,'-i',str(temp),'-vn','-ac','1','-ar','22050','-f','s16le',str(out)],check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=0x08000000 if os.name=='nt' else 0)
         finally: temp.unlink(missing_ok=True)
-        return {'kind':kind,'name':name,'source_sha256':hashlib.sha256(data).hexdigest(),'bytes':out.stat().st_size}
+        meta={'kind':kind,'name':name,'source_sha256':hashlib.sha256(data).hexdigest(),'bytes':out.stat().st_size,'encoding':'PCM16','pcm_bytes':out.stat().st_size,'decoded_pcm_sha256':sha(out)}
+        if audio_mode=='all' or (audio_mode=='voice' and kind=='voice'):
+            compressed=out.with_suffix('.nar');result=lossless.encode_audio(out,compressed)
+            meta.update(pcm_bytes=result['pcm_bytes'],decoded_pcm_sha256=result['pcm_sha256'])
+            if result['nar_bytes']<=result['pcm_bytes']*.9:
+                out.unlink();meta.update(bytes=result['nar_bytes'],encoding='NAR2')
+            else:compressed.unlink()
+        return meta
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         for result in pool.map(audio_job,audio_jobs): audio.append(result)
+    from audio_aliases import deduplicate_audio
+    audio_dedup=deduplicate_audio(cache,audio,key) if audio_mode!='off' else {'aliases':0,'saved_bytes':0,'index_bytes':0}
+    # This converter produces PCM on all channels. Experimental engines can
+    # avoid repeated missing-NAR probes; 1.0.0 safely ignores this optional index.
+    (cache/'audio-formats.bin').write_bytes(b'NAF1'+bytes([7 if audio_mode=='all' else 4 if audio_mode=='voice' else 0]))
     scripts=sorted((src/'script').glob('*.txt'))
     text=''.join(p.read_text(encoding='utf-8-sig') for p in scripts)+(src/'gameconfig.txt').read_text(encoding='utf-8-sig')
     glyphs=font_cache(text,font,cache/'font.bin')
@@ -305,11 +327,44 @@ def convert(args):
     findings=audit(scripts,folders)
     allowed=sorted({(x['folder'],key(x['name'])) for x in findings['missing_resource_references'] if x['folder'] in ('bgm','se','voice')})
     (cache/'missing-audio.txt').write_bytes(''.join(f'{kind} {hashed}\n' for kind,hashed in allowed).encode('ascii'))
+    compressed_images=[]
+    if getattr(args,'compress_images',False):
+        for path in sorted(cache.rglob('*.npi')):
+            raw=path.read_bytes();packed=lossless.image_candidate(raw,compress_spans=getattr(args,'experimental_sparse',False))
+            if packed!=raw:
+                path.write_bytes(packed);compressed_images.append({'path':path.relative_to(stage).as_posix(),'raw_bytes':len(raw),'bytes':len(packed),'decoded_sha256':hashlib.sha256(raw).hexdigest()})
+    layout=getattr(args,'cache_layout','sharded')
+    if layout not in ('flat','sharded'):raise ValueError('Unknown cache layout')
+    layout_files=0
+    if layout=='sharded':
+        moved={}
+        for folder in sorted(cache.iterdir()):
+            if not folder.is_dir():continue
+            for path in sorted(folder.iterdir()):
+                if not path.is_file() or not re.fullmatch('[0-9a-f]{16}',path.stem):continue
+                dest=folder/path.stem[:2]/path.name;dest.parent.mkdir(exist_ok=True)
+                old=path.relative_to(stage).as_posix();path.rename(dest);moved[old]=dest.relative_to(stage).as_posix();layout_files+=1
+        for entry in compressed_images:entry['path']=moved.get(entry['path'],entry['path'])
     cache_files=[{'path':p.relative_to(stage).as_posix(),'sha256':sha(p)} for p in sorted(cache.rglob('*')) if p.is_file()]
     manifest={'format':1,'converter_version':VERSION,'logical_screen':[width,height],'display_scale':scale,'original_files':originals,'cache_files':cache_files,'images':images,'audio':sorted(audio,key=lambda x:(x['kind'],x['name'])),'font_glyphs':glyphs,'font_sha256':sha(font),'audio_format':'22050 Hz mono signed 16-bit little endian PCM','tools':{'python':sys.version.split()[0],'pillow':pillow_version,'ffmpeg':ffversion},'audit':findings,'save_policy':'new empty save directory; existing saves not imported'}
+    if audio_mode!='off' or getattr(args,'compress_images',False):
+        manifest['format']=5;(cache/'format.txt').write_bytes(b'CPYMO-NDS-CACHE-5\n')
+        manifest['minimum_engine']='r13 research / future 1.1; not 1.0.0 or r9-r12'
+        for entry in cache_files:
+            if entry['path']=='nds-cache/format.txt':entry['sha256']=sha(cache/'format.txt')
+    if layout=='sharded':
+        manifest['format']=6;(cache/'format.txt').write_bytes(b'CPYMO-NDS-CACHE-6\n')
+        manifest['minimum_engine']='r15 research / future 1.1; not 1.0.0 or r9-r14'
+        for entry in cache_files:
+            if entry['path']=='nds-cache/format.txt':entry['sha256']=sha(cache/'format.txt')
+    manifest['cache_layout']={'name':layout,'prefix_hex_digits':2 if layout=='sharded' else 0,'files':layout_files,'resource_bytes_changed':False}
     manifest['omitted_files']=omitted
+    manifest['lossless']={'audio_mode':audio_mode,'audio_dedup':audio_dedup,'audio_saved_bytes':sum(x.get('pcm_bytes',x['bytes'])-x['bytes'] for x in audio),'image_saved_bytes':sum(x['raw_bytes']-x['bytes'] for x in compressed_images),'images':compressed_images,'image_threshold':{'NPA4':0.2,'NPS1':0.9},'audio_threshold':0.9,'quality':'exact relative to existing NDS RGB555/PCM16 cache; no extra downsampling or quantization'}
+    manifest['lossless']['experimental_sparse']=getattr(args,'experimental_sparse',False)
+    if audio_mode!='off':manifest['audio_format']='PCM16/NAR2 per file; identical 22050 Hz mono PCM16 samples'
     manifest['source_files']=source_hashes
     manifest['video_policy']='omit video assets; keep scripts; runtime safely skips movie commands'
+    manifest['resource_policy']='cache-only experimental' if cache_only else 'original media retained'
     manifest['presentation']=presentation
     manifest['source_platform']=config.get('platform','pygame')
     manifest['pixel_fonts']=pixel_fonts
@@ -327,7 +382,10 @@ def convert(args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     sub=parser.add_subparsers(dest='command',required=True)
-    c=sub.add_parser('convert');c.add_argument('source',type=Path);c.add_argument('destination',type=Path);c.add_argument('--ffmpeg',default='ffmpeg');c.add_argument('--font');c.add_argument('--jobs',type=int,choices=range(1,9),default=4);c.add_argument('--missing-glyph-policy',choices=('error','box'),default='error',help='Explicit box fallback for source characters absent from pixel fonts; scripts unchanged')
+    c=sub.add_parser('convert');c.add_argument('source',type=Path);c.add_argument('destination',type=Path);c.add_argument('--ffmpeg',default='ffmpeg');c.add_argument('--font');c.add_argument('--jobs',type=int,choices=range(1,9),default=4);c.add_argument('--cache-only',action='store_true',help='Omit redundant source media, retain scripts/config/credits and verify caches');c.add_argument('--missing-glyph-policy',choices=('error','box'),default='error',help='Explicit box fallback for source characters absent from pixel fonts; scripts unchanged')
+    c.add_argument('--audio-lossless',choices=('off','voice','all'),default='off');c.add_argument('--compress-images',action='store_true',help='Lossless NPA4 or row-span NPS1 selected per image; keep raw when not worthwhile')
+    c.add_argument('--cache-layout',choices=('flat','sharded'),default='sharded',help='Two-hex directory fanout avoids large flat FAT directories; requires r15 engine')
+    c.add_argument('--experimental-sparse',action='store_true',help='Private NPS2: smaller transparent images; may increase scene-change stalls')
     v=sub.add_parser('verify');v.add_argument('destination',type=Path)
     i=sub.add_parser('inspect');i.add_argument('source',type=Path)
     args=parser.parse_args()

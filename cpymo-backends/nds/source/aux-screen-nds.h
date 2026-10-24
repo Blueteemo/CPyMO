@@ -6,7 +6,7 @@ static void nds_aux_refresh(void){
     user PXI service, never a system-reserved channel or direct ARM9 POWCNT. */
  pxiWaitRemote(PxiChannel_User0);
  ui_preferences_state[4]=pxiSendAndReceive(PxiChannel_User0,lights);
- if(nds_playing)launcher_play_panel(NULL);
+ if(nds_playing&&!error_ui_active)launcher_play_panel(NULL);
  nds_preferences_sync();
 }
 static void nds_aux_poll(void){

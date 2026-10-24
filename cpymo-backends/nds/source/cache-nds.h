@@ -6,3 +6,5 @@
 extern bool nds_cache_enabled;
 void nds_cache_path(char*,size_t,const char*,const char*,cpymo_str,const char*);
 #endif
+
+void nds_cache_hash_path(char*,size_t,const char*,const char*,const char*,const char*);

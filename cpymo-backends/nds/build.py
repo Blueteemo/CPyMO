@@ -35,7 +35,7 @@ with (record/'native-windows-build.log').open('w',encoding='utf-8') as log:
    if folder==core/'cpymo' and source.name in local_sources:continue
    obj=build/(source.stem+'.o');objects.append(obj)
    run([gcc,*flags,'-MMD','-MP','-MF',obj.with_suffix('.d'),'-c',source,'-o',obj])
- wraps='-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=stbi_load_from_callbacks,--wrap=cpymo_assetloader_load_bg_image,--wrap=cpymo_assetloader_load_chara_image,--wrap=cpymo_assetloader_load_system_image,--wrap=cpymo_movie_play,--wrap=cpymo_rmenu_enter,--wrap=cpymo_charas_wait'
+ wraps='-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=stbi_load_from_callbacks,--wrap=cpymo_assetloader_load_bg_image,--wrap=cpymo_assetloader_load_chara_image,--wrap=cpymo_assetloader_load_system_image,--wrap=cpymo_movie_play,--wrap=cpymo_localization_get,--wrap=cpymo_rmenu_enter,--wrap=cpymo_ui_enter,--wrap=cpymo_charas_wait'
  if (engine/'source/masktrans-nds.h').exists():wraps+=',--wrap=cpymo_assetloader_load_system_masktrans'
  run([gcc,'-L'+str(sdk/'calico/lib'),'-L'+str(sdk/'libnds/lib'),'-specs='+str(sdk/'calico/share/ds9.specs'),'-g','-march=armv5te','-mtune=arm946e-s','-marm','-Wl,-Map,engine.map',wraps,*objects,'-lmm9','-lfat','-lnds9','-lm','-lcalico_ds9','-o',engine/'engine.elf'])
  icon=engine/'assets/icon.bmp'

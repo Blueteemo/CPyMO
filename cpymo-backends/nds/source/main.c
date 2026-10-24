@@ -8,6 +8,11 @@
 #include <sys/iosupport.h>
 #include "cpymo_engine.h"
 #include "cpymo_save.h"
+#include "cpymo_config_ui.h"
+#include "cpymo_list_ui.h"
+#include "cpymo_rmenu.h"
+#include "cpymo_ui.h"
+#include "ui-language-nds.h"
 #include "cpymo_backend_masktrans.h"
 #include "font.h"
 #include "cache-nds.h"
@@ -37,11 +42,23 @@ stbi_uc* __wrap_stbi_load_from_callbacks(const stbi_io_callbacks* cb,void* user,
 static cpymo_engine engine;
 static u16 framebuffer[256*192] __attribute__((aligned(32)));
 static u16 *vram;
+/* Cache the exact immutable base-layer command sequence, never dialogue/UI/effects. */
+typedef struct {float dx,dy,dw,dh,alpha;cpymo_backend_image image;int sx,sy,sw,sh,type;} SceneCommand;
+static SceneCommand scene_commands[64],scene_previous[64];
+static unsigned scene_count,scene_previous_count;static bool scene_collect,scene_overflow,scene_valid;
+static float scene_view[3];static u16* scene_pixels;static u16* scene_verify_pixels;
+volatile unsigned scene_state[8]={0x53435238};
+void nds_scene_release(void){scene_valid=false;if(scene_pixels){free(scene_pixels);scene_pixels=NULL;scene_state[4]++;}}
+
 static bool screens_swapped;
 #include "preferences-nds.h"
 /* magic, swapped, toast active/shown/expired/age ms, icon loaded, metadata lines, touch samples */
 volatile unsigned presentation_state[9]={0x4e505232};
 volatile unsigned engine_state[46]={0x4350454e};
+/* magic, image loads, total/max load us, draws, total/max draw us, loop pixels, omitted pixels */
+volatile unsigned perf_state[9]={0x4e505246};
+volatile unsigned draw_trace[4+64*8]={0x44545238};
+static unsigned text_us,fill_us;
 /* magic, auto/hide/X/skip flags, current script line; bounded test telemetry */
 volatile unsigned control_state[3]={0x4e43544c};
 bool nds_cache_enabled;
@@ -59,26 +76,115 @@ int nds_font_choices_available(void);
 static void enforce_text_readability(void){if(engine.gameconfig.imagesize_h>0){int min_font=(int)(text_native_pixels()*240.f/(engine.gameconfig.imagesize_h*.8f*display_scale())+.999f);if(nds_font_choices_available()||engine.gameconfig.fontsize<min_font)engine.gameconfig.fontsize=min_font;}}
 static float display_x(void){return (256-engine.gameconfig.imagesize_w*display_scale())*.5f;}
 static float display_y(void){return (192-engine.gameconfig.imagesize_h*display_scale())*.5f;}
-typedef struct {int w,h,pw,ph;u16 *px;unsigned char *mask;unsigned refs;} Image;
+/* Locate the actual menu panel, not the screen corner. */
+static bool nds_clock_collect_menu,nds_clock_menu_found;
+static int nds_clock_menu_x,nds_clock_menu_y;
+static void nds_clock_menu_rect(float x,float y,enum cpymo_backend_image_draw_type type){
+ if(!nds_clock_collect_menu||nds_clock_menu_found||type!=cpymo_backend_image_draw_type_ui_element_bg)return;
+ nds_clock_menu_x=(int)(x*display_scale()+display_x());
+ nds_clock_menu_y=(int)(y*display_scale()+display_y());
+ if(nds_clock_menu_x<0)nds_clock_menu_x=0;
+ if(nds_clock_menu_y<0)nds_clock_menu_y=0;
+ nds_clock_menu_found=true;
+}
+/* bit0=opaque spans, bit1=mask x map; private reference switch. */
+volatile unsigned render_policy[8]={0x52505231,3};
+static unsigned render_bits=3;
+typedef struct {int w,h,pw,ph;u16 *px;unsigned char *mask;unsigned refs;u16* bounds;u16* opaque;bool opaque_checked;} Image;
+
+volatile unsigned load_trace[4+64*14]={0x4c545231};
+static unsigned image_buffer_policy;static bool native_row_copy=false;static bool renderer_fast=true;static bool image_sequential;static unsigned cache_layout_policy;
+volatile unsigned load_state[32]={0x4c445046};
+static void load_phase(unsigned phase,u64 start){unsigned us=(tickGetCount()-start)*1000000/TICK_FREQ;load_state[phase]+=us;if(us>load_state[phase+12])load_state[phase+12]=us;}
+
+#include "npl4-reader.h"
+#include "nps-reader.h"
+#include "opaque-span-r12.h"
+static void prepare_bounds(Image* im){
+ if(!im->mask)return;
+ im->bounds=malloc(im->ph*2*sizeof(u16));if(!im->bounds)return;
+
+ for(int y=0;y<im->ph;y++){if(!(y&7))nds_audio_pump_if_due();int l=0,r=im->pw;const unsigned char* m=im->mask+y*im->pw;
+  while(l<r&&!m[l])l++;while(r>l&&!m[r-1])r--;
+  im->bounds[y*2]=l;im->bounds[y*2+1]=r;
+
+ }
+}
+
+/* Defer optional metadata to the first partial-alpha draw, away from the
+   scene's file-loading update. Reserve its potential size in the image cache. */
+static void prepare_opaque(Image* im){
+ im->opaque_checked=true;
+ if(!im->mask||!im->bounds)return;
+ extern void* __real_malloc(size_t);im->opaque=__real_malloc(im->ph*2*sizeof(u16));
+ if(!im->opaque){render_policy[6]++;return;}render_policy[2]++;
+ for(int y=0;y<im->ph;y++){if(!(y&7))nds_audio_pump_if_due();opaque_span(im->mask+y*im->pw,im->bounds[y*2],im->bounds[y*2+1],im->opaque+y*2);}
+}
+
+/* Bounded recent character-image cache: owns one reference, never changes pixels. */
+#define RECENT_LIMIT (384u*1024u)
+typedef struct {char path[512];Image* image;unsigned bytes,age;} RecentImage;
+static RecentImage recent_images[6];static unsigned recent_bytes,recent_age,recent_limit=RECENT_LIMIT;
+static void recent_remove(unsigned i){if(recent_images[i].image){recent_bytes-=recent_images[i].bytes;cpymo_backend_image_free(recent_images[i].image);}memset(&recent_images[i],0,sizeof recent_images[i]);}
+static void recent_clear(void){for(unsigned i=0;i<6;i++)recent_remove(i);recent_age=0;}
+static Image* recent_find(const char* path){for(unsigned i=0;i<6;i++)if(recent_images[i].image&&!strcmp(recent_images[i].path,path)){recent_images[i].age=++recent_age;recent_images[i].image->refs++;load_state[9]++;return recent_images[i].image;}load_state[10]++;return NULL;}
+static void recent_store(const char* path,Image* im){
+ unsigned cost=sizeof *im+im->pw*im->ph*(im->mask?3:2)+(im->bounds?im->ph*4:0)+(((render_bits&1)&&im->mask&&im->bounds)?im->ph*4:0);
+ if(cost>recent_limit)return;
+ int slot=-1;
+ for(;;){slot=-1;for(unsigned i=0;i<6;i++)if(!recent_images[i].image){slot=i;break;}
+  if(slot>=0&&recent_bytes+cost<=recent_limit)break;
+  unsigned oldest=0;for(unsigned i=1;i<6;i++)if(recent_images[i].image&&(!recent_images[oldest].image||recent_images[i].age<recent_images[oldest].age))oldest=i;
+  recent_remove(oldest);load_state[11]++;
+ }
+ RecentImage* r=&recent_images[slot];snprintf(r->path,sizeof r->path,"%s",path);r->image=im;r->bytes=cost;r->age=++recent_age;im->refs++;recent_bytes+=cost;
+ if(recent_bytes>load_state[30])load_state[30]=recent_bytes;
+}
 static Image* menu_images[2];
 static char menu_image_dir[256];
+void nds_cache_hash_path(char* out,size_t size,const char* dir,const char* kind,const char* hex,const char* ext){
+ unsigned mask=(!strcmp(kind,"bgm")||!strcmp(kind,"se")||!strcmp(kind,"voice"))?2:1;
+ if(cache_layout_policy&mask)snprintf(out,size,"%s/nds-cache/%s/%.2s/%s%s",dir,kind,hex,hex,ext);
+ else snprintf(out,size,"%s/nds-cache/%s/%s%s",dir,kind,hex,ext);
+}
 void nds_cache_path(char* out,size_t size,const char* dir,const char* kind,cpymo_str name,const char* ext){
  u64 hash=14695981039346656037ULL;for(size_t i=0;i<name.len;i++){unsigned char c=name.begin[i];if(c>='A'&&c<='Z')c+='a'-'A';hash^=c;hash*=1099511628211ULL;}
- snprintf(out,size,"%s/nds-cache/%s/%016llx%s",dir,kind,(unsigned long long)hash,ext);
+ char hex[17];snprintf(hex,sizeof hex,"%016llx",(unsigned long long)hash);nds_cache_hash_path(out,size,dir,kind,hex,ext);
 }
 static error_t cached_image(cpymo_backend_image* out,int* w,int* h,cpymo_str name,const cpymo_assetloader* loader,const char* kind){
- char path[512];nds_cache_path(path,sizeof path,loader->gamedir,kind,name,".npi");FILE* f=fopen(path,"rb");if(!f)return CPYMO_ERR_CAN_NOT_OPEN_FILE;
+ u64 perf_start=tickGetCount(),phase_start=perf_start;unsigned old_phase[8];for(unsigned i=1;i<8;i++)old_phase[i]=load_state[i];unsigned old_decode=compressed_state[3],old_check=compressed_state[5];
+ char path[512];nds_cache_path(path,sizeof path,loader->gamedir,kind,name,".npi");
+ if(!strcmp(kind,"chara")){Image* hit=recent_find(path);if(hit){*out=hit;*w=hit->w;*h=hit->h;loaded_image=true;engine_state[40]++;nds_audio_pump_if_due();return CPYMO_ERR_SUCC;}}
+ FILE* f=fopen(path,"rb");if(!f)return CPYMO_ERR_CAN_NOT_OPEN_FILE;
+ if(image_buffer_policy&&setvbuf(f,NULL,image_buffer_policy==1?_IONBF:_IOFBF,image_buffer_policy==2?8192:4096)&&setvbuf(f,NULL,_IONBF,0)){fclose(f);return CPYMO_ERR_OUT_OF_MEM;}
+
+ load_phase(1,phase_start);phase_start=tickGetCount();
  struct {char magic[4];u16 w,h,pw,ph;u32 flags;} header;
- if(fread(&header,1,sizeof header,f)!=sizeof header||memcmp(header.magic,"NPI1",4)||!header.w||!header.h||!header.pw||!header.ph||header.pw>2048||header.ph>2048||(unsigned)header.pw*header.ph>262144||header.flags>1){fclose(f);return CPYMO_ERR_BAD_FILE_FORMAT;}
+ if(fread(&header,1,sizeof header,f)!=sizeof header||(memcmp(header.magic,"NPI1",4)&&memcmp(header.magic,"NPA4",4)&&memcmp(header.magic,"NPS1",4)&&memcmp(header.magic,"NPS2",4))||!header.w||!header.h||!header.pw||!header.ph||header.pw>2048||header.ph>2048||(unsigned)header.pw*header.ph>262144||header.flags>1){fclose(f);return CPYMO_ERR_BAD_FILE_FORMAT;}
  unsigned count=(unsigned)header.pw*header.ph;
- if(fseek(f,0,SEEK_END)||ftell(f)!=(long)(sizeof header+count*(header.flags?3:2))||fseek(f,sizeof header,SEEK_SET)){fclose(f);return CPYMO_ERR_BAD_FILE_FORMAT;}
- Image* image=calloc(1,sizeof *image);if(!image){fclose(f);return CPYMO_ERR_OUT_OF_MEM;}
+ bool packed=!memcmp(header.magic,"NPA4",4),sparse=!memcmp(header.magic,"NPS1",4)||!memcmp(header.magic,"NPS2",4);
+ if(sparse&&header.flags!=1){fclose(f);return CPYMO_ERR_BAD_FILE_FORMAT;}
+ if(!packed&&!sparse&&!image_sequential&&(fseek(f,0,SEEK_END)||ftell(f)!=(long)(sizeof header+count*(header.flags?3:2))||fseek(f,sizeof header,SEEK_SET))){fclose(f);return CPYMO_ERR_BAD_FILE_FORMAT;}
+ load_phase(2,phase_start);phase_start=tickGetCount();
+ Image* image=calloc(1,sizeof *image);if(!image){fclose(f);if(recent_bytes){recent_clear();return cached_image(out,w,h,name,loader,kind);}return CPYMO_ERR_OUT_OF_MEM;}
  image->refs=1;image->w=header.w;image->h=header.h;image->pw=header.pw;image->ph=header.ph;image->px=malloc(count*2);if(header.flags)image->mask=malloc(count);
- if(!image->px||(header.flags&&!image->mask)){fclose(f);free(image->px);free(image->mask);free(image);return CPYMO_ERR_OUT_OF_MEM;}
+ if(!image->px||(header.flags&&!image->mask)){fclose(f);free(image->px);free(image->mask);free(image);if(recent_bytes){recent_clear();return cached_image(out,w,h,name,loader,kind);}return CPYMO_ERR_OUT_OF_MEM;}
+ load_phase(3,phase_start);phase_start=tickGetCount();
  unsigned bytes=count*2,done=0;bool ok=true;
- while(done<bytes){unsigned chunk=bytes-done;if(chunk>8192)chunk=8192;if(fread((unsigned char*)image->px+done,1,chunk,f)!=chunk){ok=false;break;}done+=chunk;nds_audio_update();}
- if(ok&&image->mask){done=0;while(done<count){unsigned chunk=count-done;if(chunk>8192)chunk=8192;if(fread(image->mask+done,1,chunk,f)!=chunk){ok=false;break;}done+=chunk;nds_audio_update();}}
- fclose(f);if(!ok){free(image->px);free(image->mask);free(image);return CPYMO_ERR_BAD_FILE_FORMAT;}
+ if(sparse){int result=nps_file(f,image,!memcmp(header.magic,"NPS2",4));if(result<0){fclose(f);free(image->px);free(image->mask);free(image);if(recent_bytes){recent_clear();return cached_image(out,w,h,name,loader,kind);}return CPYMO_ERR_OUT_OF_MEM;}ok=result>0;phase_start=tickGetCount();}
+ else if(packed){unsigned char* input=malloc(8192);if(!input){fclose(f);free(image->px);free(image->mask);free(image);if(recent_bytes){recent_clear();return cached_image(out,w,h,name,loader,kind);}return CPYMO_ERR_OUT_OF_MEM;}
+  ok=npl_plane(f,(unsigned char*)image->px,bytes,input);
+  if(ok&&image->mask)ok=npl_plane(f,image->mask,count,input);
+  if(ok)ok=fgetc(f)==EOF&&!ferror(f);free(input);phase_start=tickGetCount();
+ }else{
+ while(done<bytes){unsigned chunk=bytes-done;if(chunk>8192)chunk=8192;if(fread((unsigned char*)image->px+done,1,chunk,f)!=chunk){ok=false;break;}done+=chunk;load_phase(4,phase_start);phase_start=tickGetCount();nds_audio_update();load_phase(5,phase_start);phase_start=tickGetCount();}
+ if(ok&&image->mask){done=0;while(done<count){unsigned chunk=count-done;if(chunk>8192)chunk=8192;if(fread(image->mask+done,1,chunk,f)!=chunk){ok=false;break;}done+=chunk;load_phase(4,phase_start);phase_start=tickGetCount();nds_audio_update();load_phase(5,phase_start);phase_start=tickGetCount();}}
+ }
+ if(ok&&!packed&&!sparse&&image_sequential)ok=fgetc(f)==EOF&&!ferror(f);
+ load_phase(4,phase_start);phase_start=tickGetCount();fclose(f);load_phase(6,phase_start);if(!ok){free(image->px);free(image->mask);free(image);return CPYMO_ERR_BAD_FILE_FORMAT;}
+ phase_start=tickGetCount();prepare_bounds(image);load_phase(7,phase_start);load_state[8]++;if(!strcmp(kind,"chara"))recent_store(path,image);
+ unsigned perf_us=(tickGetCount()-perf_start)*1000000/TICK_FREQ;perf_state[1]++;perf_state[2]+=perf_us;if(perf_us>perf_state[3])perf_state[3]=perf_us;
+ unsigned seq=load_trace[1]++,j=4+(seq%64)*14;load_trace[j]=seq;load_trace[j+1]=perf_us;for(unsigned i=1;i<8;i++)load_trace[j+1+i]=load_state[i]-old_phase[i];load_trace[j+9]=!strcmp(kind,"bg")?0:!strcmp(kind,"chara")?1:2;load_trace[j+10]=count;load_trace[j+11]=engine_state[14];load_trace[j+12]=compressed_state[3]-old_decode;load_trace[j+13]=compressed_state[5]-old_check;
  *out=image;*w=image->w;*h=image->h;loaded_image=true;engine_state[40]++;return CPYMO_ERR_SUCC;
 }
 extern error_t __real_cpymo_assetloader_load_bg_image(cpymo_backend_image*,int*,int*,cpymo_str,const cpymo_assetloader*);
@@ -153,7 +259,7 @@ error_t cpymo_backend_image_load(cpymo_backend_image *out,void *px,int w,int h,e
  unsigned char* p=filtered?filtered:px;
  for(int i=0;i<im->pw*im->ph;i++,p+=channels){im->px[i]=RGB15(p[0]>>3,p[1]>>3,p[2]>>3)|BIT(15);if(im->mask)im->mask[i]=p[3];}
  free(filtered);
- free(px);*out=im;return CPYMO_ERR_SUCC;
+ prepare_bounds(im);free(px);*out=im;return CPYMO_ERR_SUCC;
 }
 error_t cpymo_backend_image_load_with_mask(cpymo_backend_image *out,void *px,void *mask,int w,int h,int mw,int mh){
  unsigned char* p=px;unsigned char* m=mask;
@@ -162,14 +268,21 @@ error_t cpymo_backend_image_load_with_mask(cpymo_backend_image *out,void *px,voi
  if(!err)free(mask);
  return err;
 }
-void cpymo_backend_image_free(cpymo_backend_image im){if(im){Image* image=im;if(--image->refs)return;free(image->px);free(image->mask);free(image);}}
+void cpymo_backend_image_free(cpymo_backend_image im){if(im){nds_scene_release();Image* image=im;if(--image->refs)return;free(image->opaque);free(image->bounds);free(image->px);free(image->mask);free(image);}}
 /* Independent red/blue lanes are ten bits apart: sums stay <=31*32.
    Exact RGB555 blend, using two multiplies for both lanes instead of four. */
 static u16 blend(u16 old,u16 col,int a){if(a>=32)return col;if(a<=0)return old;unsigned rb=(((old&0x7c1f)*(32-a)+(col&0x7c1f)*a)>>5)&0x7c1f;unsigned g=(((old&0x03e0)*(32-a)+(col&0x03e0)*a)>>5)&0x03e0;return rb|g|BIT(15);}
-void cpymo_backend_image_draw(float dx,float dy,float dw,float dh,cpymo_backend_image image,int sx,int sy,int sw,int sh,float alpha,enum cpymo_backend_image_draw_type type){
+static void image_draw_reference(float dx,float dy,float dw,float dh,cpymo_backend_image image,int sx,int sy,int sw,int sh,float alpha,enum cpymo_backend_image_draw_type type){
+ if(scene_collect){
+  if(scene_count>=64){scene_overflow=true;return;}
+  SceneCommand* c=&scene_commands[scene_count++];memset(c,0,sizeof *c);
+  c->dx=dx;c->dy=dy;c->dw=dw;c->dh=dh;c->alpha=alpha;c->image=image;c->sx=sx;c->sy=sy;c->sw=sw;c->sh=sh;c->type=type;return;
+ }
+ u64 perf_start=tickGetCount();
  (void)type;Image* im=image;if(!im||dw<=0||dh<=0)return;
  float scale=display_scale();dx=dx*scale+display_x();dy=dy*scale+display_y();dw*=scale;dh*=scale;
  int a=(int)(alpha*32);if(a<=0)return;if(a>32)a=32;
+ if((render_bits&1)&&im->mask&&!im->opaque_checked&&(a<32||native_row_copy))prepare_opaque(im);
  int left=(int)dx,top=(int)dy,right=(int)(dx+dw),bottom=(int)(dy+dh);
  int x0=left<0?0:left,y0=top<0?0:top,x1=right>256?256:right,y1=bottom>192?192:bottom;
  if(x1<=x0||y1<=y0)return;
@@ -182,16 +295,100 @@ void cpymo_backend_image_draw(float dx,float dy,float dw,float dh,cpymo_backend_
   int iy=(startY+(y-top)*stepY)>>16;if(iy<0||iy>=im->ph)continue;
   int sourceX=(startX>>16)+x0-left;
   if(!im->mask && a==32 && stepX==65536 && sourceX>=0 && sourceX+x1-x0<=im->pw){memcpy(framebuffer+y*256+x0,im->px+iy*im->pw+sourceX,(x1-x0)*2);continue;}
-  int fixedX=startX+(x0-left)*stepX;
-  for(int x=x0;x<x1;x++,fixedX+=stepX){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=im->mask?opacity[im->mask[idx]]:a;framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
+  int first=x0,last=x1;
+  if(im->bounds&&stepX>0){int l=im->bounds[iy*2],r=im->bounds[iy*2+1];
+   if(l==r){perf_state[8]+=x1-x0;continue;}
+   while(first<last&&(columns[first]<l||columns[first]>=r))first++;
+   while(last>first&&(columns[last-1]<l||columns[last-1]>=r))last--;
+  }
+  perf_state[8]+=(x1-x0)-(last-first);perf_state[7]+=last-first;
+  if((render_bits&1)&&im->opaque&&stepX>0){
+   int ol=im->opaque[iy*2],orr=im->opaque[iy*2+1],f=first,l=last;
+   if(orr>ol){
+    while(f<l&&(columns[f]<ol||columns[f]>=orr))f++;
+    while(l>f&&(columns[l-1]<ol||columns[l-1]>=orr))l--;
+   }else f=l;
+   if(f<l){
+    render_policy[3]++;render_policy[4]+=l-f;
+    for(int x=first;x<f;x++){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=opacity[im->mask[idx]];if(!aa)continue;if(aa==32)framebuffer[y*256+x]=im->px[idx];else framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
+    if(a==32){
+     if(native_row_copy&&stepX==65536){memcpy(framebuffer+y*256+f,im->px+iy*im->pw+columns[f],(l-f)*sizeof(u16));render_policy[7]+=l-f;}
+     else for(int x=f;x<l;x++)framebuffer[y*256+x]=im->px[iy*im->pw+columns[x]];
+    }
+    else{for(int x=f;x<l;x++)framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[iy*im->pw+columns[x]],a);}
+    for(int x=l;x<last;x++){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=opacity[im->mask[idx]];if(!aa)continue;if(aa==32)framebuffer[y*256+x]=im->px[idx];else framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
+    continue;
+   }
+  }
+  for(int x=first;x<last;x++){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=im->mask?opacity[im->mask[idx]]:a;if(!aa)continue;if(aa==32)framebuffer[y*256+x]=im->px[idx];else framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
  }
+ unsigned perf_us=(tickGetCount()-perf_start)*1000000/TICK_FREQ;perf_state[4]++;perf_state[5]+=perf_us;if(perf_us>perf_state[6])perf_state[6]=perf_us;
 }
-void cpymo_backend_image_fill_rects(const float* r,size_t n,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){
+__attribute__((optimize("O3"))) static void image_draw_fast(float dx,float dy,float dw,float dh,cpymo_backend_image image,int sx,int sy,int sw,int sh,float alpha,enum cpymo_backend_image_draw_type type){
+ if(scene_collect){
+  if(scene_count>=64){scene_overflow=true;return;}
+  SceneCommand* c=&scene_commands[scene_count++];memset(c,0,sizeof *c);
+  c->dx=dx;c->dy=dy;c->dw=dw;c->dh=dh;c->alpha=alpha;c->image=image;c->sx=sx;c->sy=sy;c->sw=sw;c->sh=sh;c->type=type;return;
+ }
+ u64 perf_start=tickGetCount();
+ (void)type;Image* im=image;if(!im||dw<=0||dh<=0)return;
+ float scale=display_scale();dx=dx*scale+display_x();dy=dy*scale+display_y();dw*=scale;dh*=scale;
+ int a=(int)(alpha*32);if(a<=0)return;if(a>32)a=32;
+ if((render_bits&1)&&im->mask&&!im->opaque_checked&&(a<32||native_row_copy))prepare_opaque(im);
+ int left=(int)dx,top=(int)dy,right=(int)(dx+dw),bottom=(int)(dy+dh);
+ int x0=left<0?0:left,y0=top<0?0:top,x1=right>256?256:right,y1=bottom>192?192:bottom;
+ if(x1<=x0||y1<=y0)return;
+ int startX=(int)(sx*(float)im->pw/im->w*65536.f),startY=(int)(sy*(float)im->ph/im->h*65536.f);
+ unsigned char opacity[256];if(im->mask)for(unsigned i=0;i<256;i++)opacity[i]=(a*i+127)/255;
+ int stepX=(int)(sw*(float)im->pw/im->w*65536.f/dw+.5f),stepY=(int)(sh*(float)im->ph/im->h*65536.f/dh+.5f);
+ int columns[256];for(int x=x0;x<x1;x++){int ix=(startX+(x-left)*stepX)>>16;columns[x]=ix>=0&&ix<im->pw?ix:-1;}
+ for(int y=y0;y<y1;y++){
+  if(!(y&15))nds_audio_pump_if_due();
+  int iy=(startY+(y-top)*stepY)>>16;if(iy<0||iy>=im->ph)continue;
+  int sourceX=(startX>>16)+x0-left;
+  if(!im->mask && a==32 && stepX==65536 && sourceX>=0 && sourceX+x1-x0<=im->pw){memcpy(framebuffer+y*256+x0,im->px+iy*im->pw+sourceX,(x1-x0)*2);continue;}
+  int first=x0,last=x1;
+  if(im->bounds&&stepX>0){int l=im->bounds[iy*2],r=im->bounds[iy*2+1];
+   if(l==r){perf_state[8]+=x1-x0;continue;}
+   while(first<last&&(columns[first]<l||columns[first]>=r))first++;
+   while(last>first&&(columns[last-1]<l||columns[last-1]>=r))last--;
+  }
+  perf_state[8]+=(x1-x0)-(last-first);perf_state[7]+=last-first;
+  if((render_bits&1)&&im->opaque&&stepX>0){
+   int ol=im->opaque[iy*2],orr=im->opaque[iy*2+1],f=first,l=last;
+   if(orr>ol){
+    while(f<l&&(columns[f]<ol||columns[f]>=orr))f++;
+    while(l>f&&(columns[l-1]<ol||columns[l-1]>=orr))l--;
+   }else f=l;
+   if(f<l){
+    render_policy[3]++;render_policy[4]+=l-f;
+    for(int x=first;x<f;x++){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=opacity[im->mask[idx]];if(!aa)continue;if(aa==32)framebuffer[y*256+x]=im->px[idx];else framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
+    if(a==32){
+     if(native_row_copy&&stepX==65536){memcpy(framebuffer+y*256+f,im->px+iy*im->pw+columns[f],(l-f)*sizeof(u16));render_policy[7]+=l-f;}
+     else for(int x=f;x<l;x++)framebuffer[y*256+x]=im->px[iy*im->pw+columns[x]];
+    }
+    else{for(int x=f;x<l;x++)framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[iy*im->pw+columns[x]],a);}
+    for(int x=l;x<last;x++){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=opacity[im->mask[idx]];if(!aa)continue;if(aa==32)framebuffer[y*256+x]=im->px[idx];else framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
+    continue;
+   }
+  }
+  for(int x=first;x<last;x++){int ix=columns[x];if(ix<0)continue;int idx=iy*im->pw+ix;int aa=im->mask?opacity[im->mask[idx]]:a;if(!aa)continue;if(aa==32)framebuffer[y*256+x]=im->px[idx];else framebuffer[y*256+x]=blend(framebuffer[y*256+x],im->px[idx],aa);}
+ }
+ unsigned perf_us=(tickGetCount()-perf_start)*1000000/TICK_FREQ;perf_state[4]++;perf_state[5]+=perf_us;if(perf_us>perf_state[6])perf_state[6]=perf_us;
+}
+void cpymo_backend_image_draw(float dx,float dy,float dw,float dh,cpymo_backend_image image,int sx,int sy,int sw,int sh,float alpha,enum cpymo_backend_image_draw_type type){
+ nds_clock_menu_rect(dx,dy,type);
+ if(renderer_fast)image_draw_fast(dx,dy,dw,dh,image,sx,sy,sw,sh,alpha,type);
+ else image_draw_reference(dx,dy,dw,dh,image,sx,sy,sw,sh,alpha,type);
+}
+static void fill_rects_impl(const float* r,size_t n,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){
+ if(n)nds_clock_menu_rect(r[0],r[1],type);
  (void)type;int a=(int)(alpha*32);u16 col=color(c);if(a<=0)return;
  float scale=display_scale(),ox=display_x(),oy=display_y();
  for(size_t i=0;i<n;i++,r+=4){int x0=(int)(r[0]*scale+ox),y0=(int)(r[1]*scale+oy),x1=(int)((r[0]+r[2])*scale+ox),y1=(int)((r[1]+r[3])*scale+oy);if(x0<0)x0=0;if(y0<0)y0=0;if(x1>256)x1=256;if(y1>192)y1=192;for(int y=y0;y<y1;y++){if(!(y&15))nds_audio_pump_if_due();for(int x=x0;x<x1;x++)framebuffer[y*256+x]=blend(framebuffer[y*256+x],col,a);}}
 }
 bool cpymo_backend_image_album_ui_writable(){return false;}
+void cpymo_backend_image_fill_rects(const float* r,size_t n,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){u64 t=tickGetCount();fill_rects_impl(r,n,c,alpha,type);fill_us+=(tickGetCount()-t)*1000000/TICK_FREQ;}
 #include "masktrans-nds.h"
 static unsigned decode(const char** p){unsigned c=(unsigned char)*(*p)++;if(c<128)return c;unsigned n=c<224?1:c<240?2:3;c&=(1u<<(6-n))-1;while(n--){c=(c<<6)|((unsigned char)*(*p)++&63);}return c;}
 typedef struct {u32 code;u8 advance,pad[3];u16 rows[14];} GameGlyph;
@@ -205,12 +402,35 @@ static FILE* trace_open(const char* mode);
 static void missing_glyph(unsigned cp){engine_state[20]++;FILE* file=trace_open("ab");if(file){fprintf(file,"MISSING_GLYPH U+%04X\n",cp);fclose(file);}}
 #include "ui-fallback-font.h"
 #include "pixel-font-nds.h"
-typedef struct {float size;unsigned mode;char text[];} GlyphText;
+#include "clock-nds.h"
+typedef struct {float size;unsigned mode;u8 name_bounds_ready,ink_top,ink_bottom,pad;char text[];} GlyphText;
 float cpymo_backend_text_width(cpymo_str s,float size){unsigned mode=active_font_mode(),w=0,maxw=0;const char* p=s.begin;while(p<s.begin+s.len){unsigned c=decode(&p);if(c==13)continue;if(c==10){if(w>maxw)maxw=w;w=0;continue;}int g=text_glyph(mode,c);w+=g>=0?text_advance(mode,g):font_nominal(mode);}if(w>maxw)maxw=w;return maxw*(font_scale(size,mode)/display_scale());}
-error_t cpymo_backend_text_create(cpymo_backend_text *out,float *width,cpymo_str s,float size){GlyphText* p=malloc(sizeof *p+s.len+1);if(!p)return CPYMO_ERR_OUT_OF_MEM;p->size=size;p->mode=active_font_mode();memcpy(p->text,s.begin,s.len);p->text[s.len]=0;*out=p;*width=cpymo_backend_text_width(s,size);return CPYMO_ERR_SUCC;}
+error_t cpymo_backend_text_create(cpymo_backend_text *out,float *width,cpymo_str s,float size){GlyphText* p=malloc(sizeof *p+s.len+1);if(!p)return CPYMO_ERR_OUT_OF_MEM;p->size=size;p->mode=active_font_mode();p->name_bounds_ready=0;memcpy(p->text,s.begin,s.len);p->text[s.len]=0;*out=p;*width=cpymo_backend_text_width(s,size);return CPYMO_ERR_SUCC;}
 void cpymo_backend_text_free(cpymo_backend_text p){free(p);}
-void cpymo_backend_text_draw(cpymo_backend_text text,float x,float baseline,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){
- (void)type;GlyphText* t=text;unsigned mode=t->mode;const char* p=t->text;float screen_scale=display_scale();x=x*screen_scale+display_x();baseline=baseline*screen_scale+display_y();float scale=font_scale(t->size,mode);unsigned gh=font_height(mode),gw=font_width(mode),gb=font_baseline(mode);
+// Original PyMO centers name ink in its box. The core's fixed 0.9-em
+// baseline assumes different font metrics; adapt only the live speaker name.
+// Cache bounds on first draw: no repeated glyph scan or FAT access per frame.
+static float name_baseline_adjustment(GlyphText* t,float scale,float screen_scale){
+ if(!t->name_bounds_ready){
+  unsigned top=font_height(t->mode),bottom=0;const char* p=t->text;
+  while(*p){unsigned cp=decode(&p);if(cp==10||cp==13)continue;
+   int g=text_glyph(t->mode,cp);if(g<0)g=text_glyph(t->mode,'?');
+   if(g>=0)for(unsigned y=0;y<font_height(t->mode);y++)if(text_row(t->mode,g,y)){
+    if(y<top)top=y;
+    if(y+1>bottom)bottom=y+1;
+   }
+  }
+  t->ink_top=top;t->ink_bottom=bottom;t->name_bounds_ready=1;
+ }
+ if(t->ink_bottom<=t->ink_top)return 0;
+ // Box height = 1.4 em, supplied baseline = box top + 0.9 em.
+ return (font_baseline(t->mode)-(t->ink_top+t->ink_bottom)*.5f)*scale
+        -.2f*t->size*screen_scale;
+}
+static void text_draw_impl(cpymo_backend_text text,float x,float baseline,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){
+ GlyphText* t=text;unsigned mode=t->mode;const char* p=t->text;float screen_scale=display_scale();x=x*screen_scale+display_x();baseline=baseline*screen_scale+display_y();float scale=font_scale(t->size,mode);unsigned gh=font_height(mode),gw=font_width(mode),gb=font_baseline(mode);
+ if(type==cpymo_backend_image_draw_type_text_say&&text==engine.say.name)
+  baseline+=name_baseline_adjustment(t,scale,screen_scale);
  int h=(int)(gh*scale+.5f),w=(int)(gw*scale+.5f);
  if(scale==1.f){int pen=(int)x,top=(int)(baseline-gb);int a=(int)(alpha*32);u16 col=color(c);
   while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10){pen=(int)x;top+=font_nominal(mode)+3;continue;}int g=text_glyph(mode,cp);if(g<0){missing_glyph(cp);g=text_glyph(mode,'?');}if(g>=0){for(unsigned y=0;y<gh;y++){int yy=top+y;if(yy<0||yy>=192)continue;unsigned bits=text_row(mode,g,y);for(unsigned xx=0;xx<gw;xx++)if(bits&(1<<xx)){int px=pen+xx;if(px>=0&&px<256){unsigned idx=yy*256+px;framebuffer[idx]=blend(framebuffer[idx],col,a);}}}pen+=text_advance(mode,g);}else pen+=font_nominal(mode);}
@@ -219,7 +439,18 @@ void cpymo_backend_text_draw(cpymo_backend_text text,float x,float baseline,cpym
  float start_x=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10){x=start_x;baseline+=(font_nominal(mode)+3)*scale;continue;}int g=text_glyph(mode,cp);if(g<0){missing_glyph(cp);g=text_glyph(mode,'?');}
  if(g>=0)for(int y=0;y<h;y++)for(int xx=0;xx<w;xx++){unsigned gy=(unsigned)(y/scale),gx=(unsigned)(xx/scale);if(gy<gh&&gx<gw&&(text_row(mode,g,gy)&(1<<gx)))pixel((int)x+xx,(int)(baseline-gb*scale)+y,c,alpha);}x+=(g>=0?text_advance(mode,g):font_nominal(mode))*scale;}
 }
-cpymo_input cpymo_input_snapshot(){int k=keysHeld();touchPosition t={0};if(k&KEY_TOUCH){touchRead(&t);presentation_state[8]++;}cpymo_input in={0};in.ok=k&KEY_A;in.cancel=k&(cpymo_ui_enabled(&engine)?KEY_B:KEY_X);in.up=k&KEY_UP;in.down=k&KEY_DOWN;in.left=k&KEY_LEFT;in.right=k&KEY_RIGHT;in.skip=k&KEY_R;in.hide_window=!cpymo_ui_enabled(&engine)&&(k&KEY_B);in.mouse_button=!nds_touch_blocked&&(k&KEY_TOUCH);in.mouse_position_useable=in.mouse_button;in.mouse_x=(t.px-display_x())/display_scale();in.mouse_y=(t.py-display_y())/display_scale();return in;}
+void cpymo_backend_text_draw(cpymo_backend_text text,float x,float baseline,cpymo_color c,float alpha,enum cpymo_backend_image_draw_type type){u64 t=tickGetCount();text_draw_impl(text,x,baseline,c,alpha,type);text_us+=(tickGetCount()-t)*1000000/TICK_FREQ;}
+cpymo_input cpymo_input_snapshot(){
+ int k=keysHeld();touchPosition t={0};if(k&KEY_TOUCH){touchRead(&t);presentation_state[8]++;}
+ bool ui=cpymo_ui_enabled(&engine);
+ // Script menus use the core cancel rule; save-enabled story choices keep X for the menu.
+ bool script_menu=engine.select_img.selections&&!engine.select_img.save_enabled;
+ cpymo_input in={0};in.ok=k&KEY_A;in.cancel=k&((ui||script_menu)?KEY_B:KEY_X);
+ in.up=k&KEY_UP;in.down=k&KEY_DOWN;in.left=k&KEY_LEFT;in.right=k&KEY_RIGHT;in.skip=k&KEY_R;
+ in.hide_window=!ui&&!engine.select_img.selections&&(k&KEY_B);
+ in.mouse_button=!nds_touch_blocked&&(k&KEY_TOUCH);in.mouse_position_useable=in.mouse_button;
+ in.mouse_x=(t.px-display_x())/display_scale();in.mouse_y=(t.py-display_y())/display_scale();return in;
+}
 static FILE* savefile(const char* dir,const char* name,const char* mode){char path[512];snprintf(path,sizeof path,"%s/save/%s",dir,name);return fopen(path,mode);}
 FILE* cpymo_backend_read_save(const char* dir,const char* name){return savefile(dir,name,"rb");}
 FILE* cpymo_backend_write_save(const char* dir,const char* name){return savefile(dir,name,"wb");}
@@ -248,7 +479,7 @@ volatile unsigned menu_performance[5]={0x4d454e55};
 extern error_t __real_cpymo_rmenu_enter(cpymo_engine*);
 error_t __wrap_cpymo_rmenu_enter(cpymo_engine* e){
  nds_audio_update();u64 begin=tickGetCount();
- error_t result=__real_cpymo_rmenu_enter(e);
+ nds_registering_rmenu=true;error_t result=__real_cpymo_rmenu_enter(e);nds_registering_rmenu=false;
  unsigned us=(tickGetCount()-begin)*1000000/TICK_FREQ;
  menu_performance[1]++;menu_performance[2]=us;
  if(us>menu_performance[3])menu_performance[3]=us;
@@ -272,8 +503,7 @@ static void nds_power_event(void* user,PmEvent event){
  else if(event==PmEvent_OnWakeup){u64 delta=tickGetCount()-sleep_started;sleep_state[4]=delta*1000/TICK_FREQ;if(presentation_state[2])toast_started+=delta;nds_audio_resume();sleep_state[1]=0;sleep_state[3]++;}
 }
 
-/* Standard NDS release intentionally skips video, including optional caches. */
-error_t __wrap_cpymo_movie_play(cpymo_engine* e,const char* name){(void)e;(void)name;engine_state[45]++;return CPYMO_ERR_SUCC;}
+#include "movie-lz4-r7.h"
 extern void __real_cpymo_charas_wait(cpymo_engine*);
 extern void cpymo_charas_gc(cpymo_charas*,bool);
 void __wrap_cpymo_charas_wait(cpymo_engine* e){
@@ -284,36 +514,158 @@ void __wrap_cpymo_charas_wait(cpymo_engine* e){
  cpymo_charas_gc(&e->charas,false);chara_effect_state[2]++;cpymo_engine_request_redraw(e);
 }
 
+
+volatile unsigned render_bench[68]={0x52424e43};
+/* Private fixed mask benchmark: real DS code, both directions and endpoints. */
+static void run_mask_bench(void){
+ static const unsigned sizes[4][4]={{1,1,320,240},{256,192,480,320},{73,57,240,320},{137,91,4096,17}};
+ int oldw=engine.gameconfig.imagesize_w,oldh=engine.gameconfig.imagesize_h;
+ for(unsigned n=0;n<4;n++){
+  MaskTransition* mask=mask_alloc(sizes[n][0],sizes[n][1]);
+  if(!mask){render_bench[2]=CPYMO_ERR_OUT_OF_MEM;render_bench[1]=1;return;}
+  for(unsigned i=0;i<mask->w*mask->h;i++)mask->pixels[i]=(i*37+i/13)&255;
+  engine.gameconfig.imagesize_w=sizes[n][2];engine.gameconfig.imagesize_h=sizes[n][3];
+  for(unsigned c=0;c<4;c++){
+   unsigned total=0,maximum=0,hash=2166136261u;float t=c==0?0:c==1?.15f:c==2?.65f:1;
+   for(unsigned repeat=0;repeat<16;repeat++){
+    for(unsigned i=0;i<256*192;i++)framebuffer[i]=0x8000|((i*3+repeat*17)&0x7fff);
+    u64 start=tickGetCount();cpymo_backend_masktrans_draw(mask,t,(n+c)&1);
+    unsigned us=(tickGetCount()-start)*1000000/TICK_FREQ;total+=us;if(us>maximum)maximum=us;
+    for(unsigned i=0;i<256*192;i++){hash^=framebuffer[i];hash*=16777619u;}
+   }
+   unsigned index=4+(n*4+c)*4;render_bench[index]=total;render_bench[index+1]=maximum;render_bench[index+2]=hash;render_bench[index+3]=16;render_bench[3]++;
+  }
+  cpymo_backend_masktrans_free(mask);
+ }
+ engine.gameconfig.imagesize_w=oldw;engine.gameconfig.imagesize_h=oldh;render_bench[1]=1;
+}
+
+static void run_render_bench(void){
+ static const char* names[] = {"CC01_01M","CC01_02M","CC01_04M","CC01_05M"};
+ for(unsigned n=0;n<4;n++){
+  cpymo_backend_image image=NULL;int w,h;error_t err=cached_image(&image,&w,&h,cpymo_str_pure(names[n]),&engine.assetloader,"chara");
+  if(err){render_bench[2]=err;render_bench[1]=1;return;}
+  for(unsigned c=0;c<4;c++){
+   unsigned total=0,maximum=0;float x=c==1?-80:c==2?80:0,y=c==2?-20:0,scale=c==3?.75f:1.f,a=c==1?.5f:1.f;
+   for(unsigned repeat=0;repeat<16;repeat++){
+    for(unsigned p=0;p<256*192;p++)framebuffer[p]=0x8010;
+    u64 start=tickGetCount();
+    cpymo_backend_image_draw(x,y,w*scale,h*scale,image,0,0,w,h,a,cpymo_backend_image_draw_type_chara);
+    unsigned us=(tickGetCount()-start)*1000000/TICK_FREQ;total+=us;if(us>maximum)maximum=us;
+   }
+   unsigned hash=2166136261u;for(unsigned p=0;p<256*192;p++){hash^=framebuffer[p];hash*=16777619u;}
+   unsigned index=4+(n*4+c)*4;render_bench[index]=total;render_bench[index+1]=maximum;render_bench[index+2]=hash;render_bench[index+3]=16;
+   render_bench[3]++;
+  }
+  cpymo_backend_image_free(image);
+ }
+ render_bench[1]=1;
+}
+
+
+extern volatile unsigned audio_state[12],audio_bench[12];
+extern volatile unsigned stream_diag[8];
+extern void nds_stream_diag_reset(void);
+volatile unsigned load_bench[40]={0x4c424e43};
+static void run_load_bench(void){
+ char names[4][64],kinds[4][16];
+ FILE* spec=savefile(engine.assetloader.gamedir,"nds-bench-assets.txt","rb");
+ if(!spec){load_bench[2]=1;load_bench[1]=1;return;}
+ for(unsigned n=0;n<4;n++)if(fscanf(spec,"%15s %63s",kinds[n],names[n])!=2){fclose(spec);load_bench[2]=2;load_bench[1]=1;return;}
+ fclose(spec);recent_limit=0;
+ cpymo_audio_set_channel_volume(0,&engine.audio,.20f);cpymo_audio_set_channel_volume(1,&engine.audio,.20f);cpymo_audio_set_channel_volume(2,&engine.audio,.20f);
+ load_bench[2]=cpymo_audio_bgm_play(&engine,cpymo_str_pure("BGM07"),true);
+ load_bench[2]|=cpymo_audio_se_play(&engine,cpymo_str_pure("SE013"),true);
+ load_bench[2]|=cpymo_audio_vo_play(&engine,cpymo_str_pure("8RD93O2Y"));
+ nds_audio_update();nds_stream_diag_reset();for(unsigned i=1;i<8;i++)audio_state[i]=0;
+ FILE* stress=savefile(engine.assetloader.gamedir,"nds-cache-stress.flag","rb");if(stress){fclose(stress);recent_limit=0;}recent_clear();for(unsigned i=1;i<32;i++)load_state[i]=0;for(unsigned i=1;i<8;i++)compressed_state[i]=0;
+ engine_state[28]=0;perf_state[4]=perf_state[5]=perf_state[6]=0;
+ for(unsigned repeat=0;repeat<8;repeat++)for(unsigned n=0;n<4;n++){
+  u64 start=tickGetCount();cpymo_backend_image image=NULL;int w,h;
+  error_t err=cached_image(&image,&w,&h,cpymo_str_pure(names[n]),&engine.assetloader,kinds[n]);
+  if(err){load_bench[2]=err;load_bench[1]=1;return;}
+  if(n==0)for(unsigned p=0;p<256*192;p++)framebuffer[p]=0x8010;
+  cpymo_backend_image_draw(n==2?64:0,0,w,h,image,0,0,w,h,n==0?1.f:.5f,strcmp(kinds[n],"bg")?cpymo_backend_image_draw_type_chara:cpymo_backend_image_draw_type_bg);
+  cpymo_backend_image_free(image);nds_audio_update();
+  unsigned us=(tickGetCount()-start)*1000000/TICK_FREQ;
+  load_bench[4+n]+=us;if(us>load_bench[8+n])load_bench[8+n]=us;
+  unsigned hash=2166136261u;for(unsigned p=0;p<256*192;p++){hash^=framebuffer[p];hash*=16777619u;}
+  load_bench[12+n]=hash;load_bench[3]++;
+ }
+ load_bench[16]=engine_state[28];load_bench[17]=perf_state[5];load_bench[18]=perf_state[6];
+ for(unsigned i=1;i<8;i++)load_bench[20+i]=stream_diag[i];
+ for(unsigned i=1;i<12;i++)audio_bench[i]=audio_state[i];load_bench[1]=1;
+}
+
+
+static void nds_base_draw(const cpymo_engine* e){cpymo_bg_draw(e);cpymo_scroll_draw(&e->scroll);cpymo_charas_draw(e);cpymo_anime_draw(&e->anime);}
+static void nds_engine_draw(const cpymo_engine* e){
+ nds_menu_clock_visible=false;clock_state[9]=0;
+ if(cpymo_ui_enabled(e)){cpymo_engine_draw(e);return;}
+ scene_count=0;scene_overflow=false;scene_collect=true;nds_base_draw(e);scene_collect=false;
+ float view[3]={display_scale(),display_x(),display_y()};
+ nds_audio_pump_if_due();
+ bool same=!scene_overflow&&scene_previous_count==scene_count&&!memcmp(scene_view,view,sizeof view)&&!memcmp(scene_previous,scene_commands,scene_count*sizeof(SceneCommand));
+ bool hit=scene_valid&&same;
+ if(hit){memcpy(framebuffer,scene_pixels,sizeof framebuffer);scene_state[1]++;}
+ else{
+  nds_base_draw(e);scene_state[2]++;
+  /* Avoid copying a changing scene: populate only after two identical sequences. */
+  if(same&&!scene_pixels){extern void* __real_malloc(size_t);scene_pixels=__real_malloc(sizeof framebuffer);}
+  if(same&&scene_pixels){memcpy(scene_pixels,framebuffer,sizeof framebuffer);scene_valid=true;}else{scene_valid=false;if(same)scene_state[3]++;}
+  memcpy(scene_previous,scene_commands,scene_count*sizeof(SceneCommand));memcpy(scene_view,view,sizeof view);scene_previous_count=scene_count;
+ }
+ nds_audio_pump_if_due();
+ cpymo_select_img_draw(&e->select_img,e->gameconfig.imagesize_w,e->gameconfig.imagesize_h,e->gameconfig.grayselected);
+ cpymo_floating_hint_draw(&e->floating_hint);cpymo_flash_draw(e);cpymo_bg_draw_transform_effect(e);cpymo_fade_draw(e);cpymo_text_draw(e);cpymo_say_draw(e);
+}
+
 int main(int argc,char** argv){
  pmAddEventHandler(&sleep_cookie,nds_power_event,NULL);
- debug_trace=false;filter_console_output();launcher_video_init();launcher_show_splash();
- if(!fatInitDefault()){launcher_failure_hint("FAT failed",CPYMO_ERR_CAN_NOT_OPEN_FILE,"Check TF card, then restart.");launcher_video_show();while(1){nds_power_poll();swiWaitForVBlank();}}
- nds_global_preferences_load();
+ /* Start Calico's lazy tick service through its public thread API before
+    the launcher uses tickGetCount(); audio used to initialize it later. */
+ threadSleepTicks(1);
+ debug_trace=false;nds_language_boot();filter_console_output();launcher_video_init();launcher_show_splash();
+ if(!fatInitDefault()){launcher_failure_hint("无法访问存储卡",CPYMO_ERR_CAN_NOT_OPEN_FILE,"请关机后重新启动");launcher_video_show();while(1){nds_power_poll();swiWaitForVBlank();}}
+ nds_language_load();nds_global_preferences_load();
  const char* hint=argc>1?argv[1]:NULL;
  for(;;){
  debug_trace=false;filter_console_output();
  char game_dir[256];launcher_choose(game_dir,sizeof game_dir,hint);
+ render_bits=3;{FILE* policy=savefile(game_dir,"nds-render-policy.txt","rb");if(policy){int value=fgetc(policy);fclose(policy);if(value>='0'&&value<='3')render_bits=value-'0';}}render_policy[1]=render_bits;
  FILE* debug_flag=savefile(game_dir,"nds-debug.flag","rb");debug_trace=debug_flag!=NULL;if(debug_flag)fclose(debug_flag);diagnostic_state[1]=debug_trace;diagnostic_state[2]=diagnostic_state[3]=0;
- memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
+ recent_clear();memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
+ FILE* sequential_file=savefile(game_dir,"nds-image-sequential.txt","rb");image_sequential=!sequential_file||fgetc(sequential_file)!='0';if(sequential_file)fclose(sequential_file);
+ char layout_path[512],layout_marker[32]={0};snprintf(layout_path,sizeof layout_path,"%s/nds-cache/format.txt",game_dir);FILE* marker_file=fopen(layout_path,"rb");if(marker_file){fread(layout_marker,1,31,marker_file);fclose(marker_file);}int format_layout=!strcmp(layout_marker,"CPYMO-NDS-CACHE-6\n")?3:0;
+ FILE* layout_file=savefile(game_dir,"nds-layout-policy.txt","rb");int layout=layout_file?fgetc(layout_file)-'0':format_layout;if(layout_file)fclose(layout_file);cache_layout_policy=layout>=0&&layout<=3?layout:0;
+ FILE* fast_file=savefile(game_dir,"nds-render-fast.txt","rb");renderer_fast=!fast_file||fgetc(fast_file)!='0';if(fast_file)fclose(fast_file);
+ FILE* row_file=savefile(game_dir,"nds-row-copy.txt","rb");native_row_copy=row_file&&fgetc(row_file)!='0';if(row_file)fclose(row_file);
+ FILE* buffer_file=savefile(game_dir,"nds-image-buffer.txt","rb");int buffer_policy=buffer_file?fgetc(buffer_file)-'0':2;if(buffer_file)fclose(buffer_file);image_buffer_policy=buffer_policy>=0&&buffer_policy<=3?buffer_policy:0;
+ extern void nds_stream_guard_policy(bool);FILE* guard_file=savefile(game_dir,"nds-refill-guard.txt","rb");bool guard=!guard_file||fgetc(guard_file)!='0';if(guard_file)fclose(guard_file);nds_stream_guard_policy(guard);
  if(!err)err=cpymo_engine_init(&engine,game_dir);engine_state[1]=err;
  // DS readability policy is in memory only. Keep layout line spacing in
  // agreement with the selected native pixel size; never rewrite gameconfig.txt.
  if(!err){nds_preferences_load(game_dir);enforce_text_readability();if(nds_cache_enabled)warm_menu_images();}
  if(debug_trace)printf("Core init: %d\n",err);FILE* trace=trace_open("wb");if(trace){fprintf(trace,"INIT %d\n",err);fclose(trace);}
  if(err){launcher_state[6]=err;cpymo_audio_free(&engine.audio);if(debug_trace)printf("Game init failed: %d\nPress B to return to games.\n",err);else launcher_failure("启动失败，请检查转换结果",err);do{nds_power_poll();swiWaitForVBlank();scanKeys();}while(!(keysDown()&KEY_B));continue;}
+ free(scene_verify_pixels);scene_verify_pixels=NULL;FILE* verify_flag=savefile(game_dir,"nds-scene-verify.flag","rb");if(verify_flag){fclose(verify_flag);scene_verify_pixels=malloc(sizeof framebuffer);scene_state[7]=scene_verify_pixels!=NULL;}
+ FILE* mask_flag=savefile(game_dir,"nds-maskbench.flag","rb");if(mask_flag){fclose(mask_flag);run_mask_bench();for(;;)swiWaitForVBlank();}
+ FILE* bench_flag=savefile(game_dir,"nds-renderbench.flag","rb");if(bench_flag){fclose(bench_flag);run_render_bench();for(;;)swiWaitForVBlank();}
  nds_playing=true;nds_aux_refresh();
  if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\nDS mode: 4 MiB\n");}else launcher_play_panel(NULL);
  // Count actual display interrupts; include missed frames during decoding/drawing.
  irqSet(IRQ_VBLANK,on_vblank);irqEnable(IRQ_VBLANK);
+ FILE* load_flag=savefile(game_dir,"nds-loadbench.flag","rb");if(load_flag){fclose(load_flag);run_load_bench();for(;;){swiWaitForVBlank();nds_audio_update();}}
  u64 prev_tick=tickGetCount(),observed_tick=prev_tick;float elapsed=0;char last_script[64]={0};
  while(1){unsigned wakes=sleep_state[3];nds_power_poll();bool woke=sleep_state[3]!=wakes;if(woke)prev_tick=observed_tick=tickGetCount();swiWaitForVBlank();scanKeys();
  nds_audio_update();
  if(!debug_trace)launcher_update_toast();
  if(keysDown()&KEY_L){lcdSwap();screens_swapped=!screens_swapped;presentation_state[1]=screens_swapped;nds_aux_refresh();}
  nds_aux_poll();
+ nds_clock_poll();
  if(keysDown()&KEY_START){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
  if(keysDown()&KEY_SELECT){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
  unsigned now=vblank_count;u64 now_tick=tickGetCount();float dt=(float)(now_tick-prev_tick)/TICK_FREQ;prev_tick=now_tick;if(woke)sleep_state[10]=(unsigned)(dt*1000000);elapsed+=dt;bool redraw=false;
@@ -325,6 +677,14 @@ int main(int argc,char** argv){
  u64 update_start=tickGetCount();loaded_image=false;
  err=cpymo_engine_update(&engine,dt,&redraw);if(!err)enforce_text_readability();if(skip_override)engine.config_skip_already_read_only=saved_skip_policy;engine_state[1]=err;engine_state[2]++;
  nds_preferences_sync();
+ /* Rebuild UI objects after their updater returns, never from a setter while
+    its data is still in use. Recreate the parent menu too, so Back is localized. */
+ if(nds_language_take_refresh()){
+  while(cpymo_ui_enabled(&engine))cpymo_ui_exit(&engine);
+  err=cpymo_rmenu_enter(&engine);if(!err)err=cpymo_config_ui_enter(&engine);
+  if(!err)cpymo_list_ui_set_selection_relative_to_cur(&engine,8);
+  engine_state[1]=err;launcher_play_panel(NULL);redraw=true;
+ }
  control_state[1]=(engine.say.auto_mode?1:0)|(engine.say.hide_window?2:0)|(engine.input.hide_window?4:0)|((engine.skipping||engine.input.skip)?8:0)|(engine.config_skip_already_read_only?16:0);control_state[2]=engine.interpreter?engine.interpreter->checkpoint.cur_line:0;
  if(loaded_image){prev_tick=tickGetCount();engine_state[32]++;}
  unsigned update_us=(tickGetCount()-update_start)*1000000/TICK_FREQ;if(update_us>engine_state[31])engine_state[31]=update_us;
@@ -338,11 +698,12 @@ int main(int argc,char** argv){
   /* Generic startup-menu marker; script names are recorded in the trace. */
   engine_state[7]=!strcmp(name,"MENU")?10:0;
  }
- if(redraw){u64 draw_start=tickGetCount();for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);cpymo_engine_draw(&engine);
+ if(redraw){unsigned image_before=perf_state[5],text_before=text_us,fill_before=fill_us;u64 draw_start=tickGetCount();for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);nds_engine_draw(&engine);if(scene_verify_pixels){memcpy(scene_verify_pixels,framebuffer,sizeof framebuffer);for(unsigned i=0;i<256*192;i++)framebuffer[i]=BIT(15);unsigned saved_bits=render_bits;bool saved_copy=native_row_copy,saved_fast=renderer_fast;render_bits=0;native_row_copy=false;renderer_fast=false;cpymo_engine_draw(&engine);render_bits=saved_bits;native_row_copy=saved_copy;renderer_fast=saved_fast;scene_state[5]++;if(memcmp(scene_verify_pixels,framebuffer,sizeof framebuffer))scene_state[6]++;}
   // DMA reads main memory, not the ARM9 data cache. Publish the whole frame.
+  nds_clock_sync_aux_visibility();
   DC_FlushRange(framebuffer,sizeof framebuffer);
   dmaCopy(framebuffer,vram,sizeof framebuffer);engine_state[29]++;if(engine.bg.transform_draw){engine_state[38]++;float p=cpymo_tween_value(&engine.bg.transform_progression);if(p>0&&p<1)engine_state[39]|=1u<<(unsigned)(p*31);}
-  unsigned draw_us=(tickGetCount()-draw_start)*1000000/TICK_FREQ;if(draw_us>engine_state[30])engine_state[30]=draw_us;}
+  unsigned draw_us=(tickGetCount()-draw_start)*1000000/TICK_FREQ;if(draw_us>engine_state[30])engine_state[30]=draw_us;if(draw_us>50000){unsigned seq=draw_trace[1]++,j=4+(seq%64)*8;draw_trace[j]=seq;draw_trace[j+1]=draw_us;draw_trace[j+2]=perf_state[5]-image_before;draw_trace[j+3]=text_us-text_before;draw_trace[j+4]=fill_us-fill_before;draw_trace[j+5]=engine_state[14];draw_trace[j+6]=engine_state[2];draw_trace[j+7]=mask_state[3];}}
  nds_audio_update();
  struct mallinfo mi=mallinfo();engine_state[3]=mi.uordblks;if(engine_state[3]>engine_state[4])engine_state[4]=engine_state[3];
  if(false && engine_state[2]%60==0)printf("\x1b[6;0HFrame: %6u    \nHeap: %7u      \nPeak: %7u      ",engine_state[2],engine_state[3],engine_state[4]);
