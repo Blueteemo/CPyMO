@@ -123,22 +123,44 @@ static void prepare_opaque(Image* im){
 
 /* Bounded recent character-image cache: owns one reference, never changes pixels. */
 #define RECENT_LIMIT (384u*1024u)
+#define RECENT_LIMIT_TWL (2048u*1024u)
+/* Keep the original DS budget except on a genuine TWL runtime with >=8 MiB
+ * of heap address space. No direct clock, SCFG, or heap-bound changes. */
+static unsigned nds_recent_image_budget(void){
+ if(!isDSiMode())return RECENT_LIMIT;
+ const uintptr_t lo=(uintptr_t)getHeapStart(),hi=(uintptr_t)getHeapLimit();
+ return hi>lo && hi-lo>=(8u*1024u*1024u)?RECENT_LIMIT_TWL:RECENT_LIMIT;
+}
 typedef struct {char path[512];Image* image;unsigned bytes,age;} RecentImage;
-static RecentImage recent_images[6];static unsigned recent_bytes,recent_age,recent_limit=RECENT_LIMIT;
+/* NTR keeps the original six-slot policy. TWL's 2 MiB budget can retain
+ * more recently used sprites; more memory is NOT reserved for sprite pixels
+ * unless those assets are actually loaded. */
+#define RECENT_SLOTS_DS 6u
+#define RECENT_SLOTS_TWL 12u
+static RecentImage recent_images[RECENT_SLOTS_TWL];
+static unsigned recent_bytes,recent_age,recent_limit=RECENT_LIMIT;
+/* Diagnostic-only counters: magic, background hits, misses, stores, skips.
+ * Background reuse is TWL-only, sharing the existing 2 MiB LRU with sprites. */
+volatile unsigned background_cache_state[5]={0x42474331,0,0,0,0};
+static bool nds_bg_cache_enabled;
+static unsigned recent_capacity(void){
+ return recent_limit>=RECENT_LIMIT_TWL?RECENT_SLOTS_TWL:RECENT_SLOTS_DS;
+}
 static void recent_remove(unsigned i){if(recent_images[i].image){recent_bytes-=recent_images[i].bytes;cpymo_backend_image_free(recent_images[i].image);}memset(&recent_images[i],0,sizeof recent_images[i]);}
-static void recent_clear(void){for(unsigned i=0;i<6;i++)recent_remove(i);recent_age=0;}
-static Image* recent_find(const char* path){for(unsigned i=0;i<6;i++)if(recent_images[i].image&&!strcmp(recent_images[i].path,path)){recent_images[i].age=++recent_age;recent_images[i].image->refs++;load_state[9]++;return recent_images[i].image;}load_state[10]++;return NULL;}
-static void recent_store(const char* path,Image* im){
+static void recent_clear(void){for(unsigned i=0;i<RECENT_SLOTS_TWL;i++)recent_remove(i);recent_age=0;}
+static Image* recent_find(const char* path){for(unsigned i=0;i<recent_capacity();i++)if(recent_images[i].image&&!strcmp(recent_images[i].path,path)){recent_images[i].age=++recent_age;recent_images[i].image->refs++;load_state[9]++;return recent_images[i].image;}load_state[10]++;return NULL;}
+static bool recent_store(const char* path,Image* im){
  unsigned cost=sizeof *im+im->pw*im->ph*(im->mask?3:2)+(im->bounds?im->ph*4:0)+(((render_bits&1)&&im->mask&&im->bounds)?im->ph*4:0);
- if(cost>recent_limit)return;
+ if(cost>recent_limit)return false;
  int slot=-1;
- for(;;){slot=-1;for(unsigned i=0;i<6;i++)if(!recent_images[i].image){slot=i;break;}
+ for(;;){slot=-1;for(unsigned i=0;i<recent_capacity();i++)if(!recent_images[i].image){slot=i;break;}
   if(slot>=0&&recent_bytes+cost<=recent_limit)break;
-  unsigned oldest=0;for(unsigned i=1;i<6;i++)if(recent_images[i].image&&(!recent_images[oldest].image||recent_images[i].age<recent_images[oldest].age))oldest=i;
+  unsigned oldest=0;for(unsigned i=1;i<recent_capacity();i++)if(recent_images[i].image&&(!recent_images[oldest].image||recent_images[i].age<recent_images[oldest].age))oldest=i;
   recent_remove(oldest);load_state[11]++;
  }
  RecentImage* r=&recent_images[slot];snprintf(r->path,sizeof r->path,"%s",path);r->image=im;r->bytes=cost;r->age=++recent_age;im->refs++;recent_bytes+=cost;
  if(recent_bytes>load_state[30])load_state[30]=recent_bytes;
+ return true;
 }
 static Image* menu_images[2];
 static char menu_image_dir[256];
@@ -154,7 +176,15 @@ void nds_cache_path(char* out,size_t size,const char* dir,const char* kind,cpymo
 static error_t cached_image(cpymo_backend_image* out,int* w,int* h,cpymo_str name,const cpymo_assetloader* loader,const char* kind){
  u64 perf_start=tickGetCount(),phase_start=perf_start;unsigned old_phase[8];for(unsigned i=1;i<8;i++)old_phase[i]=load_state[i];unsigned old_decode=compressed_state[3],old_check=compressed_state[5];
  char path[512];nds_cache_path(path,sizeof path,loader->gamedir,kind,name,".npi");
- if(!strcmp(kind,"chara")){Image* hit=recent_find(path);if(hit){*out=hit;*w=hit->w;*h=hit->h;loaded_image=true;engine_state[40]++;nds_audio_pump_if_due();return CPYMO_ERR_SUCC;}}
+ const bool is_bg=!strcmp(kind,"bg");
+ /* Sprite reuse remains unchanged on NTR; only actual TWL heap profiles
+  * reuse backgrounds. Both resource kinds share the same bounded LRU. */
+ const bool reuse=!strcmp(kind,"chara")||(is_bg&&nds_bg_cache_enabled);
+ if(reuse){
+  Image* hit=recent_find(path);
+  if(is_bg)background_cache_state[hit?1:2]++;
+  if(hit){*out=hit;*w=hit->w;*h=hit->h;loaded_image=true;engine_state[40]++;nds_audio_pump_if_due();return CPYMO_ERR_SUCC;}
+ }
  FILE* f=fopen(path,"rb");if(!f)return CPYMO_ERR_CAN_NOT_OPEN_FILE;
  if(image_buffer_policy&&setvbuf(f,NULL,image_buffer_policy==1?_IONBF:_IOFBF,image_buffer_policy==2?8192:4096)&&setvbuf(f,NULL,_IONBF,0)){fclose(f);return CPYMO_ERR_OUT_OF_MEM;}
 
@@ -182,7 +212,11 @@ static error_t cached_image(cpymo_backend_image* out,int* w,int* h,cpymo_str nam
  }
  if(ok&&!packed&&!sparse&&image_sequential)ok=fgetc(f)==EOF&&!ferror(f);
  load_phase(4,phase_start);phase_start=tickGetCount();fclose(f);load_phase(6,phase_start);if(!ok){free(image->px);free(image->mask);free(image);return CPYMO_ERR_BAD_FILE_FORMAT;}
- phase_start=tickGetCount();prepare_bounds(image);load_phase(7,phase_start);load_state[8]++;if(!strcmp(kind,"chara"))recent_store(path,image);
+ phase_start=tickGetCount();prepare_bounds(image);load_phase(7,phase_start);load_state[8]++;
+ if(reuse){
+  bool stored=recent_store(path,image);
+  if(is_bg)background_cache_state[stored?3:4]++;
+ }
  unsigned perf_us=(tickGetCount()-perf_start)*1000000/TICK_FREQ;perf_state[1]++;perf_state[2]+=perf_us;if(perf_us>perf_state[3])perf_state[3]=perf_us;
  unsigned seq=load_trace[1]++,j=4+(seq%64)*14;load_trace[j]=seq;load_trace[j+1]=perf_us;for(unsigned i=1;i<8;i++)load_trace[j+1+i]=load_state[i]-old_phase[i];load_trace[j+9]=!strcmp(kind,"bg")?0:!strcmp(kind,"chara")?1:2;load_trace[j+10]=count;load_trace[j+11]=engine_state[14];load_trace[j+12]=compressed_state[3]-old_decode;load_trace[j+13]=compressed_state[5]-old_check;
  *out=image;*w=image->w;*h=image->h;loaded_image=true;engine_state[40]++;return CPYMO_ERR_SUCC;
@@ -620,7 +654,25 @@ static void nds_engine_draw(const cpymo_engine* e){
  cpymo_floating_hint_draw(&e->floating_hint);cpymo_flash_draw(e);cpymo_bg_draw_transform_effect(e);cpymo_fade_draw(e);cpymo_text_draw(e);cpymo_say_draw(e);
 }
 
+/* Read-only runtime telemetry for hardware acceptance tests.
+ * [1] actual TWL runtime (not simply DSi console), [2] linked-memory profile.
+ * This deliberately does not modify CPU clock, SCFG or heap bounds. */
+volatile unsigned nds_runtime_state[5]={0x43505457,0,0,0,0};
+#ifdef CPYMO_DSI_MEMORY_LAYOUT
+/* Nonzero TWL section makes the experimental ROM DSi-capable.
+ * Touch it only after hardware confirms TWL mode. */
+static volatile u32 nds_twl_probe_slot[256] TWL_BSS __attribute__((used));
+#endif
 int main(int argc,char** argv){
+ nds_runtime_state[1]=isDSiMode()?1u:0u;
+ nds_runtime_state[3]=(unsigned)getHeapStart();
+ nds_runtime_state[4]=(unsigned)getHeapLimit();
+#ifdef CPYMO_DSI_MEMORY_LAYOUT
+ if(nds_runtime_state[1]){
+  nds_twl_probe_slot[0]=0x44534931u;
+  nds_runtime_state[2]=nds_twl_probe_slot[0]==0x44534931u?1u:2u;
+ }
+#endif
  pmAddEventHandler(&sleep_cookie,nds_power_event,NULL);
  /* Start Calico's lazy tick service through its public thread API before
     the launcher uses tickGetCount(); audio used to initialize it later. */
@@ -634,7 +686,14 @@ int main(int argc,char** argv){
  char game_dir[256];launcher_choose(game_dir,sizeof game_dir,hint);
  render_bits=3;{FILE* policy=savefile(game_dir,"nds-render-policy.txt","rb");if(policy){int value=fgetc(policy);fclose(policy);if(value>='0'&&value<='3')render_bits=value-'0';}}render_policy[1]=render_bits;
  FILE* debug_flag=savefile(game_dir,"nds-debug.flag","rb");debug_trace=debug_flag!=NULL;if(debug_flag)fclose(debug_flag);diagnostic_state[1]=debug_trace;diagnostic_state[2]=diagnostic_state[3]=0;
- recent_clear();memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
+ recent_clear();recent_limit=nds_recent_image_budget();
+ nds_bg_cache_enabled=recent_limit>=RECENT_LIMIT_TWL;
+ /* Optional test override: game root/nds-bg-cache.txt containing 0 disables
+  * background caching only; character caching and game assets are unchanged. */
+ FILE* bg_cache_flag=savefile(game_dir,"nds-bg-cache.txt","rb");
+ if(bg_cache_flag){if(fgetc(bg_cache_flag)=='0')nds_bg_cache_enabled=false;fclose(bg_cache_flag);}
+ for(unsigned i=1;i<5;i++)background_cache_state[i]=0;
+ memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
@@ -655,7 +714,7 @@ int main(int argc,char** argv){
  FILE* mask_flag=savefile(game_dir,"nds-maskbench.flag","rb");if(mask_flag){fclose(mask_flag);run_mask_bench();for(;;)swiWaitForVBlank();}
  FILE* bench_flag=savefile(game_dir,"nds-renderbench.flag","rb");if(bench_flag){fclose(bench_flag);run_render_bench();for(;;)swiWaitForVBlank();}
  nds_playing=true;nds_aux_refresh();
- if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\nDS mode: 4 MiB\n");}else launcher_play_panel(NULL);
+ if(debug_trace){consoleClear();printf("CPyMO Nintendo DS\n\nA / Touch: Next\nX: Menu    B: Hold to hide text\nR: Skip read text\nSTART: Save slot 1\nSELECT: Load slot 1\n\n%s\n",nds_runtime_mode_label());}else launcher_play_panel(NULL);
  // Count actual display interrupts; include missed frames during decoding/drawing.
  irqSet(IRQ_VBLANK,on_vblank);irqEnable(IRQ_VBLANK);
  FILE* load_flag=savefile(game_dir,"nds-loadbench.flag","rb");if(load_flag){fclose(load_flag);run_load_bench();for(;;){swiWaitForVBlank();nds_audio_update();}}

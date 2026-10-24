@@ -2,14 +2,34 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <strings.h>
+#include <unistd.h>
 #include "app-icon.h"
 typedef struct {char path[256],title[256],platform[8];unsigned status;u16 width,height;bool title_ok,meta_ok,icon_ok,list_title_ok;char intro[2][128];unsigned char title_bits[350],meta_bits[1050],list_title_bits[400];u16 icon[24*24];} LauncherGame;
 static LauncherGame launcher_games[64];
 /* magic, visible, count, selected, launches, scan truncated, last init error */
 volatile unsigned launcher_state[7]={0x4c41554e};
 static unsigned launcher_count,launcher_selected;
+/* Four visible rows; keep the selected game on-screen without page jumps. */
+static unsigned launcher_scroll_first;
+static bool launcher_scroll_dragging;
+static int launcher_scroll_drag_y;
+static unsigned launcher_scroll_drag_first;
+static void launcher_scroll_ensure_visible(void){
+ if(launcher_count<=4){launcher_scroll_first=0;return;}
+ unsigned last_start=launcher_count-4;
+ if(launcher_scroll_first>last_start)launcher_scroll_first=last_start;
+ if(launcher_selected<launcher_scroll_first)launcher_scroll_first=launcher_selected;
+ else if(launcher_selected>=launcher_scroll_first+4)launcher_scroll_first=launcher_selected-3;
+}
 static u16* launcher_sub;
 static bool launcher_about,launcher_restored,launcher_language_menu;
+/* User-facing text describes the *runtime mode*, not a guessed shell
+ * model: DSi and DSi XL/LL share the same TWL mode; a DSi can also run
+ * homebrew in NTR/DS mode. 16/4 MiB are hardware RAM capacities, not free
+ * heap sizes. Detailed heap bounds stay available in nds_runtime_state. */
+static const char* nds_runtime_mode_label(void){
+ return nds_ui(isDSiMode() ? "DSi 模式 · 16 MiB" : "DS 模式 · 4 MiB");
+}
 static unsigned launcher_language_cursor;
 static char launcher_font_path[256],launcher_icon_path[256];
 static u16 selected_icon[48*48];static bool selected_icon_ok;
@@ -24,8 +44,16 @@ static void launcher_remember(void){
  frontend_state[5]++;if(!ok)frontend_state[6]++;
 }
 static bool launcher_file(const char* dir,const char* suffix){char path[512];struct stat s;snprintf(path,sizeof path,"%s/%s",dir,suffix);return !stat(path,&s)&&S_ISREG(s.st_mode);}
+/* Explicit device-prefixed paths let the unmodified CPyMO asset loader,
+ * config and save code operate on either mounted FAT volume. Never rewrite
+ * one game's source paths or redirect its save files. */
+static bool launcher_valid_game_path(const char* dir){
+ return dir && (dir[0]=='/' ||
+                 !strncasecmp(dir,"fat:/",5) ||
+                 !strncasecmp(dir,"sd:/",4));
+}
 static void launcher_add(const char* dir){
- if(!dir||dir[0]!='/'||strlen(dir)>=256||!launcher_file(dir,"gameconfig.txt"))return;
+ if(!launcher_valid_game_path(dir)||strlen(dir)>=256||!launcher_file(dir,"gameconfig.txt"))return;
  for(unsigned i=0;i<launcher_count;i++)if(!strcasecmp(launcher_games[i].path,dir))return;
  if(launcher_count==64){launcher_state[5]=1;return;}
  LauncherGame* game=&launcher_games[launcher_count++];memset(game,0,sizeof *game);snprintf(game->path,sizeof game->path,"%s",dir);
@@ -54,13 +82,31 @@ static void launcher_add(const char* dir){
 }
 static void launcher_scan_dir(const char* root){
  DIR* d=opendir(root);if(!d)return;struct dirent* entry;char path[256];unsigned scanned=0;
- while((entry=readdir(d))&&scanned++<1024){if(entry->d_name[0]=='.')continue;int n=snprintf(path,sizeof path,"%s%s%s",root,!strcmp(root,"/")?"":"/",entry->d_name);if(n>0&&n<(int)sizeof path)launcher_add(path);}
+ while((entry=readdir(d))&&scanned++<1024){if(entry->d_name[0]=='.')continue;int n=snprintf(path,sizeof path,"%s%s%s",root,root[strlen(root)-1]=='/'?"":"/",entry->d_name);if(n>0&&n<(int)sizeof path)launcher_add(path);}
  if(scanned>=1024)launcher_state[5]=1;closedir(d);
+}
+/* libfat's fatInitDefault mounts both "sd:" and "fat:" where available,
+ * then chooses the running executable's device as cwd. Preserve the current
+ * /pymo/games scan and scan only the *other* device to avoid duplicates.
+ * DS/DS Lite never attempts DSi-SD discovery. No additional card writes. */
+static void launcher_scan_other_card(void){
+ if(!isDSiMode())return;
+ char cwd[256];
+ if(!getcwd(cwd,sizeof cwd))return;
+ const char* other=NULL;
+ if(!strncasecmp(cwd,"fat:",4))other="sd:";
+ else if(!strncasecmp(cwd,"sd:",3))other="fat:";
+ if(!other)return;
+ char path[32];
+ snprintf(path,sizeof path,"%s/pymo/games",other);
+ launcher_scan_dir(path);
+ snprintf(path,sizeof path,"%s/",other);
+ launcher_scan_dir(path);
 }
 static int launcher_compare(const void* a,const void* b){return strcasecmp(((const LauncherGame*)a)->path,((const LauncherGame*)b)->path);}
 static void launcher_scan(const char* hint){
  char previous[256]={0};if(launcher_count)snprintf(previous,sizeof previous,"%s",launcher_games[launcher_selected].path);
- launcher_count=0;launcher_state[5]=0;launcher_scan_dir("/pymo/games");launcher_scan_dir("/");launcher_add(hint);
+ launcher_count=0;launcher_state[5]=0;launcher_scan_dir("/pymo/games");launcher_scan_dir("/");launcher_scan_other_card();launcher_add(hint);
  const char* configs[]={"/cpymo-nds/cache-game-path.txt","/cpymo-nds/game-path.txt"};
  for(unsigned i=0;i<2;i++){FILE* f=fopen(configs[i],"rb");if(f){char path[256];if(fgets(path,sizeof path,f)){path[strcspn(path,"\r\n")]=0;launcher_add(path);}fclose(f);}}
  qsort(launcher_games,launcher_count,sizeof *launcher_games,launcher_compare);if(launcher_selected>=launcher_count)launcher_selected=0;launcher_state[2]=launcher_count;
@@ -68,7 +114,71 @@ static void launcher_scan(const char* hint){
  for(unsigned i=0;i<launcher_count;i++)if(!strcmp(previous,launcher_games[i].path)){launcher_selected=i;frontend_state[4]=1;break;}
 
 }
-static void launcher_rect(int x,int y,int w,int h,u16 color){for(int yy=y;yy<y+h&&yy<192;yy++)for(int xx=x;xx<x+w&&xx<256;xx++)if(xx>=0&&yy>=0)framebuffer[yy*256+xx]=color|BIT(15);}
+static void launcher_rect(int x,int y,int w,int h,u16 color){for(int yy=y;yy<y+h&&yy<192;yy++)for(int xx=x;xx<w+x&&xx<256;xx++)if(xx>=0&&yy>=0)framebuffer[yy*256+xx]=color|BIT(15);}
+/* Preserve R5's full-width game rows and 4px visual track. The 14px
+ * touch target is hit testing only (partly overlapping the visually blank
+ * right edge of a row), so increased usability does not change appearance. */
+#define LAUNCHER_SCROLL_Y 33
+#define LAUNCHER_SCROLL_H 121
+#define LAUNCHER_SCROLL_TOUCH_X 242
+static int launcher_scroll_thumb_height(void){
+ if(launcher_count<=4)return LAUNCHER_SCROLL_H;
+ int h=(LAUNCHER_SCROLL_H*4+(int)launcher_count/2)/(int)launcher_count;
+ return h<14?14:h;
+}
+static int launcher_scroll_thumb_top(void){
+ if(launcher_count<=4)return LAUNCHER_SCROLL_Y;
+ int travel=LAUNCHER_SCROLL_H-launcher_scroll_thumb_height();
+ unsigned max_first=launcher_count-4;
+ return LAUNCHER_SCROLL_Y+(int)((travel*launcher_scroll_first+max_first/2)/max_first);
+}
+static bool launcher_scroll_set_first(unsigned first){
+ if(launcher_count<=4)return false;
+ const unsigned max_first=launcher_count-4;
+ if(first>max_first)first=max_first;
+ const unsigned old_first=launcher_scroll_first,old_selected=launcher_selected;
+ launcher_scroll_first=first;
+ /* Keep the highlighted title attached to a visible row, not an
+  * offscreen game, when the viewport moves independently of the D-pad. */
+ if(launcher_selected<first)launcher_selected=first;
+ else if(launcher_selected>=first+4)launcher_selected=first+3;
+ return old_first!=launcher_scroll_first||old_selected!=launcher_selected;
+}
+static bool launcher_scrollbar_begin_touch(int x,int y){
+ if(launcher_count<=4||x<LAUNCHER_SCROLL_TOUCH_X||x>=256||
+    y<LAUNCHER_SCROLL_Y||y>=LAUNCHER_SCROLL_Y+LAUNCHER_SCROLL_H)return false;
+ int top=launcher_scroll_thumb_top(),height=launcher_scroll_thumb_height();
+ /* A tap outside the thumb jumps to the corresponding place. Pressing
+  * the thumb itself keeps its position and avoids an initial jump. */
+ if(y<top||y>=top+height){
+  int travel=LAUNCHER_SCROLL_H-height,relative=y-LAUNCHER_SCROLL_Y-height/2;
+  if(relative<0)relative=0;
+  if(relative>travel)relative=travel;
+  launcher_scroll_set_first((unsigned)((relative*(int)(launcher_count-4)+travel/2)/travel));
+ }
+ launcher_scroll_dragging=true;
+ launcher_scroll_drag_y=y;
+ launcher_scroll_drag_first=launcher_scroll_first;
+ return true;
+}
+static bool launcher_scrollbar_move_touch(int y){
+ if(!launcher_scroll_dragging||launcher_count<=4)return false;
+ const int travel=LAUNCHER_SCROLL_H-launcher_scroll_thumb_height();
+ const int max_first=(int)launcher_count-4;
+ const int delta=(y-launcher_scroll_drag_y)*max_first;
+ /* Signed rounding, then clamp. Keep capture even if the pen slides
+  * outside the narrow gutter until release, for natural nail dragging. */
+ const int shift=(delta+(delta>=0?travel/2:-(travel/2)))/travel;
+ int first=(int)launcher_scroll_drag_first+shift;
+ if(first<0)first=0;
+ if(first>max_first)first=max_first;
+ return launcher_scroll_set_first((unsigned)first);
+}
+static void launcher_scrollbar_draw(void){
+ if(launcher_count<=4)return;
+ launcher_rect(251,LAUNCHER_SCROLL_Y,4,LAUNCHER_SCROLL_H,RGB15(6,10,14));
+ launcher_rect(252,launcher_scroll_thumb_top(),2,launcher_scroll_thumb_height(),RGB15(14,24,30));
+}
 static void launcher_text_mode(const char* text,int x,int y,u16 color,int max_x,unsigned mode){
  const char* p=text;int start=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10|| (cp=='\\'&&*p=='n')){if(cp=='\\')p++;x=start;y+=17;continue;}if(y>178)break;
  int g=text_glyph(mode,cp),fallback=g<0?ui_fallback_glyph(cp):-1;if(g<0&&fallback<0)g=text_glyph(mode,'?');if(g<0&&fallback<0)continue;unsigned advance=fallback>=0?ui_fallback_advances[fallback]:text_advance(mode,g);if(x+(int)advance>max_x){while(*p&&*p!='\n')p++;continue;}
@@ -140,7 +250,7 @@ static void launcher_show_splash(void){
  for(unsigned y=0;y<32;y++)for(unsigned x=0;x<32;x++){u16 c=app_icon[y*32+x];if(c)launcher_rect(96+x*2,38+y*2,2,2,c);}
  launcher_splash_text("CPyMO for NDS",121,true,RGB15(31,31,31));launcher_publish(vram);
  launcher_background();launcher_splash_text(nds_ui("正在读取游戏列表..."),88,false,RGB15(28,29,31));
- launcher_splash_text("DS / DS Lite · 4 MiB",166,false,RGB15(19,22,25));launcher_publish(launcher_sub);
+ launcher_splash_text(nds_runtime_mode_label(),166,false,RGB15(19,22,25));launcher_publish(launcher_sub);
  /* Both planes are complete already. No timer, key wait or extra VBlank. */
  setBrightness(3,0);splash_state[1]=1;splash_state[2]++;
 }
@@ -241,18 +351,21 @@ static void launcher_library_clock(u16* pixels,bool erase){
  nds_clock_paint_impl(pixels,200,4,RGB15(26,28,30),false);
 }
 static void launcher_draw(const char* message){
+ launcher_scroll_ensure_visible();
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
  u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
  launcher_selected_icon();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  if(launcher_about){launcher_icon(12,40);launcher_text(nds_ui("CPyMO / PYMO"),53,47,white,246);launcher_text(nds_ui("NDS 平台移植：千岚之夏"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
- else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,46,accent,245);
+ else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,53,accent,245);
  launcher_title(game,12,90,white,245);
  launcher_intro(game,1,12,114,RGB15(26,27,29));launcher_intro(game,2,12,132,RGB15(26,27,29));
- const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,245);
+ const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,215);
+ if(!strncasecmp(game->path,"sd:/",4))launcher_text("SD",220,153,accent,248);
+ else if(!strncasecmp(game->path,"fat:/",5))launcher_text("TF",220,153,accent,248);
  launcher_text(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),12,175,accent,245);}
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
- if(!launcher_count||launcher_about)launcher_text(nds_ui("DS / DS Lite · 4 MiB"),12,177,muted,245);launcher_publish(vram);
+ if(!launcher_count||launcher_about)launcher_text(nds_runtime_mode_label(),12,177,muted,245);launcher_publish(vram);
  launcher_background();
  if(!launcher_about&&!launcher_language_menu){
   launcher_rect(0,0,256,28,RGB15(5,10,16));
@@ -267,10 +380,11 @@ static void launcher_draw(const char* message){
  launcher_text(nds_ui("PyMO：chen_xin_ming"),10,47,white,248);launcher_text(nds_ui("CPyMO：Seng Jik 及贡献者"),10,75,muted,248);launcher_text(nds_ui("游戏与汉化署名照原样保留"),10,103,muted,248);launcher_text(nds_ui("新游戏请先使用转换助手"),10,131,muted,248);
  launcher_text(nds_ui("按 B 返回游戏列表"),10,169,accent,248);}
 
- else {unsigned first=launcher_selected/4*4;
+ else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
+ launcher_scrollbar_draw();
  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,160,accent,250);launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,178,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}
@@ -282,8 +396,9 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  nds_playing=false;nds_aux_override=false;nds_aux_refresh();lcdMainOnTop();screens_swapped=false;presentation_state[1]=0;presentation_state[2]=0;launcher_icon_path[0]=0;
  free(game_glyphs);game_glyphs=NULL;game_glyph_count=0;launcher_font_path[0]=0;free_pixel_fonts();clear_menu_images();nds_cache_enabled=false;
  nds_menu_clock_visible=false;clock_state[9]=0;
- launcher_about=false;launcher_language_menu=false;launcher_state[1]=1;launcher_scan(hint);launcher_draw(NULL);launcher_video_show();launcher_release_keys();
- while(1){nds_power_poll();swiWaitForVBlank();scanKeys();int down=keysDown();bool redraw=false,start=false;
+ launcher_about=false;launcher_language_menu=false;launcher_scroll_dragging=false;launcher_state[1]=1;launcher_scan(hint);launcher_draw(NULL);launcher_video_show();launcher_release_keys();
+ while(1){nds_power_poll();swiWaitForVBlank();scanKeys();int down=keysDown(),held=keysHeld();bool redraw=false,start=false;
+ if(!(held&KEY_TOUCH))launcher_scroll_dragging=false;
  if(nds_clock_sample()&&!launcher_about&&!launcher_language_menu)launcher_library_clock(launcher_sub,true);
  if(down&KEY_X){launcher_language_menu=!launcher_language_menu;launcher_about=false;launcher_language_cursor=nds_language_choice_get();launcher_draw(NULL);continue;}
  if(down&KEY_B){if(launcher_language_menu)launcher_language_menu=false;else launcher_about=!launcher_about;launcher_draw(NULL);continue;}
@@ -298,7 +413,17 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  if(down&KEY_SELECT){launcher_font_path[0]=0;launcher_scan(hint);redraw=true;}
  if(launcher_count){if(down&KEY_UP){launcher_selected=(launcher_selected+launcher_count-1)%launcher_count;redraw=true;}if(down&KEY_DOWN){launcher_selected=(launcher_selected+1)%launcher_count;redraw=true;}
  if(down&KEY_LEFT){launcher_selected=launcher_selected>=4?launcher_selected-4:0;redraw=true;}if(down&KEY_RIGHT){launcher_selected+=4;if(launcher_selected>=launcher_count)launcher_selected=launcher_count-1;redraw=true;}
- if(down&KEY_TOUCH){touchPosition t;touchRead(&t);if(t.py>=33&&t.py<157){unsigned index=launcher_selected/4*4+(t.py-33)/31;if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}}}
+ if(down&KEY_TOUCH){touchPosition t;touchRead(&t);
+  if(launcher_scrollbar_begin_touch(t.px,t.py)){redraw=true;}
+  else if(t.px>=6&&t.px<(launcher_count>4?LAUNCHER_SCROLL_TOUCH_X:250)&&t.py>=33&&t.py<157){
+   unsigned index=launcher_scroll_first+(t.py-33)/31;
+   if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}
+  }
+ }
+ if(launcher_scroll_dragging&&(held&KEY_TOUCH)){
+  touchPosition t;touchRead(&t);
+  if(launcher_scrollbar_move_touch(t.py))redraw=true;
+ }
  if(down&KEY_A)start=true;
  if(start){LauncherGame* game=&launcher_games[launcher_selected];if(game->status==1){launcher_remember();snprintf(out,size,"%s",game->path);launcher_release_keys();launcher_state[1]=0;launcher_state[4]++;return;}launcher_draw("请在电脑上先转换或修复缓存");continue;}}
  if(redraw)launcher_draw(NULL);

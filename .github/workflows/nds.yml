@@ -39,6 +39,19 @@ jobs:
         with:
           name: CPyMO-for-NDS
           path: cpymo-backends/nds/engine.nds
+      - name: Build DSi experimental ROM (separate output)
+        run: python3 cpymo-backends/nds/build.py --dsi-experiment
+      - name: Inspect experimental NDS header
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          rom = Path('cpymo-backends/nds/cpymo-dsi-experiment.nds').read_bytes()
+          print(f"ROM bytes={len(rom)}, unit code={rom[0x12]}, header size={int.from_bytes(rom[0x84:0x88], 'little'):#x}")
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-for-DSi-Experiment
+          path: cpymo-backends/nds/cpymo-dsi-experiment.nds
   converter:
     runs-on: ubuntu-latest
     steps:
