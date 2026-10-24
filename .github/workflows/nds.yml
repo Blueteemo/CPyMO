@@ -1,0 +1,51 @@
+name: Nintendo DS
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'codex/nds-*'
+    paths:
+      - 'cpymo/**'
+      - 'cpymo-backends/include/**'
+      - 'cpymo-backends/nds/**'
+      - 'cpymo-tool/nds-converter/**'
+      - '.github/workflows/nds.yml'
+  pull_request:
+    paths:
+      - 'cpymo/**'
+      - 'cpymo-backends/include/**'
+      - 'cpymo-backends/nds/**'
+      - 'cpymo-tool/nds-converter/**'
+      - '.github/workflows/nds.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:20260610
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Initialize required submodules
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init stb endianness.h
+      - name: Install DS libraries and record SDK
+        run: |
+          dkp-pacman -Syu --noconfirm --needed libnds libfat-nds maxmod-nds calico ndstool
+          dkp-pacman -Q devkitARM libnds libfat-nds maxmod-nds calico ndstool
+      - name: Build original DS ROM
+        run: python3 cpymo-backends/nds/build.py
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-for-NDS
+          path: cpymo-backends/nds/engine.nds
+  converter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r cpymo-tool/nds-converter/requirements.txt
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python -m unittest discover -s cpymo-tool/nds-converter/tests -v

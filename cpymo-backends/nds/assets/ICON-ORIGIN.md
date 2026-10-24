@@ -1,0 +1,2 @@
+Icon motif reference: user-provided PYMO logo, girl and yellow mascot. Simplified icon created with built-in imagegen, then normalized to DS 32x32/4bpp format. Reference artwork rights remain with their holders; AI derivation does not establish a new license to the original motif. Original horizontal logo not included.
+Prompt: simplify the left girl and yellow mascot motif as a legible tiny pixel application icon, transparent, no text or URL.
