@@ -4,6 +4,76 @@
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
 
 
+## 2026-10-23 — Final DSpico (TWL) / R4 (NTR) shared-game candidate
+
+The user approved the final *two genuine runtime modes* acceptance plan:
+DSpico via DSi/TWL and R4 via DS/NTR. We built a **single 39.37 MiB original
+PyMO stress game** with 12 scene panoramas, four sprites, eight ~83s BGM
+tracks, voice/SE and four FFmpeg-derived NVL1 clips (2/9/3 silent/24s).
+Full title selection, first-story dual-screen transition, subsequent
+choices, quicksave/load and L/Y/X operation are included. Source script
+is byte-identical after conversion; 0 unknown directives, 0 missing assets,
+0 unconverted videos. No dummy padding or commercial test media.
+
+Final integrated [CI #39865964204](https://github.com/Blueteemo/CPyMO/actions/runs/39865964204)
+**all jobs success**: game generation/verification, separate NTR and TWL
+compiled-memory-profile ROMs, combined ZIP with per-file SHA256 for 84 files.
+The review ZIP contains an **additional compact CPYMO12_NVA1_CHECK game**
+produced with the same public converter in `--video-mode nva1`, with an
+original audiovisual 2-second movie and silent 3-second movie. The main
+39.37 MiB game remains strictly NVL1. This lets the user's final DSpico
+and R4 sessions also validate the independently implemented NVA1/NAR2
+video path without duplicating the entire long-form dataset.
+The actual combined artifact is
+`CPyMO-1.2-DSpico-TWL-R4-NTR-FINAL-STRESS-REVIEW`. Original ROMs
+use devkitPro Calico's DSi-compatible header unit code `2` in
+**both** compile modes; this flag alone does not show TWL execution.
+The real acceptance must see runtime `DSi 模式 · 16 MiB` via DSpico
+and `DS 模式 · 4 MiB` via R4. The two ROM binaries differ in SHA,
+with the same data copied to two cards. Detailed six-step human
+checklist: [VALIDATION-1.2-DUALCARD-FINAL.md](VALIDATION-1.2-DUALCARD-FINAL.md).
+
+**Important:** This is a test candidate, NOT physical validation or a
+public release. Physical two-card, GUI acceptance, public licences/
+corresponding FFmpeg source, 1.2 version bump/changelog, and
+NVA1 physical acceptance through the supplied sidecar still require release decisions.
+Stable 1.1 and R7 remain untouched.
+
+## 2026-10-23 — First actual Windows video-converter EXE accepted
+
+**Critical release blocker discovered and fixed:** original Windows Starter's
+\`tools/build-ffmpeg-audio.sh\` built FFmpeg with video decoding and swscale
+disabled; the new source-video encoder could not possibly work in such a
+portable package. \`video_nvl.validate_ffmpeg\` now interrogates the FFmpeg
+filter/decoder tables (not \`-version\`) and refuses audio-only builds before
+writing a new video. \`build_portable.py\` runs the same gate **before packaging**
+to prevent false "MP4 supported" products. The validator accepts differences
+in FFmpeg 8 filter flag table widths / stderr output and has independent
+mocked tests. Original 1.1 packages and games are not changed.
+
+**Actual Windows executable:** a new opt-in GitHub Actions Windows
+PyInstaller job packages the same-run NTR ROM and a video-capable FFmpeg,
+then invokes the *frozen* \`Converter.exe --job\` on an original synthetic
+PyMO game including an audiovisual MP4. Real result on Windows:
+\`frozen_worker=PASS\`, \`ffmpeg_video=PASS\`,
+\`format=NVL1\`, \`frames=14\`,
+\`rom_pair=MATCH\`, \`source_preservation=PASS\`.
+Cache manifest, scripts, NDS ROM hash and source preservation are checked
+by the smoke script. All three jobs **success**:
+[CI #39860993871](https://github.com/Blueteemo/CPyMO/actions/runs/39860993871),
+with a 14-day development artifact
+\`CPyMO-1.2-Windows-Portable-VIDEO-REVIEW-NOT-RELEASE\`.
+NTR/TWL ROMs and full Linux converter suite passed in the same run.
+
+The temporary CI artifact is **not the public 1.2 release**. It has only a
+headless frozen worker smoke test, not a human GUI acceptance or independent
+R4/NTR video performance test. Before public binary redistribution attach
+all appropriate FFmpeg third-party licensing/notice and corresponding-source
+materials, audit the distribution layout/launcher, finish NTR/DSi game/save
+regression and consolidated versioning. Keep public version at 1.1.0 until
+release gates close. Do not require the owner to keep retesting every
+small UI-only patch.
+
 ## 2026-10-23 — Unified opening title + compact save/load help
 
 Owner requested two additional UI decisions after the successful DSi video
