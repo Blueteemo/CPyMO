@@ -1,7 +1,165 @@
 # CPyMO for NDS — 1.2 全局进度与发布门槛
 
-更新时间：2026-10-22。性质：实验分支动态状态表；**不是**发行说明或完成声明。
+更新时间：2026-10-23。性质：实验分支动态状态表；**不是**发行说明或完成声明。
 集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
+
+
+## 2026-10-23 — Unified opening title + compact save/load help
+
+Owner requested two additional UI decisions after the successful DSi video
+exercise, without another immediate device test:
+
+- Classic auxiliary LCD shows **START：快速保存  SELECT：快速读取**
+  together on line y=158, with y=176 left empty unless an action/status
+  toast arrives. Translated English/Japanese strings deliberately use shorter
+  labels to fit 256×192. Original clock (x196,y96), title/icon (x196,y40),
+  game mode labels, and save-slot indication in *action feedback* retained.
+- **Enhanced dual-screen does not split the game's opening/title menu.**
+  The startup authored image/selection remains entirely on upper LCD with
+  lower auxiliary help until first real story dialogue (#say, without
+  overlaid core UI or choice). Then existing top-scene/bottom-dialogue
+  dual-screen routing takes over. This is deliberately session-based rather
+  than hardcoding any PyMO script filename. It does not edit original scripts,
+  input mappings, mode persistence, actual story choices, or saves.
+  A game with unusual title scripts that display narrative-style #say
+  before the title may need separate follow-up evidence, rather than a
+  claim of universal menu detection.
+
+**Evidence:** standalone production-C title gate, host state-machine test
+and updated full production display-mode/ghost-click regression.
+[UI host #39857531941](https://github.com/Blueteemo/CPyMO/actions/runs/39857531941)
+**passed**. [NTR/TWL SDK plus complete converter
+#39857605866](https://github.com/Blueteemo/CPyMO/actions/runs/39857605866)
+**both jobs passed**. These exact small UI changes have not undergone a
+fresh DSi visual acceptance; bundle into later meaningful 1.2 hardware
+candidate instead of sending successive minor ROMs.
+
+## 2026-10-23 — DSi video demo hardware feedback and multilingual font correction
+
+User reports the independent 1.2 DSi video conversion demo **runs without observed gameplay issues**. This is first physical confirmation of the actual source-MP4 → NVL1/NVA1 converter-backed #movie demo (including its user-facing playback flow), not a broad compatibility or NTR performance certificate.
+
+User then identified a locale-dependent auxiliary help bug: simplified "增强双屏" printed as "？？？屏" in demo and Japanese "強化2画面" as "？化2画面" in other games. Root cause confirmed by comparing ROM `ui_fallback_codes` and the converter's game-specific pixel-font subsets: codepoints 增/强/双 and 強 (plus five other published UI literal characters) had never been inserted into the built-in fallback ROM table; behavior depended on incidental glyphs in each game's own cache.
+
+Fixed both layers without touching video, scripts, or UI geometry: ROM's OFL Fusion/Unifont glyph arrays include all nine missing official UI glyphs (for existing games without reconversion), converter's mandatory `UI_CODEPOINTS` includes them for future conversions. New `test_nds_ui_font_coverage.py` enforces all published four-language UI string coverage even with an empty game cache. [Host regression #39855409830](https://github.com/Blueteemo/CPyMO/actions/runs/39855409830) **success**; [NTR/TWL SDK + full converter #39855507624](https://github.com/Blueteemo/CPyMO/actions/runs/39855507624) **both jobs success**. Fresh DSi/TWL font-fix ROM built and packaged for optional device confirmation; that exact patched ROM has **not yet** been independently hardware inspected. Legacy converted source/saves need no replacement.
+
+## 2026-10-23 — First real ordinary-media NVL1/NVA1 converter milestone
+
+**Public, independently implemented video encoder integrated on this 1.2
+branch** (not the private FVDS decoder): \`video_nvl.py\` invokes FFmpeg
+to decode ordinary input MP4/AVI/MKV/MOV/etc to stream-bounded 256×192
+RGB555, normalized 12 FPS by default, with native NVL1-compatible packet
+framing, four-second reset/key pictures, optional LZ4 XOR delta frames,
+and the **Adler32 of the reconstructed complete RGB555 frame**. Exact
+22,050-Hz mono PCM sample alignment after explicit *pre-trim* resampling;
+optional public NAR2 lossless compression gives NVA1. Source with no audio
+receives deterministic silence.
+
+**Converter and Windows helper actually wired:** opt-in CLI
+\`--video-mode nvl1\` / \`nva1\` and \`--video-fps 12\`; GUI has explicit
+video codec choice, with old default "skip" to preserve 1.1 compatibility.
+Writes \`nds-cache/video/<2-letter-hash>/<full-hash>.nvl\`; original
+\`#movie\` instruction unchanged; hashes and full manifests validated;
+unconverted movie references still reported. Video conversion never
+touches source script, original game, or user saves. Invalid/non-media
+inputs fail rather than silently producing an empty video.
+
+**Host evidence:** original 2 s synthetic audiovisual MP4 converted into
+both NVL1 and NVA1, frame-by-frame complete *decode back to identical
+RGB555* via independent Python LZ4, checksum, packet and audio bounds
+audited; silent MP4 and deliberately invalid source exercised. Actual
+synthetic PyMO \`#movie\` game converted twice and verified with 0 skipped
+movie commands, byte-identical source hashes/script. Full GitHub Actions
+[run #39851339676](https://github.com/Blueteemo/CPyMO/actions/runs/39851339676)
+**success**, including NTR+TWL dual SDK ROM builds and entire Python
+converter suite. No unlicensed FVDS tables or vendor video codec copied.
+
+**Next release blocking gate is the physical movie experience:** built a
+separate DSi video review game \`CPYMO12_VIDEO_CHECK\` using the actual
+compiled 1.2 ROM and separately converted original SHORT (2 s with
+sound), SKIP (8 s with B interruption), and SILENT (1.5 s without source
+audio). Normal EOF, skip, error/bad-input behavior, post-playback scene,
+BGM reentry, display and touch preservation **must be verified on DSi**
+before claiming a finished 1.2 video player. NTR memory and performance
+remain open. Mainline 1.1 and known-good R7 unchanged.
+
+## 2026-10-23 — DSi hardware UI acceptance and next release gate
+
+**Owner hardware confirmation:** the custom interactive three-mode DSi demo
+played normally and every exercised input/layout scenario passed.
+This establishes a *real DSi acceptance baseline for the pre-polish 1.2
+UI*, including story, touch choices, X menu and L-mode cycling. Do not
+repeat that old claim that enhanced three-state UI is untested.
+
+**Post-acceptance changes actually committed:** follow-up owner-approved
+guide text (UP/DOWN, R/L and three named modes, short START/SELECT help)
+plus A+B subtle integer RGB555 gradient with an intentionally empty
+lower half. The game icon remains at x=196,y=40; help LCD clock at
+x=196,y=96; menu clock routing and save-slot action toast retained.
+No change to original CPyMO dialogue coordinates or input semantics.
+Host test now verifies four-language alignment, LCD reserved x ranges,
+the real C renderer, and six cooperative audio ticks per frame:
+[UI CI #39847351976](https://github.com/Blueteemo/CPyMO/actions/runs/39847351976)
+**success**. NTR + TWL SDK ROM builds and existing converter suite:
+[NDS CI #39847457104](https://github.com/Blueteemo/CPyMO/actions/runs/39847457104)
+**success** (both jobs). This fine polish **has not itself undergone a
+second hardware visual test**; avoid demanding a new device session for
+every cosmetic adjustment.
+
+**Next release-critical engineering milestone:** create a legitimate,
+reproducible source video → NVL1/NVA1 workflow backed by ordinary FFmpeg,
+integrate into converter CLI + Windows helper with bounded output,
+independent test media and exact video/audio packet checks; test game's
+existing `#movie` EOF/B skip/error/BGM restore with converted assets on
+NTR and TWL. This is **not** a demand for further FVDS codec optimisation.
+Any real 1.2 release claim remains blocked until converter playback,
+source licensing and final regression pass.
+
+## 2026-10-23 — User-approved release-first scope and immediate UI hardware gate
+
+**Priority order has changed by explicit owner instruction:**
+1. **3DS-like enhanced dual-screen UI acceptance now.** Hand over a
+   fresh DSi/TWL ROM from the present integration branch; visually verify
+   scene on physical top, authored textbox/name/text/menu/choices below,
+   touch hit-testing, L 0→1→2→0 cycling, Y hide/reveal, return to
+   launcher/game, saved mode and responsiveness. Use actual DSi
+   observations and optional pixel-exact NDSPIX1 captures; do not keep
+   adjusting visual appearance from synthetic previews or unverified
+   source-level theories.
+2. **Ship real game video support with the converter.** The NDS runtime
+   already has experimental NVL1/NVA1 playback and B-skip paths, but
+   `cpymo-tool/nds-converter` **currently omits videos by default**.
+   A public 1.2 video feature is not accepted until an ordinary user
+   can convert their own game's allowed source video via the supplied
+   converter, play it from `#movie`, and reach story content again
+   after EOF/B skip/error with BGM restored. Prefer an existing
+   independently developed reproducible video format; do not make
+   unlicensed private FVDS tables a dependency of 1.2.
+3. **Consolidated release candidate**: SDK/build + converter tests,
+   NTR (4MiB)/TWL (16MiB) hardware regression, source/asset
+   licence gate, game save safety, one clearly packaged public 1.2.
+   Earlier accepted R7 remains the rollback.
+4. **Deferred beyond the release-critical path**: extra FVDS encoding
+   size/bitrate/ADPCM optimisation, exotic format sweeps, broad
+   profiling unrelated to user-visible breakage, repeated per-commit
+   ROM distributions. First make the current features complete.
+
+**This turn's immediate hardware candidate:** targeted Nintendo DS
+workflow [#39827066654](https://github.com/Blueteemo/CPyMO/actions/runs/39827066654),
+commit `e2b712c37a1f897db8f2d439ce9eb819d50146b6`.
+The DSi/TWL ROM is real, has header unit code 2 and passes the ROM SDK
+build; the independent converter job may finish later and is not
+needed to start **UI-only** acceptance. A single-ROM private review ZIP
+includes a short Chinese guide and optional four-scene capture flag,
+rather than piling up multiple obsolete candidate ROMs. No new
+hardware pass is claimed until the user reports experience.
+
+**Release scope is not conditional on FVDS codec compression progress.**
+If the vendor-table license/provenance issue stays unresolved, do not
+smuggle the received private decoder into public AGPL source or ROM;
+deliver video via legitimate existing NVL1/NVA1 and a supported
+converter workflow, or explicitly keep the video milestone open.
+Development readiness percentages remain separate from UI hardware
+acceptance and may be reweighted after concrete results.
 
 ## 1.2 加权进度（开发者估算，非自动百分比）
 
@@ -10,10 +168,10 @@
 | 工作包 | 1.2 权重 | 包内估算 | 加权贡献 | 状态与主要限制 |
 | --- | ---: | ---: | ---: | --- |
 | 已验证 R7 基础和兼容 | 20% | 95% | 19% | DSi 已验证；还需 NTR 和新分支防回归 |
-| 三态双屏与 3DS 风格视觉 | 20% | 65% | 13% | 源码、主机验证与背景预览具备；三态新版未实机 |
+| 三态双屏与 3DS 风格视觉 | 20% | 65% | 13% | 源码、主机验证与背景预览具备；三态首版 DSi 实机全部通过；后续外观精修待合并验收 |
 | FVDS 真正视频画面解码 | 30% | 20% | 6% | 包结构、I/P、bitreader 具备；I 帧 VLC/IDCT/P 运动补偿未完成 |
 | FVDS 音频、播放时序与游戏内整合 | 20% | 35% | 7% | 独立 ADPCM/WAV/PCM 环具备；ARM7 混音及完整 #movie 未接入 |
-| 版本品质、ROM 集成、许可与发布 | 10% | 30% | 3% | Banner/说明和静态测试；正式 ARM 编译、双平台验收和发布尚缺 |
+| 版本品质、ROM 集成、许可与发布 | 10% | 30% | 3% | Banner/说明和静态测试；NTR/TWL 已成功构建；视频转换、最终设备回归和发布尚缺 |
 | **总计** | **100%** | — | **48%** | **开发估算，不是自动测量** |
 
 **缩短体感空档的交付原则**：将「双屏/交互体验构建」与「FVDS 底层播放器」拆成不同验收关卡。双屏的新三态不必无限等待 FVDS 完成才交给用户：只要 SDK 编译成功并排除明显的崩溃，就准备一次集中的、明确标注“非正式版”的三态视觉测试（含原生 256×192 抓帧）。视频仍由独立研究/实现推进，不得把音频流或 I/P 解析当成画面已解码。
@@ -228,3 +386,139 @@ three times, risking visibly delayed LCD switching on slow flashcarts.
 - Weighted 1.2 delivery readiness stays **48%**, since FVDS real video
   reconstruction/output and the final combined NTR/DSi device visual tests
   are still open, independently of these successful UI changes.
+
+## 2026-10-22 — Local DeepSeek full FVDS decoder handoff, online independent audit
+
+Received the private `DeepSeek_FVDS_FullDecoder_Review.zip` (59 MiB
+compressed, approximately 209 MiB expanded). **No source, film frames,
+VLC tables or private licensed media were pushed into GitHub.**
+
+- Delivered: an original-host C VLC + inverse-dequantisation/4x4-IDCT
+  + I/P/motion-compensated picture decoder, `PATCH.diff` with eight new
+  source/test files, 1,908 decoded 256x192 RGB555 frames and PNGs,
+  per-frame SHA/CRC CSVs, quality report, source-level unit tests.
+- Verified here: all 1,908 RGB555 SHA-256 hashes **match** their delivered
+  manifest; 1,814 distinct pixel hashes, 92 **consecutive** still-frame
+  repeats, eight indexed I pictures, 1,900 P pictures. Sampled PNG pixels
+  exactly equal each frame's 5-bit RGB channels expanded by `<<3`.
+  Delivered CRCs refer to **G/R/B planar bytes**, not packed RGB555;
+  independently reconstructed and verified several. `crc.csv` is identical
+  to `san.csv` (internal equality, not independently rerun sanitizer).
+- Built the supplied C video dump tool with Linux GCC
+  `-std=c11 -O2 -Wall -Wextra -Werror`, and ran the supplied
+  coefficient/IDCT/motion test against actual source C successfully.
+  Eight patch paths re-applied successfully; five byte-level diffs from
+  the included flat sources are CRLF vs LF **only**.
+  Packaged baseline `fvds-bits-nds.c`, `fvds-stream-nds.c`,
+  `fvds-picture-source-nds.h` exactly match the current integration
+  branch, so rebase-interface risk is low. This is an offline host audit,
+  **not** an independent full replay from the copyrighted source FVDS
+  (source video was not in the review ZIP).
+- Found a **production hardening issue before ROM integration**:
+  `nds_fvds_vlc_fill` synthesizes zero bits at payload EOF without a
+  strict bound. A standalone 2-byte all-zero vector returns success
+  after 64 logical bits and 75 synthetic zero bits; the shipped unit
+  test explicitly allows this. Need distinguish legal final-word padding
+  from a corrupted/truncated picture and add malformed-stream tests.
+- The I-picture quantiser is parsed in the dump path but not passed to
+  `nds_fvds_decode_picture`; the actual shipped sample uses q=30.
+  Confirm support/validation for other legal quantiser values rather
+  than implying the decoder is generally format-complete.
+- `perf.csv` is byte-identical to `crc.csv` and has no durations, so
+  the reported ~0.705ms desktop mean speed cannot be recalculated
+  from this bundle. A real ARM9 12fps/NTR 4MiB test remains open.
+  Decoder local-memory estimate (~140KiB for two planes + tables + stack)
+  is not a whole-application peak RSS guarantee.
+- Third-party provenance remains to be checked before moving
+  generated VLC/bias table content into a **public AGPL repository**:
+  the original vendor encoder source is described as unlicensed.
+  Do not assume a clean-room claim automatically clears table reuse.
+- **Engineering next:** harden decoder boundary and quantiser tests;
+  stage the standalone decoder privately; implement cooperative video
+  packet/PCM dispatch and a reusable graphics presentation lease;
+  validate normal EOF/B skip/errors/lid/audio resume and the physical
+  12fps budget on both NTR 4MiB and TWL 16MiB before public 1.2.
+  No 1.2 playable FVDS ROM or hardware acceptance is claimed yet.
+
+## 2026-10-23 — FVDS private integration M1, owned entirely by this project
+
+The user asked the online CPyMO team to continue the implementation without
+outsourcing later steps to local DeepSeek. The received full-decoder work has
+been staged **privately** and treated as input, not as a merged ROM feature.
+
+- Built and tested a concrete `fvds-playback-bridge-nds.[ch]` joining the
+  existing FVDS stream reader to the provided I/P picture decoder. Its per-frame
+  callback contract carries a rational microsecond PTS and the decoded planar
+  G/R/B bytes; it decodes existing 264-byte FVDS ADPCM pairs via the already
+  public `nds_fvds_adpcm_pair` into 256-frame interleaved stereo PCM blocks.
+  This is a host-side operational callback boundary, **not ARM7 sound playback**.
+- Verified an entirely synthetic 3-picture **I→P→I** FVDS container through
+  the real C packet reader, VLC, IDCT, motion/reference chain, ADPCM decoder
+  and callback bridge. Regressions also cover natural EOF, early user skip,
+  unsupported q (reject q!=30 rather than misdecode), a truncated I payload,
+  malformed ADPCM index, pixel-channel packing, and preservation of packet
+  audio/video boundaries. Compiler uses `-Wall -Wextra -Werror`, the bridge
+  run uses AddressSanitizer/UBSan, and both new bridge and the adjusted native
+  coefficient tests pass locally.
+- Tightened the *private* VLC coefficient decode: consuming more than the
+  physical picture payload plus 15 legitimate terminal pad bits now yields a
+  truncated error, preventing the observed two-byte synthetic zero-fill
+  false success. This is not yet independently checked against the original
+  full 1908-frame FVDS source, which was not present in the decoder review ZIP.
+- Corrected a material decoder memory accounting error in the handoff:
+  `2 * 3 * 256 * 192 = 294,912 bytes` (288 KiB) for two triple-plane
+  reference frames, NOT 100,368 bytes. VLC lookup constants separately use
+  about 35 KiB. Allow for audio queue, original engine and runtime stack on
+  NTR 4 MiB; no assertion of completed NTR allocation acceptance yet.
+- The supplied host `.rgb555` files encode red in the **high** five bits.
+  Actual libnds `RGB15(r,g,b)` places red in the **low** five bits and blue
+  in the high five. A direct planar → existing CPyMO framebuffer conversion
+  (with bit15 set) is verified; there is no third full-frame RGB555 buffer.
+- The private handoff `CPyMO_1.2_FVDS_私有集成M1_源码与回归_20261023.zip`
+  contains the self-contained C prototype, synthetic unit tests and delta.
+  No copyrighted movie content and no new decoder VLC-derived tables were
+  uploaded to GitHub. Original stable R7 and 1.1.0 remain unchanged.
+- The FastVideoDS Player/Encoder public repositories have no clear root
+  code-merging licence; upstream license-request issue #15 was still open
+  during this review. Before pushing vendor-derived table data into public
+  AGPL code, provenance/permission must be resolved.
+- **Next milestone (M2):** schedule the decoded PCM using the existing
+  pre-roll queue and rational 12fps clock, implement safe ARM9 display and
+  VRAM lease plus ROM-local `#movie` transition, with one cleanup path for B,
+  EOF, errors, lid, BGM and script continuation; then benchmark actual
+  NTR and DSi hardware. This M1 is deliberately not called a video-playing
+  `.nds` and does not increase the accepted 48% integrated release readiness.
+
+## 2026-10-23 — Public GitHub 1.2 release protection (required)
+
+After user requested that FVDS integration must **remain publicly publishable**,
+audited the private DeepSeek handoff generator. Its
+`tests/gen_vlc_tables.py` reads upstream
+`Gericom.FastVideoDS/VlcTables.cs` (`TableA`, `TableB`,
+`TableARefLinear`) and emits the decoder's ~84 KiB VLC lookup header.
+The vendor Player/Encoder repositories have **no declared licence**
+(GitHub API returned `license:null` as of 2026-10-23), and licence
+request [#15](https://github.com/Gericom/FastVideoDSPlayer/issues/15)
+was **open**. Therefore the private full decoder + M1 bridge is
+**not yet suitable for redistribution inside AGPL-3.0 source or ROMs**.
+"Independently written" C glue does not cure vendor-data provenance.
+
+Created mandatory
+[`RELEASE-LICENSE-GATE-1.2.md`](RELEASE-LICENSE-GATE-1.2.md)
+and an opt-in-host/full-converter
+`test_nds_fvds_release_gate.py` that blocks known quarantined
+received source files, VLC signature constants and named private media.
+It is a safeguard, not complete legal verification and not a blanket
+ban on FVDS as a format. The targeted
+[NDS UI host workflow #39826200756](https://github.com/Blueteemo/CPyMO/actions/runs/39826200756)
+passed with the gate enabled; the regular NDS converter workflow
+discovers the same test on its next requested build.
+
+Future open-release path: obtain an explicit AGPL-compatible
+source/lookup-table grant **or** independently replace the affected
+codec internals with documented clean provenance and review. Work on
+generic A/V scheduling/PCM/VRAM/EOF/B skip may continue without those
+tables. Existing independently developed NVL1/NVA1 remains an
+optional releasable fallback if codec permissions cannot be resolved.
+Do not tag or advertise public FVDS playback using an unreviewed
+decoder. R7/1.1.0 untouched; overall accepted v1.2 readiness still 48%.

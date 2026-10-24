@@ -18,7 +18,6 @@ static void audio_tick(void *unused){CHECK(unused==NULL);ticks++;}
 int main(void){
  const uint16_t bg=nds_dual_canvas_color(5,9,13);
  const uint16_t dark=nds_dual_canvas_color(2,4,7);
- const uint16_t footer=nds_dual_canvas_color(3,6,9);
  const uint16_t bright=nds_dual_canvas_color(12,18,23);
  for(int interactive=0;interactive<=1;interactive++){
   for(int dialogue=0;dialogue<=1;dialogue++){
@@ -28,13 +27,16 @@ int main(void){
                               audio_tick,NULL);
    CHECK(ticks==6);  /* scanlines y=0,32,64,96,128,160 */
    CHECK(!memcmp(source_a,source_b,sizeof source_a));
-   CHECK(source_a[1*256+0]==bg);
+   CHECK(source_a[1*256+0]==nds_dual_canvas_row(1));
+   CHECK(source_a[0]==bg);
+   CHECK(source_a[191*256+0]==dark);
    CHECK(source_a[7*256+15]==bright);
-   CHECK(source_a[155*256+2]==dark);
-   if(dialogue&&!interactive)
-    CHECK(source_a[170*256+2]==footer);
-   else
-    CHECK(source_a[170*256+2]==dark);
+   CHECK(source_a[155*256+2]==nds_dual_canvas_row(155));
+   /* The bottom half is no longer an oversized fabricated textbox footer.
+      Interactive/hidden dialogue paths share the same quiet background. */
+   CHECK(source_a[162*256+20]==nds_dual_canvas_row(162));
+   CHECK(source_a[170*256+2]==nds_dual_canvas_row(170));
+   CHECK(source_a[191*256+200]==dark);
   }
  }
  return 0;

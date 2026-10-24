@@ -126,7 +126,9 @@ def run_job(job):
                 audio_mode=job.get('audio_lossless','voice')
                 if audio_mode not in ('off','voice','all'):raise ValueError('无损压缩模式无效。')
                 cache_only=cache_only or audio_mode!='off'
-                convert.convert(argparse.Namespace(source=game_source,destination=destination,ffmpeg=str(ffmpeg),font=None,jobs=4,missing_glyph_policy=job.get('missing_policy','box'),cache_only=cache_only,audio_lossless=audio_mode,compress_images=audio_mode!='off'))
+                video_mode=job.get('video_mode','skip')
+                if video_mode not in ('skip','nvl1','nva1'):raise ValueError('视频转换模式无效。')
+                convert.convert(argparse.Namespace(source=game_source,destination=destination,ffmpeg=str(ffmpeg),font=None,jobs=4,missing_glyph_policy=job.get('missing_policy','box'),cache_only=cache_only,audio_lossless=audio_mode,compress_images=audio_mode!='off',video_mode=video_mode,video_fps=12))
                 manifest=json.loads((destination/'nds-cache/manifest.json').read_text(encoding='utf8'))
                 warnings=[];audit=manifest['audit']
                 for label,key in [('未知脚本指令','unknown_commands'),('缺失资源引用','missing_resource_references'),('需运行检查的指令','commands_requiring_game_runtime_check')]:
@@ -135,11 +137,11 @@ def run_job(job):
                 if boxed:warnings.append('字库缺字以□显示，原脚本未改：'+', '.join(boxed))
                 rom=ROOT/'cpymo-nds.nds'
                 if rom.is_file():shutil.copy2(rom,output/'cpymo-nds.nds')
-                report={'ok':True,'status':'已转换，仍需实际运行确认' if warnings else '转换和完整性检查通过，仍需实际运行确认','game':candidate['title'],'platform':candidate['platform'],'game_directory':str(destination),'output':str(output),'original_files_checked':len(manifest.get('source_files',manifest['original_files'])),'cache_files_checked':len(manifest['cache_files']),'warnings':warnings,'compatibility_certified':False,'video_policy':'默认不带视频；引擎安全跳过','missing_policy':job.get('missing_policy','box'),'source_modified':False}
+                report={'ok':True,'status':'已转换，仍需实际运行确认' if warnings else '转换和完整性检查通过，仍需实际运行确认','game':candidate['title'],'platform':candidate['platform'],'game_directory':str(destination),'output':str(output),'original_files_checked':len(manifest.get('source_files',manifest['original_files'])),'cache_files_checked':len(manifest['cache_files']),'warnings':warnings,'compatibility_certified':False,'video_policy':manifest['video_policy'],'videos':manifest.get('videos',[]),'missing_policy':job.get('missing_policy','box'),'source_modified':False}
                 report.update(release_version=convert.VERSION,cache_format=manifest['format'],rom_sha256=hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None)
                 report.update(cache_only=cache_only,resource_policy=manifest['resource_policy'],redundant_media_bytes=sum(item['bytes'] for item in manifest.get('omitted_files',[]) if item.get('reason','').startswith('redundant original media')))
                 report.update(lossless=manifest['lossless'])
-                instructions='安装：先备份TF卡上同一游戏的save。将本目录中的cpymo-nds.nds和pymo文件夹复制到TF根目录，保留R4内核。不要用本包空save覆盖自己的存档。\n原游戏包、脚本和汉化内容未修改。视频默认省略。转换通过不等于已经验证所有剧情及R4兼容。\nNDS平台移植：千岚之夏；CPyMO/PyMO与依赖的原署名和许可证保留。\n'+('\n注意：\n'+'\n'.join(warnings) if warnings else '')
+                instructions='安装：先备份TF卡上同一游戏的save。将本目录中的cpymo-nds.nds和pymo文件夹复制到TF根目录，保留R4内核。不要用本包空save覆盖自己的存档。\n原游戏包、脚本和汉化内容未修改。视频按本次选择转换或省略。转换通过不等于已经验证所有剧情及R4兼容。\nNDS平台移植：千岚之夏；CPyMO/PyMO与依赖的原署名和许可证保留。\n'+('\n注意：\n'+'\n'.join(warnings) if warnings else '')
                 if cache_only:instructions+='\n本次使用精简资源：仅省去已有NDS缓存的重复媒体；画质音质不变，脚本与署名保留。精简后的目录用于NDS，请保留原包供其他平台使用。\n'
                 if audio_mode!='off':instructions+=f'\n本次启用无损缓存压缩，请使用随附的 {VERSION} 引擎。像素和音频采样与未压缩 NDS 缓存一致；BGM/音效默认保持 PCM。\n' if audio_mode=='voice' else f'\n本次启用实验性全部音频压缩，请使用随附的 {VERSION} 引擎；此选项不属于默认性能基线。\n'
                 (output/'安装必读.txt').write_text(instructions,encoding='utf-8-sig')

@@ -67,5 +67,87 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r cpymo-tool/nds-converter/requirements.txt
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Use hosted FFmpeg or pip wheel (no apt mirror dependency)
+        run: |
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -version | head -n 1
+          else
+            python -m pip install 'imageio-ffmpeg==0.6.0'
+            python - <<'PY'
+          import os
+          from pathlib import Path
+          import imageio_ffmpeg
+          link=Path(os.environ['RUNNER_TEMP'])/'ffmpeg'
+          link.symlink_to(imageio_ffmpeg.get_ffmpeg_exe())
+          with open(os.environ['GITHUB_PATH'],'a',encoding='utf8') as stream:
+              stream.write(str(link.parent)+'\n')
+          print('CI FFmpeg wheel binary:',link.resolve())
+          PY
+          fi
       - run: python -m unittest discover -s cpymo-tool/nds-converter/tests -v
+
+  portable-windows:
+    # Opt in explicitly: only runs when the CI request commit contains
+    # [portable]. All ordinary DS/DSi builds remain fast and unchanged.
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[portable]')
+    # Linux apt/mirror availability must not hold the independent Windows
+    # frozen-worker proof hostage. Full converter suite is a separate gate.
+    needs: [build]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install pinned portable build dependencies
+        run: python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
+      - name: Download exactly this workflow run's NTR ROM
+        uses: actions/download-artifact@v4
+        with:
+          name: CPyMO-for-NDS
+          path: cpymo-backends/nds
+      - name: Locate video-capable Windows FFmpeg
+        shell: pwsh
+        run: |
+          $ff = (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue).Source
+          if (-not $ff) {
+            choco install ffmpeg -y --no-progress
+            $ff = (Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          }
+          if (-not $ff) { throw 'No FFmpeg found on Windows runner' }
+          & $ff -version
+          "NDS_BUILD_FFMPEG=$ff" >> $env:GITHUB_ENV
+      - name: Build PyInstaller app with real video decoder
+        shell: pwsh
+        run: |
+          python cpymo-tool/nds-converter/build_portable.py --ffmpeg "$env:NDS_BUILD_FFMPEG" --output cpymo-portable
+      - name: Test actual frozen worker with MP4/NVL1 conversion and paired ROM
+        shell: pwsh
+        run: |
+          python cpymo-tool/nds-converter/tests/smoke_windows_portable.py --portable cpymo-portable --ffmpeg "$env:NDS_BUILD_FFMPEG"
+      - name: Include development-only release limitations
+        shell: pwsh
+        run: |
+          Copy-Item cpymo-tool/nds-converter/README.md cpymo-portable/转换助手说明.md
+          @'
+          CPyMO 1.2 Windows portable - INTEGRATION BUILD ONLY.
+          Video-enabled FFmpeg is included. The frozen worker was smoke-tested
+          with ordinary MP4 -> NVL1 and original files were not modified.
+          GUI window and NTR/DSi performance still need device testing.
+          NOT A PUBLIC RELEASE. Collect matching FFmpeg third-party licenses,
+          corresponding source and redistribution notices before distributing.
+          Do not overwrite the save folder of an existing game.
+          '@ | Set-Content -Path cpymo-portable/开发版说明.txt -Encoding UTF8
+      - name: Upload tested Windows portable candidate for review
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-Windows-Portable-VIDEO-REVIEW-NOT-RELEASE
+          path: |
+            cpymo-portable/app/Converter/
+            cpymo-portable/cpymo-nds.nds
+            cpymo-portable/VERSION.json
+            cpymo-portable/BUILD-COMMAND.json
+            cpymo-portable/helper-build.log
+            cpymo-portable/转换助手说明.md
+            cpymo-portable/开发版说明.txt
+          retention-days: 14

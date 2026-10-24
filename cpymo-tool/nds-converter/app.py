@@ -30,7 +30,7 @@ class App:
         ttk.Label(frame,text='2  选择保存位置',font=('Microsoft YaHei UI',11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,6));ttk.Entry(row,textvariable=self.output,state='readonly').pack(side='left',fill='x',expand=True)
         self.output_button=ttk.Button(row,text='选保存位置',command=self.pick_output);self.output_button.pack(side='left',padx=(8,0))
-        ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档。视频默认省略并安全跳过。',foreground='#526579').pack(anchor='w',pady=(0,10))
+        ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频可选择转换。',foreground='#526579').pack(anchor='w',pady=(0,10))
         self.box=tk.BooleanVar(value=True)
         ttk.Checkbutton(frame,text='遇到字库缺字时显示 □ 并记录，保留原脚本内容',variable=self.box).pack(anchor='w')
         self.cache_only=tk.BooleanVar(value=True)
@@ -41,6 +41,13 @@ class App:
         self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,state='readonly',width=47);self.compression_box.pack(side='left')
         self.compression_box.bind('<<ComboboxSelected>>',lambda _:self.cache_only.set(True) if self.compression_modes.index(self.compression.get()) else None)
         ttk.Label(frame,text='请使用随附的 '+VERSION+' 引擎；无损缓存压缩不额外降低画质或音质。',foreground='#526579').pack(anchor='w',pady=(3,0))
+        self.video_modes=['不转换视频（兼容旧流程）','转换视频 NVL1（推荐：兼容优先）','转换视频 NVA1（压缩音频）']
+        self.video=tk.StringVar(value=self.video_modes[0])
+        row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='游戏视频：').pack(side='left')
+        ttk.Combobox(row,textvariable=self.video,values=self.video_modes,
+                     state='readonly',width=47).pack(side='left')
+        ttk.Label(frame,text='视频以 256×192 / 12 FPS 转换；需要 CPyMO 1.2 引擎。',
+                  foreground='#526579').pack(anchor='w',pady=(3,0))
         row=ttk.Frame(frame);row.pack(fill='x',pady=(13,8))
         self.convert_button=ttk.Button(row,text='3  开始转换',command=self.begin,state='disabled');self.convert_button.pack(side='left')
         self.cancel_button=ttk.Button(row,text='取消',command=self.cancel,state='disabled');self.cancel_button.pack(side='left',padx=8)
@@ -53,6 +60,7 @@ class App:
         if self_test:
             if 'cache_only' in self_test:self.cache_only.set(self_test['cache_only'])
             if 'audio_lossless' in self_test:self.compression.set(self.compression_modes[{'off':0,'voice':1,'all':2}[self_test['audio_lossless']]])
+            if 'video_mode' in self_test:self.video.set(self.video_modes[{'skip':0,'nvl1':1,'nva1':2}[self_test['video_mode']]])
             self.source.set(self_test['source']);self.output.set(self_test['output_base']);window.after(300,self.inspect)
 
     def pick_zip(self):
@@ -112,7 +120,7 @@ class App:
         self.status.set('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
         audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
         if audio_mode!='off':self.cache_only.set(True)
-        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box' if self.box.get() else 'error','cache_only':self.cache_only.get(),'audio_lossless':audio_mode},self.converted)
+        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box' if self.box.get() else 'error','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())]},self.converted)
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return

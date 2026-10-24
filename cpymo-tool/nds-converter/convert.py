@@ -12,6 +12,7 @@ from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw, __version__ as pillow_version
 from pixel_font import pixel_font_cache
 import lossless
+import video_nvl
 from fvds_inspect import inspect_fvds
 
 from release_info import VERSION
@@ -42,7 +43,10 @@ UI_CODEPOINTS = (
     36716,36731,36733,36807,36816,36820,36827,36864,36873,36895,36914,36938,36984,37096,37197,37325,37327,38291,
     38388,38543,38544,38577,38656,38899,38917,39033,39057,65292,65306,65311,
 )
-UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)'))))
+# All three mode names are engine UI, not game script dialogue. Always embed
+# them in newly converted games even when their novels never use these glyphs.
+# The ROM fallback font independently covers already-converted game caches.
+UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)增强双屏增強雙強化画面操控モむ'))))
 
 def sha(path):
     h = hashlib.sha256()
@@ -136,7 +140,7 @@ def mask_cache(asset, target, width, height):
     target.write_bytes(struct.pack('<4sHH',b'NMT1',width,height)+image.tobytes())
     return {'source_sha256':hashlib.sha256(asset.read()).hexdigest(),'physical_size':[width,height]}
 
-def audit(scripts, collections):
+def audit(scripts, collections, playable_videos=()):
     missing=[]; unsupported=[]; dynamic=[]; unknown=[]; runtime=[]
     mapping={'bg':'bg','bgm':'bgm','se':'se','vo':'voice'}
     for path in scripts:
@@ -146,7 +150,8 @@ def audit(scripts, collections):
             parts=line[1:].split(None,1);command=parts[0] if parts else '';args=parts[1] if len(parts)>1 else ''
             if command and command not in CORE_COMMANDS: unknown.append({'script':path.name,'line':line_number,'command':command,'behavior':'upstream skips unknown directive; review before distribution'})
             if command in ('album','music','chara_anime','anime_on','scroll'): runtime.append({'script':path.name,'line':line_number,'command':command})
-            if command in ('movie','video'): unsupported.append({'script':path.name,'line':line_number,'command':command})
+            if command in ('movie','video') and args.split(',')[0].strip().casefold() not in playable_videos:
+                unsupported.append({'script':path.name,'line':line_number,'command':command,'name':args.split(',')[0].strip()})
             folder=mapping.get(command)
             if folder is None: continue
             name=args.split(',')[0].strip()
@@ -298,6 +303,37 @@ def convert(args):
         retained={p.relative_to(src).as_posix() for p in fv_candidates}
         omitted=[item for item in omitted if item['path'] not in retained]
 
+    # 1.2 public playback path: independently encoded NVL1/NVA1 from
+    # FFmpeg-decoded source movie; original game assets/scripts are untouched.
+    video_mode=getattr(args,'video_mode','skip')
+    if video_mode not in ('skip','nvl1','nva1'):
+        raise ValueError('Unknown NDS video conversion mode')
+    if video_mode!='skip' and getattr(args,'video_fvds',False):
+        raise ValueError('Choose playable NVL1/NVA1 or research FVDS preflight, not both')
+    playable_videos=[]
+    if video_mode!='skip':
+        names={}
+        for src_video in source_files:
+            rel=src_video.relative_to(src)
+            if (len(rel.parts)!=2 or
+                    rel.parts[0].casefold() not in ('movie','video','movies','videos') or
+                    rel.suffix.casefold() not in video_nvl.VIDEO_SUFFIXES):
+                continue
+            name=src_video.stem
+            hashed=key(name)
+            if hashed in names:
+                raise ValueError(f'Ambiguous video name: {names[hashed]} vs {src_video}')
+            names[hashed]=str(src_video)
+            output=cache/'video'/hashed[:2]/(hashed+'.nvl')
+            print(f'Converting movie {name}: {video_mode}',flush=True)
+            meta=video_nvl.encode(src_video,output,ffmpeg,
+                                  fps=getattr(args,'video_fps',12),
+                                  audio='nar' if video_mode=='nva1' else 'pcm')
+            playable_videos.append({'name':name,'path':output.relative_to(stage).as_posix(),
+                'source_sha256':sha(src_video),**meta})
+            for item in omitted:
+                if item['path']==rel.as_posix():
+                    item['reason']='source video replaced with playable '+meta['format']+' cache'
     # Some legacy packers included Windows Thumbs.db in image packages.
     # Recognize both its name and OLE signature; never hide corrupt game images.
     ignored=[]
@@ -358,7 +394,7 @@ def convert(args):
     text=''.join(p.read_text(encoding='utf-8-sig') for p in scripts)+(src/'gameconfig.txt').read_text(encoding='utf-8-sig')
     glyphs=font_cache(text,font,cache/'font.bin')
     pixel_fonts=pixel_font_cache([cp for cp in (set(map(ord,text))|set(range(32,127))|set(UI_CODEPOINTS)) if cp>=32 and cp not in (0xfeff,0xfffe,0xffff)],cache,args.missing_glyph_policy)
-    findings=audit(scripts,folders)
+    findings=audit(scripts,folders,{v['name'].casefold() for v in playable_videos})
     allowed=sorted({(x['folder'],key(x['name'])) for x in findings['missing_resource_references'] if x['folder'] in ('bgm','se','voice')})
     (cache/'missing-audio.txt').write_bytes(''.join(f'{kind} {hashed}\n' for kind,hashed in allowed).encode('ascii'))
     compressed_images=[]
@@ -397,9 +433,12 @@ def convert(args):
     manifest['lossless']['experimental_sparse']=getattr(args,'experimental_sparse',False)
     if audio_mode!='off':manifest['audio_format']='PCM16/NAR2 per file; identical 22050 Hz mono PCM16 samples'
     manifest['source_files']=source_hashes
-    manifest['video_policy']=('opt-in FVDS cache pass-through; 1.2 runtime preflight only; video decoding not implemented'
+    manifest['video_policy']=('playable NVL1/NVA1 converted from source videos; unconverted movie references still skipped'
+                              if video_mode!='skip'
+                              else 'opt-in FVDS cache pass-through; 1.2 runtime preflight only; video decoding not implemented'
                               if getattr(args,'video_fvds',False)
                               else 'omit video assets; keep scripts; runtime safely skips movie commands')
+    manifest['videos']=playable_videos
     manifest['fvds_videos']=video_entries
     manifest['resource_policy']='cache-only experimental' if cache_only else 'original media retained'
     manifest['presentation']=presentation
@@ -424,6 +463,8 @@ def main():
     c.add_argument('--cache-layout',choices=('flat','sharded'),default='sharded',help='Two-hex directory fanout avoids large flat FAT directories; requires r15 engine')
     c.add_argument('--experimental-sparse',action='store_true',help='Private NPS2: smaller transparent images; may increase scene-change stalls')
     c.add_argument('--video-fvds',action='store_true',help='Research-only: validate and copy pre-encoded video/*.fv into hashed NDS cache; NOT playback')
+    c.add_argument('--video-mode',choices=('skip','nvl1','nva1'),default='skip',help='Source video conversion: omit (legacy) or playable NVL1 PCM / NVA1 NAR2')
+    c.add_argument('--video-fps',type=int,choices=(6,8,12,15,20,24),default=12,help='Output video FPS, default 12 for NDS')
     v=sub.add_parser('verify');v.add_argument('destination',type=Path)
     i=sub.add_parser('inspect');i.add_argument('source',type=Path)
     args=parser.parse_args()
