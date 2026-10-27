@@ -16,6 +16,7 @@ jobs:
         run: |
           python3 cpymo-backends/nds/tools/generate-ui-font.py
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_picture_bg.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_launcher_footer_layout.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_ui_font_coverage.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_rom_banner.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_save_dir.py' -v
