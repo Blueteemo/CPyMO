@@ -1,0 +1,94 @@
+"""Small, dependency-free player-facing UI translations (MIT).
+
+The canonical UI strings are Simplified Chinese. Translation is applied at
+display time only: PyMO scripts, conversion diagnostics and output paths never
+change when users switch the assistant's language.
+"""
+
+LANGUAGES = ("简体中文", "English")
+UI_EN = {
+    "CPyMO NDS 转换助手": "CPyMO NDS Converter",
+    "选择游戏包，生成可复制到 DS / DSi 存储卡的游戏目录。无需另装 Python 或 FFmpeg。":
+        "Choose a PyMO game and prepare its DS / DSi files. No separate Python or FFmpeg installation.",
+    "1  选择游戏": "1  Select a game",
+    "选压缩包": "Open ZIP / APK",
+    "选文件夹": "Open folder",
+    "支持 S60v3 / S60v5 / Android PyMO 数据；同包有多个版本时优先推荐 S60v3。":
+        "Supports S60v3 / S60v5 / Android PyMO data. If multiple versions exist, S60v3 is preferred.",
+    "2  选择保存位置": "2  Choose output location",
+    "选保存位置": "Browse",
+    "自动创建新文件夹，不覆盖原包或已有存档；视频默认转换为 NVL1。":
+        "Creates a new output folder. Source games and existing saves are never overwritten. NVL1 video is on by default.",
+    "缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。":
+        "Missing font glyphs appear as □ with a warning. Conversion continues and scripts stay unchanged.",
+    "精简重复媒体：省去已有 NDS 缓存的原媒体，保留脚本与署名":
+        "Remove redundant source media after caching (keep scripts and credits)",
+    "不压缩缓存（读取优先）": "Uncompressed cache (faster reads)",
+    "无损压缩语音与适合的图片（推荐）":
+        "Lossless voice and image cache compression (recommended)",
+    "无损压缩全部音频与适合的图片（实验）":
+        "Lossless compression for all audio and images (experimental)",
+    "缓存压缩：": "Cache compression:",
+    "安装包已包含 CPyMO {version}；缓存压缩不会进一步降低转换后素材质量。":
+        "CPyMO {version} is included. Cache compression does not further reduce converted asset quality.",
+    "不转换视频（兼容旧流程）": "Skip videos (legacy mode)",
+    "转换视频 NVL1（推荐：兼容优先）": "Convert to NVL1 (recommended)",
+    "转换视频 NVA1（压缩音频）": "Convert to NVA1 (compressed audio)",
+    "游戏视频：": "Game videos:",
+    "视频默认转换为 256×192 / 12 FPS；可选 NVA1 或跳过，安装包已含对应引擎。":
+        "Video defaults to 256×192 at 12 FPS. NVA1 or skip is optional; the matching engine is bundled.",
+    "3  开始转换": "3  Convert",
+    "取消": "Cancel",
+    "打开结果文件夹": "Open output folder",
+    "NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 {version}":
+        "NDS port: 千岚之夏  ·  Based on CPyMO / PyMO  ·  Converter {version}",
+    "先选择游戏压缩包或游戏文件夹。": "Select a game ZIP / APK or folder to begin.",
+    "选择 PyMO 游戏包": "Select a PyMO game package",
+    "游戏包": "Game packages",
+    "全部文件": "All files",
+    "选择含 gameconfig.txt 的游戏数据目录": "Select the game folder containing gameconfig.txt",
+    "选择保存位置": "Choose an output folder",
+    "正在识别游戏包里的平台版本……": "Detecting platform variants in the game package…",
+    "推荐  ": "Recommended  ",
+    "已识别游戏。确认保存位置后，点击“开始转换”。":
+        "Game recognized. Choose an output folder, then click Convert.",
+    "保存位置不能位于原游戏目录内部。":
+        "The output folder cannot be inside the source game's directory.",
+    "正在转换，请稍候。语音较多的游戏需要更长时间……":
+        "Converting… Games with extensive voice audio may take longer.",
+    "。点击“打开结果文件夹”查看安装必读。":
+        ". Open the output folder and read the installation instructions.",
+    "已转换，仍需实际运行确认":
+        "Converted with warnings; on-device verification is still recommended",
+    "转换和完整性检查通过，仍需实际运行确认":
+        "Conversion and integrity checks passed; on-device verification is still recommended",
+    "未发现静态兼容性警告。": "No static compatibility warnings were found.",
+    "已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。":
+        "Removed {size:.2f} MiB of redundant media. Scripts and credits kept; source unchanged.",
+    "无损缓存另节省 {size:.2f} MiB。请使用随附的 {version} 引擎。":
+        "Lossless caching saved another {size:.2f} MiB. Use the bundled {version} engine.",
+    "未完成：": "Not completed: ",
+    "暂时不能完成转换": "Conversion could not be completed",
+    "原游戏包未改动。诊断目录：": "Source game was not modified. Diagnostic folder: ",
+    "已取消。原游戏包未改动；未完成目录和日志保留供检查。":
+        "Cancelled. Source unchanged; incomplete output and logs remain for inspection.",
+    "转换进程意外退出，请保留诊断日志。":
+        "The conversion worker exited unexpectedly. Please keep the diagnostic logs.",
+    "界面语言：": "Language:",
+    "检测到不支持的素材；请查看诊断日志。": "Unsupported assets were detected; see diagnostic logs.",
+}
+
+def tr(value: str, language: str = "简体中文") -> str:
+    if language != "English":
+        return value
+    if value in UI_EN:
+        return UI_EN[value]
+    # A version number embedded in a static UI caption is not a translation
+    # key; replacing it temporarily makes the label stable across releases.
+    import re
+    normalized = re.sub(r"(?<![\d])\d+\.\d+\.\d+(?![\d])", "{version}", value)
+    if normalized in UI_EN:
+        match = re.search(r"\d+\.\d+\.\d+", value)
+        if match:
+            return UI_EN[normalized].format(version=match.group())
+    return value
