@@ -49,7 +49,7 @@ class ConverterLanguageTests(unittest.TestCase):
         for name in ('self.log=tk.Text(', 'self.games=tk.Listbox('):
             line=next(line for line in app.splitlines() if name in line)
             def prop(key):
-                m=search(r"\\b"+key+r"='(#[0-9a-fA-F]{6})'",line)
+                m=search(r"\b"+key+r"='(#[0-9a-fA-F]{6})'",line)
                 self.assertIsNotNone(m, (name,key))
                 return m.group(1)
             background=prop('background')
