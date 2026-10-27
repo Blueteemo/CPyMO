@@ -41,6 +41,30 @@ class ConverterLanguageTests(unittest.TestCase):
         self.assertIn('Error detail unknown: x',translated)
         self.assertEqual(tr_log(raw,'简体中文'),raw)
 
+    def test_log_and_game_list_have_high_contrast_in_macos_dark_mode(self):
+        # macOS can supply white Tk text in dark appearance; never pair its
+        # inherited foreground with our fixed pale-gray log background.
+        app=(ROOT/'app.py').read_text(encoding='utf8')
+        from re import search
+        for name in ('self.log=tk.Text(', 'self.games=tk.Listbox('):
+            line=next(line for line in app.splitlines() if name in line)
+            def prop(key):
+                m=search(r"\\b"+key+r"='(#[0-9a-fA-F]{6})'",line)
+                self.assertIsNotNone(m, (name,key))
+                return m.group(1)
+            background=prop('background')
+            foreground=prop('foreground')
+            self.assertNotEqual(foreground, '#ffffff')
+            self.assertEqual(prop('selectforeground'), '#ffffff')
+            def channel(c):
+                value=int(c,16)/255
+                return value/12.92 if value<=0.04045 else ((value+0.055)/1.055)**2.4
+            def lightness(h):
+                return sum(x*y for x,y in zip((0.2126,0.7152,0.0722),
+                    (channel(h[i:i+2]) for i in (1,3,5))))
+            hi,lo=sorted((lightness(background),lightness(foreground)),reverse=True)
+            self.assertGreaterEqual((hi+0.05)/(lo+0.05),7.0)
+
     def test_unknown_diagnostics_are_preserved(self):
         raw='Unmapped PyMO error for source investigation: /tmp/foo'
         self.assertEqual(tr(raw,'English'),raw)
