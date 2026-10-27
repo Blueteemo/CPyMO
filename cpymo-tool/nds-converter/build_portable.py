@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--rom', type=Path, help='Explicit paired, validated NTR/TWL release ROM')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--rebuild', action='store_true', help='Reuse an owned portable-build directory')
+    parser.add_argument('--require-desktop-icon', action='store_true',
+                        help='Fail packaging if the owner-approved converter icon is missing')
     args = parser.parse_args()
     if os.name != 'nt':
         parser.error('Build the Windows portable executable on Windows.')
@@ -56,6 +58,16 @@ def main():
     build = output/'build'
     resources = build/'resources'
     resources.mkdir(parents=True, exist_ok=True)
+    source_icon = ROOT/'assets/converter-icon-source.png'
+    icon_out = build/'branding'
+    icon_args=[]
+    if source_icon.is_file():
+        from tools.build_desktop_icons import build as build_icons
+        build_icons(source_icon,icon_out)
+        icon_args=['--icon',str(icon_out/'converter-icon.ico'),
+                   '--add-data',f"{icon_out/'converter-icon-64.png'};assets"]
+    elif args.require_desktop_icon:
+        parser.error("Missing approved converter artwork: "+str(source_icon))
     paired_rom = resources/'cpymo-nds.nds'
     shutil.copy2(rom, paired_rom)
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
@@ -67,6 +79,7 @@ def main():
                '--exclude-module', 'numpy', '--exclude-module', 'scipy',
                '--exclude-module', 'matplotlib', '--exclude-module', 'pytest',
                str(ROOT/'app.py')]
+    command[-1:-1]=icon_args
     if (ROOT/'lossless-native.dll').is_file():
         command[-1:-1]=['--add-binary',f'{ROOT / "lossless-native.dll"};.']
     with (output/'helper-build.log').open('w', encoding='utf8') as log:
