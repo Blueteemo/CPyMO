@@ -16,6 +16,26 @@ This is the release-engineering record, **not** the public GitHub Release. Do no
 - The selected **second** PyMO long logo exists at `assets/branding/pymo-long-logo.webp` and is the only image planned for the new NDS README header. The approved background lives at `cpymo-backends/nds/assets/nds-dual-bg.rgb555`.
 - User's DS/NTR and DSi/TWL real-machine acceptance was completed *before* packaging. Do not repeat those tests merely because docs or packaging change.
 
+## Found after first RC: macOS FFmpeg redistribution blocker (2026-10-27)
+
+Inspection of the **actual bundled Intel macOS FFmpeg executable** found
+`--enable-gpl --enable-version3 --enable-nonfree --enable-libx264 --enable-libx265`
+in its compiled configuration. That executable's SHA-256 was
+`83ca390efa58ebbf9e1493bdf94e528c5afc9dc3d8e695296a1e2e7715fba487`.
+**Do not publish or redistribute the old 40490746670 macOS RC as a final package.**
+FFmpeg's own documentation identifies `--enable-nonfree` combinations as
+unredistributable: https://ffmpeg.org/doxygen/trunk/md_LICENSE.html .
+
+The replacement candidate pipeline now invokes
+`cpymo-tool/nds-converter/tools/build_ffmpeg_macos_lgpl.sh`, which compiles
+FFmpeg 7.1.5 from official source with `--disable-gpl --disable-nonfree`,
+checks the resulting binary's configuration, and packages its matching source,
+build options, logs, licensing output and checksums alongside the `.app`.
+This remains a **new RC awaiting CI completion and verification**, not yet a
+successful legal release. The owner should receive a *replacement* local
+DeepSeek test package only when this workflow succeeds, instead of relying
+on the prior Mac candidate.
+
 ## Still needed before the **public** Release
 
 1. **macOS user-local Finder/GUI check.** The current RC is unsigned and was only tested as a frozen worker on Intel macOS CI. Require the owner's separate DeepSeek report before including the Mac installer in the public release. Do not disable or recommend disabling Gatekeeper or SIP. Apple Silicon is not automatically certified by Intel CI.
