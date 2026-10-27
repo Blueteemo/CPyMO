@@ -31,6 +31,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--target-arch", choices=("arm64", "x86_64"), default=platform.machine(),
                         help="Build a native single-architecture app; ARM64 requires Apple silicon.")
+    parser.add_argument("--require-desktop-icon", action="store_true",
+                        help="Fail packaging unless the approved 04 desktop icon source is present")
     args = parser.parse_args()
     if sys.platform != "darwin":
         parser.error("Build native macOS applications on a macOS host.")
@@ -69,6 +71,16 @@ def main():
     shutil.copy2(rom, paired_rom)
     shutil.copy2(ffmpeg, paired_ffmpeg)
     paired_ffmpeg.chmod(paired_ffmpeg.stat().st_mode | 0o111)
+    icon_source = HERE / "assets/converter-icon-source.png"
+    icon_args=[]
+    if icon_source.is_file():
+        from tools.build_desktop_icons import build as build_icons
+        branding = build / "branding"
+        build_icons(icon_source,branding)
+        icon_args=["--icon",str(branding/"converter-icon.icns"),
+                   "--add-data",f"{branding/'converter-icon-64.png'}:assets"]
+    elif args.require_desktop_icon:
+        parser.error(f"Missing owner-approved desktop icon: {icon_source}")
     command = [sys.executable, "-m", "PyInstaller",
                "--noconfirm", "--clean", "--onedir", "--windowed",
                "--name", "CPyMO-NDS-Converter",
@@ -84,6 +96,7 @@ def main():
                "--exclude-module", "numpy", "--exclude-module", "scipy",
                "--exclude-module", "matplotlib", "--exclude-module", "pytest",
                str(HERE / "app.py")]
+    command[-1:-1]=icon_args
     # The runtime uses sys._MEIPASS for the bundled FFmpeg and ROM. macOS's
     # app contains Resources/Frameworks cross-links; inspect both locations.
     with (output / "build.log").open("w", encoding="utf8") as log:
@@ -100,6 +113,8 @@ def main():
     plist["CFBundleShortVersionString"] = metadata["version"]
     plist["CFBundleVersion"] = metadata["version"]
     plist["CFBundleGetInfoString"] = f"CPyMO NDS Converter {metadata['version']}"
+    if icon_args:
+        plist["CFBundleIconFile"] = "converter-icon.icns"
     with info.open("wb") as file:
         plistlib.dump(plist, file)
     subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)],
@@ -109,6 +124,13 @@ def main():
     with info.open("rb") as file:
         assert plistlib.load(file)["CFBundleShortVersionString"] == metadata["version"]
     require_arch(app / "Contents/MacOS/CPyMO-NDS-Converter")
+    if icon_args:
+        icon_candidates = [
+            app/"Contents/Resources/converter-icon.icns",
+            app/"Contents/Resources/icon-windowed.icns",
+        ]
+        if not any(p.is_file() for p in icon_candidates):
+            raise RuntimeError("macOS .app is missing the packaged Finder/Dock icon")
     for resource in ("cpymo-nds.nds", "ffmpeg", "release.json"):
         present = any((app / location / resource).is_file() for location in
                       ("Contents/Resources", "Contents/Frameworks", "Contents/MacOS"))
@@ -133,7 +155,8 @@ def main():
     shutil.copytree(app, output / app.name, symlinks=True)
     shutil.copy2(rom, output / "cpymo-nds.nds")
     shutil.rmtree(build)
-    metadata.update(macos_architecture=args.target_arch,
+    metadata.update(desktop_icon="approved-PyMO-04" if icon_args else "default-not-public",
+                    macos_architecture=args.target_arch,
                     app_bundle_version=metadata["version"],
                     rosetta_required=False if args.target_arch=="arm64" else "Apple silicon only",
                     rom_sha256=digest(rom),
