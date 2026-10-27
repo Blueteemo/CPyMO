@@ -20,7 +20,7 @@ class LauncherHelpLayoutTests(unittest.TestCase):
   self.assertIn("launcher_rect(6,y,244,26",LAUNCHER)
   self.assertIn("t.py>=33&&t.py<154",LAUNCHER)
   for y in (155,173):
-   self.assertRegex(LAUNCHER,rf"launcher_text\\([^;]+,7,{y},")
+   self.assertRegex(LAUNCHER,rf"launcher_text\([^;]+,7,{y},")
   self.assertGreaterEqual(155-(33+3*31+26),3)
   self.assertGreaterEqual(192-(173+16),3)
   self.assertGreaterEqual(173-(155+16),2)
