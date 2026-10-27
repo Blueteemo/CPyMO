@@ -1,6 +1,6 @@
 """Execute the exact NDS enhanced RGB555 canvas C source on host.
-Checks pixel rows, dialogue/footer palette, all three states and six audio
-yield calls per pass. Does not assert invented game artwork or text.
+Checks exact RGB555 background gradients, star field, low-contrast cloud
+horizons, interactive suppression and six audio yield calls per pass.
 """
 from pathlib import Path
 import shutil,subprocess,tempfile,unittest
@@ -29,14 +29,18 @@ int main(void){
    CHECK(!memcmp(source_a,source_b,sizeof source_a));
    CHECK(source_a[1*256+0]==nds_dual_canvas_row(1));
    CHECK(source_a[0]==bg);
-   CHECK(source_a[191*256+0]==dark);
+   CHECK(source_a[191*256+0]==(interactive?dark:nds_dual_canvas_cloud(191,1)));
    CHECK(source_a[7*256+15]==bright);
-   CHECK(source_a[155*256+2]==nds_dual_canvas_row(155));
-   /* The bottom half is no longer an oversized fabricated textbox footer.
-      Interactive/hidden dialogue paths share the same quiet background. */
-   CHECK(source_a[162*256+20]==nds_dual_canvas_row(162));
-   CHECK(source_a[170*256+2]==nds_dual_canvas_row(170));
-   CHECK(source_a[191*256+200]==dark);
+   /* Artistic sky/horizon only appears when the canvas is not occupied by
+      a menu or story choice; original dialogue pixels are drawn on top. */
+   CHECK(source_a[155*256+2]==(interactive?nds_dual_canvas_row(155):nds_dual_canvas_cloud(155,0)));
+   CHECK(source_a[162*256+20]==(interactive?nds_dual_canvas_row(162):nds_dual_canvas_cloud(162,0)));
+   CHECK(source_a[170*256+2]==(interactive?nds_dual_canvas_row(170):nds_dual_canvas_cloud(170,0)));
+   CHECK(source_a[191*256+200]==(interactive?dark:nds_dual_canvas_cloud(191,1)));
+   CHECK(source_a[125*256+132]==(interactive?nds_dual_canvas_row(125):
+       nds_dual_canvas_color(9,14,19)));
+   CHECK(source_a[108*256+206]==(interactive?nds_dual_canvas_row(108):
+       nds_dual_canvas_color(9,14,19)));
    const uint16_t base=nds_dual_canvas_row(70);
    const uint16_t edge=nds_dual_canvas_color(
        (base&31u)+1u,((base>>5)&31u)+2u,((base>>10)&31u)+2u);
