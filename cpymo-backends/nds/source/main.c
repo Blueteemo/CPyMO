@@ -598,11 +598,13 @@ static void nds_dual_lower_background(bool ui,bool choices){
            !engine.input.hide_window && !engine.say.hide_window;
  /* Same RGB555 canvas function is compiled and pixel-tested on desktop;
     CPyMO's REAL namebox, textbox, text and menu render over it afterward. */
- if(!interactive && nds_picture_get()){
-  /* Copy the approved artwork before rendering game-owned names and text. */
-  memcpy(framebuffer,nds_picture_pixels,sizeof framebuffer);
+ /* Use the exact same ROM-embedded artwork under story, choices,
+    restart and exit-to-library confirmations. Interactive pages get a
+    25% dimming pass; otherwise a legacy plain-color panel would flash. */
+ if(nds_picture_draw(framebuffer,interactive)){
   nds_audio_pump_if_due();
  }else{
+  /* Unpatched developer ROM keeps the established canvas fallback. */
   nds_dual_canvas_draw_yield(framebuffer,interactive,dialogue_visible,
                              nds_dual_canvas_audio_tick,NULL);
  }
