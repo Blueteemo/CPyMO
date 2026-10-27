@@ -29,7 +29,21 @@ def main():
     assert exe.is_file(), "Frozen .app executable is missing"
     rom=root/"cpymo-nds.nds"
     assert rom.is_file()
-    assert digest(rom)==json.loads((root/"VERSION.json").read_text())["rom_sha256"]
+    metadata=json.loads((root/"VERSION.json").read_text())
+    assert digest(rom)==metadata["rom_sha256"]
+    bundled=app/"Contents/Frameworks/ffmpeg"
+    if not bundled.is_file():
+        bundled=app/"Contents/Resources/ffmpeg"
+    assert bundled.is_file(), "Bundled FFmpeg missing from frozen application"
+    bundled_hash=digest(bundled)
+    expected_hash=metadata.get("ffmpeg_bundled_sha256")
+    if expected_hash:
+        assert bundled_hash==expected_hash, ("Bundled FFmpeg checksum mismatch",
+                                            bundled_hash,expected_hash)
+    cfg=subprocess.run([str(bundled),"-buildconf"],check=True,
+                       capture_output=True,text=True,timeout=45)
+    assert "--disable-gpl" in cfg.stdout and "--disable-nonfree" in cfg.stdout
+    assert "--enable-nonfree" not in cfg.stdout and "--enable-gpl" not in cfg.stdout
     with tempfile.TemporaryDirectory(prefix="cpymo-macos-smoke-") as temp:
         base=Path(temp);source=base/"source";fixture(source,"s60v3")
         movie=source/"video/omitted.mp4"
@@ -55,7 +69,8 @@ def main():
         assert (Path(report["game_directory"])/"nds-cache/video").is_dir()
         print(json.dumps({"mac_frozen_worker":"PASS","default_video":"NVL1",
                           "missing_glyph_policy":"box","paired_rom":"MATCH",
-                          "source_integrity":"PASS"},ensure_ascii=False))
+                          "source_integrity":"PASS","ffmpeg_license_flags":"LGPL-compatible",
+                          "ffmpeg_bundle_sha256":bundled_hash},ensure_ascii=False))
 
 
 if __name__=="__main__":
