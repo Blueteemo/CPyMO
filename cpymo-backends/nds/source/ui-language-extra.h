@@ -1,5 +1,5 @@
 /* Additional NDS UI translations; AGPL-3.0-or-later. */
-static const char* const extra_ui[2][70]={
+static const char* const extra_ui[2][72]={
 {"正在讀取遊戲列表...",
 "遊戲資料庫",
 "選擇遊戲",
@@ -69,7 +69,9 @@ static const char* const extra_ui[2][70]={
 "R：快進 · L：切換模式",
 "上屏遊戲 / 下屏遊戲 / 增強雙屏",
 "START：快速儲存  SELECT：快速讀取",
-"SELECT：快速讀取"},
+"SELECT：快速讀取",
+"退出到遊戲庫",
+"確定退出到遊戲庫？\n未儲存的進度將遺失。"},
 {"ゲーム一覧を読み込み中...",
 "ゲームライブラリ",
 "ゲーム選択",
@@ -139,7 +141,9 @@ static const char* const extra_ui[2][70]={
 "R：スキップ · L：画面切替",
 "上画面 / 下画面 / 強化2画面",
 "START：セーブ / SELECT：ロード",
-"SELECT：クイックロード"},
+"SELECT：クイックロード",
+"ゲーム一覧へ終了",
+"ゲーム一覧へ戻りますか？\n未保存の進行は失われます。"},
 };
 static error_t jp_saved(char** out,int i){*out=malloc(96);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"スロット%dにセーブしました",i);return CPYMO_ERR_SUCC;}
 static error_t jp_failed(char** out,error_t e){const char* s=cpymo_error_message(e);*out=malloc(strlen(s)+64);if(!*out)return CPYMO_ERR_OUT_OF_MEM;sprintf(*out,"セーブ失敗: %s",s);return CPYMO_ERR_SUCC;}
