@@ -65,6 +65,27 @@ class ConverterLanguageTests(unittest.TestCase):
             hi,lo=sorted((lightness(background),lightness(foreground)),reverse=True)
             self.assertGreaterEqual((hi+0.05)/(lo+0.05),7.0)
 
+    def test_local_gui_log_refresh_and_unclipped_english_options(self):
+        app=(ROOT/'app.py').read_text(encoding='utf8')
+        self.assertIn("self._render_log()",app)
+        self.assertIn("if text!=self._log_disk_text:",app)
+        self.assertIn("displayed.startswith(self._last_log_display)",app)
+        self.assertNotIn("self.log.delete('1.0','end');self.log.insert",app)
+        self.assertIn("self.compression_box.pack(side='left',fill='x',expand=True",app)
+        self.assertIn("width=64",app)
+        self.assertIn("spacing2=4",app)
+        self.assertIn("self.log.configure(state='disabled')",app)
+        # Player-facing media pruning remains an internal safe default.
+        self.assertNotIn("ttk.Checkbutton(frame,text='精简输出",app)
+        self.assertIn("self.cache_only=tk.BooleanVar(value=True)",app)
+
+    def test_macos_app_finder_version_and_signed_bundle(self):
+        builder=(ROOT/'build_portable_macos.py').read_text(encoding='utf8')
+        self.assertIn('CFBundleShortVersionString',builder)
+        self.assertIn('CFBundleVersion',builder)
+        self.assertIn('"codesign", "--verify", "--deep", "--strict"',builder)
+        self.assertIn("app_bundle_version=metadata[\"version\"]",builder)
+
     def test_unknown_diagnostics_are_preserved(self):
         raw='Unmapped PyMO error for source investigation: /tmp/foo'
         self.assertEqual(tr(raw,'English'),raw)
