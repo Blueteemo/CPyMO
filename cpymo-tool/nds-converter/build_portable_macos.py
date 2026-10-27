@@ -84,11 +84,25 @@ def main():
                                   app / "Contents/Frameworks/cpymo-nds.nds") if p.is_file())
     if digest(internal_rom) != digest(rom):
         raise RuntimeError("Bundled ROM does not match the supplied input")
+    bundled_ffmpeg = next((p for p in (
+        app / "Contents/Resources/ffmpeg",
+        app / "Contents/Frameworks/ffmpeg",
+    ) if p.is_file()), None)
+    if bundled_ffmpeg is None:
+        raise RuntimeError("Bundled FFmpeg executable not found")
+    # PyInstaller applies an ad-hoc macOS code signature to its collected
+    # binaries; the app's actual executable can differ byte-for-byte from
+    # the source-built input. Record BOTH hashes, not a misleading single one.
+    ffmpeg_input_sha = digest(ffmpeg)
+    ffmpeg_bundle_sha = digest(bundled_ffmpeg)
     shutil.copytree(app, output / app.name, symlinks=True)
     shutil.copy2(rom, output / "cpymo-nds.nds")
     shutil.rmtree(build)
-    metadata.update(rom_sha256=digest(rom), ffmpeg_sha256=digest(ffmpeg),
-                    macos_bundle_validation="resources matched; not signed/notarized")
+    metadata.update(rom_sha256=digest(rom),
+                    ffmpeg_input_sha256=ffmpeg_input_sha,
+                    ffmpeg_bundled_sha256=ffmpeg_bundle_sha,
+                    ffmpeg_sha256=ffmpeg_input_sha,
+                    macos_bundle_validation="paired ROM and FFmpeg captured; unsigned/not notarized")
     (output / "VERSION.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf8")
     (output / "README-macOS.txt").write_text(
         "CPyMO NDS 转换助手 macOS 开发候选包（非正式发行版）\n"
