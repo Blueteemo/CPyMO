@@ -20,7 +20,7 @@ CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏
 
 ## 第一次使用
 
-1. 在电脑上完整解压 Windows 安装套件，双击“启动转换器.bat”，也可运行“转换器/Converter.exe”。
+1. 在电脑上完整解压 Windows 安装套件，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。
 2. 选择自己的 PyMO 游戏 ZIP/APK 或包含 `gameconfig.txt` 的游戏文件夹。同包有多个平台时，一般优先选择 S60v3；选择新的输出位置，开始转换。游戏视频默认转换为 NVL1；也可选择压缩音轨的 NVA1，或主动选择跳过视频。
 3. 转换完成后阅读警告与“安装必读”，将**转换结果**中的 `cpymo-nds.nds` 和 `pymo` 文件夹复制到 TF 根目录。
 4. 安全弹出 TF，装回烧录卡，在 DS/DSi 上启动 `cpymo-nds.nds`，从游戏库选择游戏。
