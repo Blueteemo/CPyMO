@@ -18,6 +18,10 @@ for path,replacement in [(core,'.'),(sdk,'/opt/devkitpro')]:
   prefix_flags.append(f'-ffile-prefix-map={spelling}={replacement}')
 record=engine/('build-records-dsi-experiment' if experiment else 'build-records')
 record.mkdir(parents=True,exist_ok=True)
+# Regenerate the self-contained ROM bitmap UI font before compiling.
+# Every released locale must draw new engine-owned menu labels even for
+# legacy converted games whose per-title cache lacks these glyphs.
+subprocess.run([sys.executable,str(engine/'tools/generate-ui-font.py')],check=True)
 release=json.loads((engine/'release.json').read_text(encoding='utf8'))
 assert (engine/'VERSION').read_text().strip()==release['version'], 'VERSION/release.json mismatch'
 (build/'release-version.h').write_text('#define CPYMO_NDS_VERSION '+json.dumps(release['version'])+'\n',encoding='ascii')
