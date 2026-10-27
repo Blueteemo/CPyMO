@@ -1,0 +1,1 @@
+2026-10-27 RC compliance rebuild: inspect LGPL-only FFmpeg macOS source build diagnostics; keep public Release blocked until validated.
