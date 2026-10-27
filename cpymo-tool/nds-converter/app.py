@@ -53,7 +53,7 @@ class App:
         self.compression_modes=['不压缩缓存（读取优先）','无损压缩语音与适合的图片（推荐）','无损压缩全部音频与适合的图片（实验）']
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='缓存压缩：').pack(side='left')
         self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,state='readonly',width=47);self.compression_box.pack(side='left')
-                ttk.Label(frame,text='安装包已包含 CPyMO '+VERSION+'；缓存压缩不会进一步降低转换后素材质量。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
+        ttk.Label(frame,text='安装包已包含 CPyMO '+VERSION+'；缓存压缩不会进一步降低转换后素材质量。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
         self.video_modes=['不转换视频（兼容旧流程）','转换视频 NVL1（推荐：兼容优先）','转换视频 NVA1（压缩音频）']
         self.video=tk.StringVar(value=self.video_modes[1])
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='游戏视频：').pack(side='left')
