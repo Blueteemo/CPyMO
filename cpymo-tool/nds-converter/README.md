@@ -25,9 +25,9 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 `nds-cache/manifest.json` 及转换结果中。GUI 默认缺字显示 □ 并记录，脚本文字不改。
 加密/打包脚本和其他游戏引擎不支持。
 
-## 1.2 集成分支：可播放视频转换（开发验收功能）
+## 1.2 游戏视频转换
 
-**已发布的 1.1.0 正式版不受影响。** 1.2.0 候选分支中，视频转换默认使用 NVL1、原样保留脚本；
+1.1.0 正式版不受影响。1.2.0 中视频转换默认使用 NVL1、原样保留脚本；
 1.2 提供 **NVL1**（22050 Hz PCM16）与 **NVA1**（NAR2
 无损压缩音频）视频转换，在 GUI 的“游戏视频”下拉框中选择（默认 NVL1，NVA1 和跳过视频可选）。默认
 12 FPS、256×192 RGB555；保留原始画面比例，居中补黑边，不随意拉伸。
@@ -38,8 +38,8 @@ CLI 用法（在正式发布前需搭配同分支 ROM）：
 
 
 ```sh
-python cpymo-tool/nds-converter/convert.py convert 原游戏目录 新输出目录 --video-mode nvl1 --cache-only --missing-glyph-policy box
-# 压缩视频音轨（更省空间，但建议先做实机性能验证）
+python cpymo-tool/nds-converter/convert.py convert 原游戏目录 新输出目录 --cache-only
+# 可选：使用压缩音轨的视频转换模式
 python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目录 --video-mode nva1 --video-fps 12
 ```
 
@@ -51,9 +51,7 @@ python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目�
 10 分钟限制。生成缓存及主机验证通过**不等于** NTR/DSi 实机视频性能、
 跳过恢复、所有原始游戏视频的兼容性已验收。
 
-新的 \`video_nvl.py\` 和本路径下的 NVL 视频转换测试不使用
-Gericom/FastVideoDSPlayer 的专有或未授权查表。FVDS 独立解码仍存在
-发布许可门槛，不能混入公共 1.2 源码或 ROM。
+1.2 对玩家公开的可播放视频格式为 NVL1／NVA1；不要将其他研究阶段的格式当成正式支持功能。
 
 
 ## 从源码运行与构建
@@ -67,7 +65,7 @@ python cpymo-tool/nds-converter/convert.py convert /path/to/game /path/to/new-ou
 python cpymo-tool/nds-converter/convert.py verify /path/to/new-output
 ```
 
-CLI 默认缺字报错且保留便于对照的原媒体/未压缩缓存；上述参数与 GUI 推荐路径一致。
+CLI 默认也将缺字替换为 □ 并记录；若开发者希望针对字体严格检查，可明确传入 `--missing-glyph-policy error`。CLI 保留便于对照的原媒体／未压缩缓存，GUI 默认启用精简与推荐压缩方案。
 缓存格式6按哈希前两位分目录，兼容引擎旧格式1～5；`--cache-layout flat` 用于对照测试。
 图像/音频去重不改脚本资源名称。保留 fonts/ 的字体文件和全部许可，不要只拷单个 Python 文件。
 版本从 cpymo-backends/nds/release.json 读取。
