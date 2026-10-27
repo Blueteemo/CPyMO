@@ -86,6 +86,12 @@ jobs:
             $ff = (Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
           }
           if (-not $ff) { throw 'Video-capable FFmpeg not found' }
+          New-Item -ItemType Directory -Force -Path "windows-ffmpeg-provenance" | Out-Null
+          & $ff -version 2>&1 | Set-Content -Encoding UTF8 "windows-ffmpeg-provenance/FFMPEG-VERSION.txt"
+          & $ff -buildconf 2>&1 | Set-Content -Encoding UTF8 "windows-ffmpeg-provenance/FFMPEG-BUILDCONF.txt"
+          $cfg = Get-Content -Raw "windows-ffmpeg-provenance/FFMPEG-BUILDCONF.txt"
+          if ($cfg.Contains("--enable-nonfree")) { throw 'Windows FFmpeg has --enable-nonfree; it is not suitable for redistribution' }
+          (Get-FileHash $ff -Algorithm SHA256).Hash | Set-Content -Encoding ascii "windows-ffmpeg-provenance/FFMPEG-SHA256.txt"
           "NDS_FFMPEG=$ff" >> $env:GITHUB_ENV
       - name: Verify final ROM before and after packaging
         shell: pwsh
@@ -105,6 +111,8 @@ jobs:
           Copy-Item windows-rc/cpymo-nds.nds "$folder/cpymo-nds.nds"
           Copy-Item cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
           Copy-Item windows-rc/VERSION.json "$folder/VERSION.json"
+          New-Item -ItemType Directory -Force -Path "$folder/FFmpeg-Provenance" | Out-Null
+          Copy-Item windows-ffmpeg-provenance/* "$folder/FFmpeg-Provenance/"
           Set-Content -Path "$folder/启动转换器.bat" -Value '@echo off' -Encoding ascii
           Add-Content -Path "$folder/启动转换器.bat" -Value 'start "" "%~dp0Converter\Converter.exe"' -Encoding ascii
           @'
