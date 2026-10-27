@@ -1,10 +1,10 @@
 <!-- Root README replacement draft, NOT yet the repository root README.
 Publish to Blueteemo/CPyMO:main only after the 1.2.0 assets and Release exist.
-Expected image path in the final ROOT README: assets/branding/pymo-long-logo.png.\nThe chosen second user-provided PyMO long logo must be committed to that path\ntogether with the README. Do not merge an image-less broken README.\nKeep upstream PR #60's source branch separate; update PR #60 description AFTER
+Expected image path in the final ROOT README: assets/branding/pymo-long-logo.webp.\nThe chosen second user-provided PyMO long logo must be committed to that path\ntogether with the README. Do not merge an image-less broken README.\nKeep upstream PR #60's source branch separate; update PR #60 description AFTER
 formal release with accurate links and accepted feature summary. -->
 
 <p align="center">
-  <img src="assets/branding/pymo-long-logo.png" alt="PyMO — Python Memories Off" width="720">
+  <img src="assets/branding/pymo-long-logo.webp" alt="PyMO — Python Memories Off" width="720">
 </p>
 
 # CPyMO for Nintendo DS
