@@ -768,9 +768,15 @@ int main(int argc,char** argv){
  /* Start Calico's lazy tick service through its public thread API before
     the launcher uses tickGetCount(); audio used to initialize it later. */
  threadSleepTicks(1);
- debug_trace=false;nds_language_boot();filter_console_output();launcher_video_init();launcher_show_splash();
+ /* Initialize the bitmap screens before accessing FAT, but do not draw the
+    localized game-library loading screen with firmware language. The saved
+    CPyMO preference is only available after the card is mounted. */
+ debug_trace=false;nds_language_boot();filter_console_output();launcher_video_init();
  if(!fatInitDefault()){launcher_failure_hint("无法访问存储卡",CPYMO_ERR_CAN_NOT_OPEN_FILE,"请关机后重新启动");launcher_video_show();while(1){nds_power_poll();swiWaitForVBlank();}}
  nds_language_load();nds_global_preferences_load();
+ /* First visible game-list transition now honors the resolved CPyMO locale,
+    including the Chinese default on English/Japanese DSi firmware. */
+ launcher_show_splash();
  const char* hint=argc>1?argv[1]:NULL;
  for(;;){
  debug_trace=false;filter_console_output();
