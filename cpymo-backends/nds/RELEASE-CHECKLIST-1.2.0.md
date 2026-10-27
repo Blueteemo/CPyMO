@@ -1,5 +1,15 @@
 # CPyMO for NDS 1.2.0 — 发行工程与最后验收
 
+## 桌面转换器正式应用图标（2026-10-27）
+
+- [x] 视觉方案：采用 10 月 25 日资料库的 **04_高清像素图标_透明外框.png**，而非 02 黑底版本。原件尺寸 1254×1254 RGBA，SHA-256 `3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62`。
+- [x] 已在本地导出并校验 1024px PNG、64px GUI PNG、16–256px Windows ICO、支持 Retina 的 macOS ICNS；交付完整 04 原件与图标包。
+- [x] Github 开发分支已加入确定性图标生成工具，Windows PyInstaller `--icon` / Tk、macOS ARM64 `--icon` / `CFBundleIconFile` 的接入及防默认图标校验；UI 回归测试已通过 [40533116706](https://github.com/Blueteemo/CPyMO/actions/runs/40533116706)。
+- [ ] **图标源 PNG 二进制尚未写入 GitHub。** 从提供的 `CPyMO_1.2_桌面转换器04号图标_完整交付包.zip` 中，将 `GitHub-ready/cpymo-tool/nds-converter/assets/converter-icon-source.png` 按原字节放入对应 repo 路径。上传后必须核对 SHA-256 与上述 digest；不拿低分辨率备选代替。
+- [ ] 重新运行两端构建并传入 `--require-desktop-icon`，复核 Windows `.exe` PE icon / 任务栏以及 macOS `.app` 的 Dock/Finder 图标、Info.plist 与源 ICNS 一致；软件逻辑和 NDS ROM 不做重测。
+- [ ] 正式公开附带用户选定的 PyMO 衍生视觉前，核对上游图案的使用/转载许可或取得必要授权。图像制作不意味着自动享有原版权。
+
+
 此清单仅用于发版操作，优先级高于早期 1.2 研究与阶段性试验文档。
 用户已完成 R4 Wood DS/NTR 和 DSpico DSi/TWL 的本地 ROM 实机验收；
 不要再要求用户重复进行已经验收过的 NDS 游戏端测试。
