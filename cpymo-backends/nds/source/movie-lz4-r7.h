@@ -1,4 +1,25 @@
 /* Experimental NVL1 RGB555/LZ4 delta video; AGPL-3.0-or-later. */
+/* An NVL1/NVA1 movie takes over the upper game LCD directly. In enhanced
+ * dual-screen mode, the physical lower LCD otherwise retains the prior
+ * dialogue because cpymo_engine_draw does not run during movie playback.
+ * Render ONLY the owner-approved illustration, without dialogue or the
+ * "continue" hint, once before the first movie frame.
+ *
+ * Do not touch VRAM A (upper movie), audio scheduling, touch mapping or the
+ * per-game mode. The normal end/skip/error cleanup requests an engine redraw
+ * that will restore the ordinary lower-screen story or menu afterward.
+ */
+static void nds_movie_prepare_lower_screen(void){
+ if(!nds_dual_active() || !launcher_sub)return;
+ if(!nds_picture_draw(framebuffer,false)){
+  /* Unpatched developer ROM: use the prior decorative fallback, without
+     synthesizing a story prompt or repeating stale dialogue. */
+  nds_dual_canvas_draw_yield(framebuffer,false,false,
+                             nds_dual_canvas_audio_tick,NULL);
+ }
+ DC_FlushRange(framebuffer,sizeof framebuffer);
+ dmaCopy(framebuffer,launcher_sub,sizeof framebuffer);
+}
 volatile unsigned movie_state[24]={0x4e564c37};
 extern bool nds_movie_audio_begin(const char*,unsigned,unsigned);
 extern void nds_movie_audio_verify(bool);
@@ -48,6 +69,9 @@ error_t __wrap_cpymo_movie_play(cpymo_engine* e,cpymo_str name){
  unsigned char *packet=valid?malloc(98304):NULL,*delta=packet?malloc(98304):NULL;
  bool started=false,failed=!packet||!delta,skipped=false;unsigned last_samples=0,audio_errors_before=movie_state[7];
  if(failed)goto done;
+ /* Movie accepted and buffers acquired: clear the previous dialogue from
+    the lower LCD exactly once, before starting frame/audio playback. */
+ nds_movie_prepare_lower_screen();
  memset(framebuffer,0,sizeof framebuffer);movie_state[1]=1;movie_state[19]=h[4];movie_state[11]=(unsigned long long)h[4]*1000/h[3];
  for(unsigned frame=0;frame<h[4];frame++){
   u64 start=tickGetCount();unsigned p[3];if(!nvl_read(f,p,12)||!p[0]||p[0]>98304||(p[1]&~3)||(!frame&&(p[1]&2))||!nvl_read(f,packet,p[0])){failed=true;break;}

@@ -305,7 +305,10 @@ static void launcher_play_panel(const char* message){
  /* The two shortcuts fit on one line in the native small bitmap font;
     leave a calm last row, used only for save/load/action feedback. */
  launcher_text(nds_ui("START：快速保存  SELECT：快速读取"),12,158,muted,245);
- if(message && *message)launcher_text(nds_ui(message),12,176,accent,245);
+ /* Keep the last help row useful without placeholder text: status overlays
+    native runtime mode metadata and resets when its toast expires. */
+ launcher_text(message&&*message?nds_ui(message):nds_runtime_mode_label(),
+               12,176,message&&*message?accent:muted,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
  if(!nds_aux_clock_suppressed)nds_clock_paint(framebuffer,196,96,RGB15(21,24,27));clock_state[6]++;
  launcher_publish(launcher_sub);
@@ -418,10 +421,13 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
- launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
+  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
- launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,160,accent,250);launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,178,muted,250);}
+ /* Preserve the original 28px game cards, touch hitboxes and 18px hint row spacing.
+    Move both hint lines 4px up; do not redesign the UI. */
+  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,156,accent,250);
+  launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,174,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}
 }

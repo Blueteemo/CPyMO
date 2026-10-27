@@ -53,7 +53,8 @@ class ConverterTests(unittest.TestCase):
             (src/'voice').mkdir();shutil.copy2(src/'bgm/tone.wav',src/'voice/line.wav')
             before=hashes(src)
             report=helper_core.run_job({'action':'convert','source':str(src),'output':str(base/'output'),
-                'result':str(base/'job/result.json'),'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
+                'result':str(base/'job/result.json'),'video_mode':'skip',
+                'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
             self.assertTrue(report['ok'],report)
             self.assertTrue(report['cache_only']);self.assertEqual(report['lossless']['audio_mode'],'voice')
             dst=Path(report['game_directory'])
@@ -63,6 +64,29 @@ class ConverterTests(unittest.TestCase):
             self.assertTrue(list((dst/'nds-cache/bgm').rglob('*.pcm')))
             self.assertFalse(list((dst/'nds-cache/bgm').rglob('*.nar')))
             convert.verify(dst)
+
+    @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'), 'FFmpeg required')
+    def test_unchecked_prune_preserves_output_original_media_even_with_lossless_compression(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);src=base/'input';fixture(src,'s60v3')
+            (src/'voice').mkdir();shutil.copy2(src/'bgm/tone.wav',src/'voice/line.wav')
+            before=hashes(src)
+            report=helper_core.run_job({
+                'action':'convert','source':str(src),'output':str(base/'output'),
+                'result':str(base/'job/result.json'),'video_mode':'skip',
+                'cache_only':False,'audio_lossless':'voice',
+                'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
+            self.assertTrue(report['ok'],report)
+            self.assertFalse(report['cache_only'],
+                'Unchecking the UI option must not be overridden by cache compression')
+            self.assertEqual(report['lossless']['audio_mode'],'voice')
+            output=Path(report['game_directory'])
+            self.assertTrue((output/'bg/scene.png').is_file())
+            self.assertTrue((output/'bgm/tone.wav').is_file())
+            self.assertTrue(list((output/'nds-cache/voice').rglob('*.nar')))
+            self.assertTrue(list((output/'nds-cache/bgm').rglob('*.pcm')))
+            self.assertEqual(before,hashes(src))
+            convert.verify(output)
 
     @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),
                          'FFmpeg required')
@@ -154,12 +178,21 @@ class ConverterTests(unittest.TestCase):
                     with zipfile.ZipFile(nested,'w') as inner:
                         for p in game.rglob('*'):
                             if p.is_file():inner.writestr('Game/'+p.relative_to(game).as_posix(),p.read_bytes())
-                    outer.writestr(platform+('.apk' if platform=='android' else '.zip'),nested.getvalue())
+                    outer.writestr(platform+'.zip',nested.getvalue())
             candidates=helper_core.discover(source,base)
             self.assertEqual([c['platform'] for c in candidates],['s60v3','s60v5','android'])
             dest=helper_core.extract_game(candidates[0],base/'selected')
             self.assertEqual(helper_core.configuration((dest/'gameconfig.txt').read_bytes())['platform'],'s60v3')
             self.assertFalse((dest/'save').exists())
+
+    def test_apk_installers_are_not_game_package_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp)
+            apk=base/'android-engine.apk'
+            with zipfile.ZipFile(apk,'w') as z:
+                z.writestr('Game/gameconfig.txt','gametitle,example\nplatform,android\n')
+            with self.assertRaisesRegex(ValueError,'ZIP'):
+                helper_core.discover(apk,base)
 
     @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),'FFmpeg required')
     def test_uppercase_packed_and_loose_symbian_masks(self):

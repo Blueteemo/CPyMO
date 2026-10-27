@@ -32,7 +32,7 @@ class NDSHelpGuideTests(unittest.TestCase):
             self.assertIn(f'nds_ui("{msg}")', panel, msg)
         self.assertNotRegex(panel, r'%u/3|[123]/3')
         self.assertNotIn("存档1", panel)
-        self.assertIn('if(message && *message)launcher_text(nds_ui(message),12,176,accent,245)', panel)
+        self.assertIn('launcher_text(message&&*message?nds_ui(message):nds_runtime_mode_label(),', panel)
         self.assertNotIn('launcher_text(nds_ui("SELECT：快速读取")', panel)
         self.assertNotIn('显示、字号、音量：X 菜单', panel)
 
@@ -51,7 +51,7 @@ class NDSHelpGuideTests(unittest.TestCase):
                 self.assertLessEqual(int(max_x), 183)
             else:
                 self.assertLessEqual(int(max_x), 245)
-        self.assertIn("if(message && *message)launcher_text(nds_ui(message)", panel)
+        self.assertIn('12,176,message&&*message?accent:muted,245)', panel)
 
     def test_translation_index_count_and_no_missing_new_keys(self):
         source = self.i18n
@@ -59,8 +59,8 @@ class NDSHelpGuideTests(unittest.TestCase):
             '#include "ui-language-extra.h"', 1
         )[0]
         pair_count = len(re.findall(r'\{"(?:[^"\\]|\\.)*","(?:[^"\\]|\\.)*"\}', section))
-        self.assertEqual(pair_count, 70)
-        self.assertIn("extra_ui[2][70]", self.extra)
+        self.assertEqual(pair_count, 72)
+        self.assertIn("extra_ui[2][72]", self.extra)
         for value in ("A / DOWN：继续", "UP：历史对话",
                       "R：快进 · L：切换模式",
                       "上屏游戏 / 下屏游戏 / 增强双屏",
@@ -69,7 +69,7 @@ class NDSHelpGuideTests(unittest.TestCase):
         cht = '{"正在讀取' + self.extra.split('{"正在讀取', 1)[1].split('{"ゲーム一覧', 1)[0]
         jap = '{"ゲーム一覧' + self.extra.split('{"ゲーム一覧', 1)[1].split("static error_t jp_saved", 1)[0]
         for localized in (cht, jap):
-            self.assertEqual(len(re.findall(r'"(?:[^"\\]|\\.)*"', localized)), 70)
+            self.assertEqual(len(re.findall(r'"(?:[^"\\]|\\.)*"', localized)), 72)
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ int nds_language_take_refresh(void){int value=refresh_pending;refresh_pending=0;
 static const struct {const char* zh;const char* en;} strings[]={
  {"正在读取游戏列表...","Reading game list..."},
  {"游戏资料库","Game library"},{"选择游戏","Select a game"},{"关于与许可","About and licenses"},
- {"A / 轻触：继续","A / Touch: Continue"},{"X：菜单 · B：返回","X: Menu / B: Back"},
+ {"A / DOWN / 轻触：继续","A / DOWN / Touch: Next"},{"X：菜单 · B：返回","X: Menu / B: Back"},
  {"B：按住隐藏文字","Hold B: Hide text"},{"R：按设置快进","R: Skip (per settings)"},
  {"L：切换显示模式","L: Cycle display mode"},{"Y：隐藏／唤回辅助屏","Y: Toggle info screen"},
  {"START：快速保存到存档1","START: Save to slot 1"},{"SELECT：快速读取存档1","SELECT: Load slot 1"},
@@ -104,7 +104,9 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"R：快进 · L：切换模式","R: Skip / L: Cycle modes"},
  {"上屏游戏 / 下屏游戏 / 增强双屏","Game top / Game bottom / Dual screen"},
  {"START：快速保存  SELECT：快速读取","START: Save / SELECT: Load"},
- {"SELECT：快速读取","SELECT: Quick load"}
+ {"SELECT：快速读取","SELECT: Quick load"},
+ {"退出到游戏库","Exit to library"},
+ {"确定退出到游戏库？\n未保存的进度将丢失。","Exit to library?\nUnsaved progress will be lost."}
 };
 #include "ui-language-extra.h"
 int nds_language_choice_get(void){return preference;}

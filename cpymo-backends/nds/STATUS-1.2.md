@@ -1,7 +1,7 @@
 # CPyMO for NDS — 1.2 全局进度与发布门槛
 
 更新时间：2026-10-23。性质：实验分支动态状态表；**不是**发行说明或完成声明。
-集成分支：`codex/nds-v1.2-integration`。稳定回退：用户 DSi 实机验收过的 R7。公开版本号目前仍是 1.1.0，不提前写 1.2.0。
+集成源自 `codex/nds-v1.2-integration`。2026-10-27 的独立验收修复分支将开发版显示提前统一为 1.2.0；公开稳定版仍为 1.1.0，R7 保持可回退。**版本字符串更新不代表正式发布。**
 
 
 ## 2026-10-23 — Final DSpico (TWL) / R4 (NTR) shared-game candidate
@@ -35,7 +35,7 @@ checklist: [VALIDATION-1.2-DUALCARD-FINAL.md](VALIDATION-1.2-DUALCARD-FINAL.md).
 
 **Important:** This is a test candidate, NOT physical validation or a
 public release. Physical two-card, GUI acceptance, public licences/
-corresponding FFmpeg source, 1.2 version bump/changelog, and
+corresponding FFmpeg source, public release/changelog approval, and
 NVA1 physical acceptance through the supplied sidecar still require release decisions.
 Stable 1.1 and R7 remain untouched.
 
@@ -70,7 +70,7 @@ headless frozen worker smoke test, not a human GUI acceptance or independent
 R4/NTR video performance test. Before public binary redistribution attach
 all appropriate FFmpeg third-party licensing/notice and corresponding-source
 materials, audit the distribution layout/launcher, finish NTR/DSi game/save
-regression and consolidated versioning. Keep public version at 1.1.0 until
+regression and consolidated versioning. Keep the public stable release at 1.1.0 until
 release gates close. Do not require the owner to keep retesting every
 small UI-only patch.
 

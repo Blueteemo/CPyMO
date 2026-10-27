@@ -6,6 +6,7 @@
 #include "cpymo_save_ui.h"
 #include "cpymo_save.h"
 #include "cpymo_localization.h"
+#include "ui-language-nds.h"
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -149,6 +150,18 @@ error_t cpymo_rmenu_restart_game(cpymo_engine *e, void *data, bool confirm)
 	return err;
 }
 
+extern void nds_request_exit_to_library(void);
+
+/* The message box exits its own UI before calling this callback.
+ * The owning main loop tears down the engine AFTER cpymo_engine_update. */
+static error_t cpymo_rmenu_exit_to_library(
+    cpymo_engine *e, void *data, bool confirmed)
+{
+    (void)e; (void)data;
+    if (confirmed) nds_request_exit_to_library();
+    return CPYMO_ERR_SUCC;
+}
+
 static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 {
 	switch (sel) {
@@ -169,7 +182,13 @@ static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 			NULL);
 		break;
 
-	case 8: cpymo_ui_exit(e); break;
+	case 8:
+        cpymo_ui_exit(e);
+        cpymo_msgbox_ui_enter(e,
+            cpymo_str_pure(nds_ui("确定退出到游戏库？\n未保存的进度将丢失。")),
+            &cpymo_rmenu_exit_to_library, NULL);
+        break;
+    case 9: cpymo_ui_exit(e); break;
 	default:
 		assert(false);
 	}
@@ -184,7 +203,7 @@ static inline float cpymo_rmenu_bg_zoom(
 	#ifdef DISABLE_IMAGE_SCALING
 	return 1.0f;
 	#else
-	const size_t menu_items = 9;
+	const size_t menu_items = 10;
 	const float menu_item_padding = 2.0f;
 	const float menu_padding = 16.0f;
 	const float menu_height =
@@ -247,7 +266,7 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 
 	err = cpymo_select_img_configuare_begin(
 		&rmenu->menu,
-		9,
+		10,
 		cpymo_str_pure(""),
 		&e->assetloader,
 		&e->gameconfig);
@@ -287,7 +306,8 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 	RMENU_ITEM(5, l->rmenu_backlog, true);
 	RMENU_ITEM(6, l->rmenu_config, true)
 	RMENU_ITEM(7, l->rmenu_restart, true);
-	RMENU_ITEM(8, l->rmenu_back_to_game, true);
+	RMENU_ITEM(8, nds_ui("退出到游戏库"), true);
+	RMENU_ITEM(9, l->rmenu_back_to_game, true);
 
 	float xywh[4] = {
 		((float)e->gameconfig.imagesize_w - (float)rmenu->bg_w) / 2,

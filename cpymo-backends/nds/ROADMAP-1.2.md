@@ -1,6 +1,6 @@
 # CPyMO for NDS / DSi 1.2 — experimental video milestone
 
-**Status: research only.** Base: hardware-accepted R7 branch `codex/nds-dsi-asset-cache-r7`, commit `98ac08432cbff35708570fe1f311c37010bf4992`. Existing `VERSION` and `release.json` still identify 1.1.0; no new tag, Release, or version bump has been authorized. R7 can be evaluated for a 1.1.1 maintenance release separately, but 1.2 development must not change its verified fallback.
+**Status: research only.** Base: hardware-accepted R7 branch `codex/nds-dsi-asset-cache-r7`, commit `98ac08432cbff35708570fe1f311c37010bf4992`. The isolated 2026-10-27 DSpico acceptance branch now identifies its **unreleased candidate** as 1.2.0 in both `VERSION` and `release.json`. No public tag or GitHub Release is implied; the original 1.1.0 remains the stable fallback. R7 can be evaluated for a 1.1.1 maintenance release separately, but 1.2 development must not change its verified fallback.
 
 ## Grounded video results (private 2026-10-21 user handoff)
 

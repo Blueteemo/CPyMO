@@ -42,12 +42,13 @@ static cpymo_engine engine;
 static bool nds_playing=true,error_ui_active=false,nds_aux_override=false;
 static bool nds_touch_blocked=false,screens_swapped=false,menu_enabled=false,aux_hidden=false;
 static volatile unsigned presentation_state[9];
-static int keys=0,remap=0,refresh=0,redraw=0,ignored=0;
+static int keys=0,remap=0,refresh=0,redraw=0,ignored=0,vblanks=0;
 #define KEY_TOUCH 1
 #define KEY_A 2
 static int keysHeld(void){return keys;}
 static void lcdMainOnTop(void){remap=0;}
 static void lcdSwap(void){remap=!remap;}
+static void swiWaitForVBlank(void){vblanks++;}
 static void nds_aux_refresh(void){refresh++;}
 static bool nds_aux_hidden(void){return aux_hidden;}
 static bool cpymo_ui_enabled(const cpymo_engine *e){(void)e;return menu_enabled;}
@@ -58,6 +59,7 @@ static void cpymo_input_ignore_next_mouse_button_event(cpymo_engine *e){
 }
 static float display_scale(void){return .8f;}
 static float display_y(void){return 0.f;}
+#include "save-dir-nds.h"
 #include "dual-screen-nds.h"
 
 static void verify_not_saved(const char *dir){
@@ -103,7 +105,12 @@ int main(int argc,char**argv){
  /* Releasing stylus lets the real input poll clear touch_blocked. */
  keys=0;nds_touch_blocked=false;
  nds_display_cycle();
- assert(nds_display_mode==2 && nds_dual_mode && !screens_swapped && remap==0);
+ /* The LCD remains mapped to classic-lower until both new framebuffers
+    have been published, then commits the switch at VBlank. */
+ assert(nds_display_mode==2 && nds_dual_mode && screens_swapped && remap==1);
+ assert(nds_display_swap_pending && vblanks==0);
+ nds_display_commit_pending_swap();
+ assert(!screens_swapped && remap==0 && !nds_display_swap_pending && vblanks==1);
  assert(refresh==2 && redraw==2);
  fake_ticks=1200;nds_dual_poll_mode();
  verify_not_saved(argv[1]); /* new deadline is 1250 ticks */
@@ -161,6 +168,7 @@ int main(int argc,char**argv){
  engine.input.mouse_position_useable=true;
  nds_display_cycle();
  assert(nds_display_mode==2 && engine.input.ok);
+ assert(nds_display_swap_pending && remap==1);
  assert(!engine.input.mouse_button && !engine.input.mouse_position_useable);
  keys=0;
  /* Exit must persist even before the 750ms threshold; never lose last
@@ -183,7 +191,7 @@ class NDSDisplayMachineTests(unittest.TestCase):
  def test_live_header_mode_cycle_stylus_and_saved_state(self):
   with tempfile.TemporaryDirectory() as td:
    base=Path(td)
-   game=base/"game";(game/"save").mkdir(parents=True)
+   game=base/"game";game.mkdir(parents=True)
    src=base/"mode.c";src.write_text(C_PROGRAM,encoding="utf-8")
    exe=base/"mode"
    result=subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",

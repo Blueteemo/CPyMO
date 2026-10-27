@@ -40,6 +40,10 @@ static int pump_eof(void* user){PumpIO* io=user;return io->cb->eof(io->user);}
 stbi_uc* __wrap_stbi_load_from_callbacks(const stbi_io_callbacks* cb,void* user,int* w,int* h,int* channels,int requested){PumpIO io={cb,user,tickGetCount()};stbi_io_callbacks pump={pump_read,pump_skip,pump_eof};return __real_stbi_load_from_callbacks(&pump,&io,w,h,channels,requested);}
 
 static cpymo_engine engine;
+/* UI requests only set this latch; the main game loop owns cleanup. */
+static bool nds_library_exit_requested;
+void nds_request_exit_to_library(void){nds_library_exit_requested=true;}
+
 static u16 framebuffer[256*192] __attribute__((aligned(32)));
 static u16 *vram;
 /* Cache the exact immutable base-layer command sequence, never dialogue/UI/effects. */
@@ -51,6 +55,7 @@ volatile unsigned scene_state[8]={0x53435238};
 void nds_scene_release(void){scene_valid=false;if(scene_pixels){free(scene_pixels);scene_pixels=NULL;scene_state[4]++;}}
 
 static bool screens_swapped;
+#include "save-dir-nds.h"
 #include "preferences-nds.h"
 /* magic, swapped, toast active/shown/expired/age ms, icon loaded, metadata lines, touch samples */
 volatile unsigned presentation_state[9]={0x4e505232};
@@ -532,7 +537,7 @@ cpymo_input cpymo_input_snapshot(){
  in.mouse_y=touch_sample.y;
  return in;
 }
-static FILE* savefile(const char* dir,const char* name,const char* mode){char path[512];snprintf(path,sizeof path,"%s/save/%s",dir,name);return fopen(path,mode);}
+static FILE* savefile(const char* dir,const char* name,const char* mode){return nds_save_fopen(dir,name,mode);}
 FILE* cpymo_backend_read_save(const char* dir,const char* name){return savefile(dir,name,"rb");}
 FILE* cpymo_backend_write_save(const char* dir,const char* name){return savefile(dir,name,"wb");}
 /* Movie wrapper is implemented after the power and framebuffer helpers. */
@@ -578,6 +583,7 @@ static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3]
 #include "aux-screen-nds.h"
 #include "visual-capture-nds.h"
 #include "dual-canvas-nds.h"
+#include "nds-picture-bg.h"
 /* Refined lower-LCD presentation for the 1.2 enhanced screen.
  * Native RGB555 decoration sits BEHIND the game's own speaker/name/text.
  * Do not stretch a captured upper screen or allocate a second framebuffer.
@@ -592,10 +598,18 @@ static void nds_dual_lower_background(bool ui,bool choices){
            !engine.input.hide_window && !engine.say.hide_window;
  /* Same RGB555 canvas function is compiled and pixel-tested on desktop;
     CPyMO's REAL namebox, textbox, text and menu render over it afterward. */
- nds_dual_canvas_draw_yield(framebuffer,interactive,dialogue_visible,
-                            nds_dual_canvas_audio_tick,NULL);
+ /* Use the exact same ROM-embedded artwork under story, choices,
+    restart and exit-to-library confirmations. Interactive pages get a
+    25% dimming pass; otherwise a legacy plain-color panel would flash. */
+ if(nds_picture_draw(framebuffer,interactive)){
+  nds_audio_pump_if_due();
+ }else{
+  /* Unpatched developer ROM keeps the established canvas fallback. */
+  nds_dual_canvas_draw_yield(framebuffer,interactive,dialogue_visible,
+                             nds_dual_canvas_audio_tick,NULL);
+ }
  if(!interactive && dialogue_visible)
-  launcher_text(nds_ui("A / 轻触：继续"),14,169,RGB15(19,25,28),248);
+  launcher_text(nds_ui("A / DOWN / 轻触：继续"),14,169,RGB15(19,25,28),248);
 }
 static PmEventCookie sleep_cookie;
 static u64 sleep_started;
@@ -754,9 +768,15 @@ int main(int argc,char** argv){
  /* Start Calico's lazy tick service through its public thread API before
     the launcher uses tickGetCount(); audio used to initialize it later. */
  threadSleepTicks(1);
- debug_trace=false;nds_language_boot();filter_console_output();launcher_video_init();launcher_show_splash();
+ /* Initialize the bitmap screens before accessing FAT, but do not draw the
+    localized game-library loading screen with firmware language. The saved
+    CPyMO preference is only available after the card is mounted. */
+ debug_trace=false;nds_language_boot();filter_console_output();launcher_video_init();
  if(!fatInitDefault()){launcher_failure_hint("无法访问存储卡",CPYMO_ERR_CAN_NOT_OPEN_FILE,"请关机后重新启动");launcher_video_show();while(1){nds_power_poll();swiWaitForVBlank();}}
  nds_language_load();nds_global_preferences_load();
+ /* First visible game-list transition now honors the resolved CPyMO locale,
+    including the Chinese default on English/Japanese DSi firmware. */
+ launcher_show_splash();
  const char* hint=argc>1?argv[1]:NULL;
  for(;;){
  debug_trace=false;filter_console_output();
@@ -773,6 +793,7 @@ int main(int argc,char** argv){
  memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
+ nds_library_exit_requested=false;
  nds_dual_load(game_dir);
  nds_capture_init(game_dir);
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
@@ -823,6 +844,14 @@ int main(int argc,char** argv){
  engine_state[33+(interval_us<=20000?0:interval_us<=34000?1:interval_us<=50000?2:interval_us<=100000?3:4)]++;
  u64 update_start=tickGetCount();loaded_image=false;
  err=cpymo_engine_update(&engine,dt,&redraw);
+ if(nds_library_exit_requested){
+  /* The confirmation callback has already exited its UI. Leave the
+     engine alive until the common teardown below; do not restart ROM. */
+  trace=trace_open("ab");
+  if(trace){fputs("EXIT_TO_LIBRARY\n",trace);fclose(trace);}
+  engine_state[1]=0;
+  break;
+ }
  if(!err){
   enforce_text_readability();
   /* Only narrative dialogue ends the opening/title screen. No script-name
@@ -911,6 +940,10 @@ int main(int argc,char** argv){
    nds_dual_bottom_pass=false;
    nds_dual_state[6]++;
   }
+  /* Commit a pending physical LCD role swap only AFTER both target VRAM
+     surfaces have been published. This avoids exposing the previous
+     auxiliary panel as a one-frame lower-screen ghost in mode 1 -> 2. */
+  nds_display_commit_pending_swap();
   if(engine.bg.transform_draw){engine_state[38]++;float p=cpymo_tween_value(&engine.bg.transform_progression);if(p>0&&p<1)engine_state[39]|=1u<<(unsigned)(p*31);}
   unsigned draw_us=(tickGetCount()-draw_start)*1000000/TICK_FREQ;if(draw_us>engine_state[30])engine_state[30]=draw_us;if(draw_us>50000){unsigned seq=draw_trace[1]++,j=4+(seq%64)*8;draw_trace[j]=seq;draw_trace[j+1]=draw_us;draw_trace[j+2]=perf_state[5]-image_before;draw_trace[j+3]=text_us-text_before;draw_trace[j+4]=fill_us-fill_before;draw_trace[j+5]=engine_state[14];draw_trace[j+6]=engine_state[2];draw_trace[j+7]=mask_state[3];}}
  nds_audio_update();

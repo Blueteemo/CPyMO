@@ -1,7 +1,8 @@
 """CPyMO NDS cache converter, MIT. Python 3.10+, Pillow, external FFmpeg.
 
 Scripts/config and retained resources remain byte-identical in a new directory.
-Video files are omitted from NDS copies, with source hashes retained in the manifest.
+Normal CLI conversion defaults to playable NVL1 movie caches; users can opt out.
+Original source video bytes stay untouched and hashes remain in the manifest.
 No game names, chapters, translated text, or machine-specific paths are assumed.
 """
 from __future__ import annotations
@@ -46,7 +47,7 @@ UI_CODEPOINTS = (
 # All three mode names are engine UI, not game script dialogue. Always embed
 # them in newly converted games even when their novels never use these glyphs.
 # The ROM fallback font independently covers already-converted game caches.
-UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)增强双屏增強雙強化画面操控モむ'))))
+UI_CODEPOINTS = tuple(sorted(set(UI_CODEPOINTS) | set(map(ord, '立绘特效(全局)增强双屏增強雙強化画面操控モむ退出到游戏库确定未保存的进度将丢失。遊戲庫確定未儲存的進度將遺失。ゲーム一覧へ終了戻りますか進行は失われます'))))
 
 def sha(path):
     h = hashlib.sha256()
@@ -175,7 +176,7 @@ def verify(destination):
     print(f'VERIFIED {len(manifest["original_files"])} original files and {len(manifest["cache_files"])} cache files')
 
 def inspect_source(src):
-    if not (src/'gameconfig.txt').is_file(): raise ValueError('Choose the extracted GAME folder containing gameconfig.txt, not the platform bundle or APK')
+    if not (src/'gameconfig.txt').is_file(): raise ValueError('Choose the extracted GAME folder containing gameconfig.txt, not the platform bundle or Android installer')
     config={}
     for line in (src/'gameconfig.txt').read_text(encoding='utf-8-sig').splitlines():
         k,sep,v=line.partition(',')
@@ -458,12 +459,12 @@ def convert(args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     sub=parser.add_subparsers(dest='command',required=True)
-    c=sub.add_parser('convert');c.add_argument('source',type=Path);c.add_argument('destination',type=Path);c.add_argument('--ffmpeg',default='ffmpeg');c.add_argument('--font');c.add_argument('--jobs',type=int,choices=range(1,9),default=4);c.add_argument('--cache-only',action='store_true',help='Omit redundant source media, retain scripts/config/credits and verify caches');c.add_argument('--missing-glyph-policy',choices=('error','box'),default='error',help='Explicit box fallback for source characters absent from pixel fonts; scripts unchanged')
+    c=sub.add_parser('convert');c.add_argument('source',type=Path);c.add_argument('destination',type=Path);c.add_argument('--ffmpeg',default='ffmpeg');c.add_argument('--font');c.add_argument('--jobs',type=int,choices=range(1,9),default=4);c.add_argument('--cache-only',action='store_true',help='Omit redundant source media, retain scripts/config/credits and verify caches');c.add_argument('--missing-glyph-policy',choices=('error','box'),default='box',help='Default box fallback with warning for missing pixel-font characters; original scripts unchanged')
     c.add_argument('--audio-lossless',choices=('off','voice','all'),default='off');c.add_argument('--compress-images',action='store_true',help='Lossless NPA4 or row-span NPS1 selected per image; keep raw when not worthwhile')
     c.add_argument('--cache-layout',choices=('flat','sharded'),default='sharded',help='Two-hex directory fanout avoids large flat FAT directories; requires r15 engine')
     c.add_argument('--experimental-sparse',action='store_true',help='Private NPS2: smaller transparent images; may increase scene-change stalls')
     c.add_argument('--video-fvds',action='store_true',help='Research-only: validate and copy pre-encoded video/*.fv into hashed NDS cache; NOT playback')
-    c.add_argument('--video-mode',choices=('skip','nvl1','nva1'),default='skip',help='Source video conversion: omit (legacy) or playable NVL1 PCM / NVA1 NAR2')
+    c.add_argument('--video-mode',choices=('skip','nvl1','nva1'),default='nvl1',help='Source video conversion: default NVL1 PCM, optionally NVA1 NAR2 or skip (legacy)')
     c.add_argument('--video-fps',type=int,choices=(6,8,12,15,20,24),default=12,help='Output video FPS, default 12 for NDS')
     v=sub.add_parser('verify');v.add_argument('destination',type=Path)
     i=sub.add_parser('inspect');i.add_argument('source',type=Path)
