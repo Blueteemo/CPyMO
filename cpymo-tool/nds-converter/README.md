@@ -57,7 +57,7 @@ python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目�
 ## 从源码运行与构建
 
 Python 3.10+，安装 requirements.txt，另备 FFmpeg；完整仓库内运行 `python app.py`。
-Windows 提供免安装包，macOS/Linux 可运行源码 CLI；macOS 原生 .app 正在单独验证，在实际通过打包与启动检查前不作为正式下载项。
+Windows 提供免安装包，macOS/Linux 可运行源码 CLI。macOS 原生 `.app` 已在 Intel Mac CI 完成打包及冻结工作进程的原创视频转换测试；实际 Finder GUI 启动、Apple Silicon、签名／公证与正式发行许可仍待确认，因此暂不作为正式下载项。
 
 ```sh
 python -m pip install -r cpymo-tool/nds-converter/requirements.txt
@@ -81,6 +81,20 @@ python build_portable.py --ffmpeg /path/to/ffmpeg.exe --output /path/to/new-port
 打包脚本嵌入并检查同一 ROM 与版本元数据。发布时还需附玩家必读、第三方许可和完整对应源码。
 FFmpeg 独立进程运行，不链接进 MIT 转换器；tools/ 提供音频专用构建脚本。
 发行页 Sources.zip 包含相应 FFmpeg 官方源码、构建配置及工具链许可。
+
+
+macOS 开发候选构建（须在 Mac 上运行，且显式传入与目标发行版本匹配的 ROM）：
+
+```sh
+python cpymo-tool/nds-converter/build_portable_macos.py \
+  --rom /path/to/cpymo-nds.nds --ffmpeg /path/to/ffmpeg \
+  --output /path/to/new-macos-package
+```
+
+已通过 [原生 macOS CI](https://github.com/Blueteemo/CPyMO/actions/runs/40484402394)：
+使用打包后的 `.app` 工作进程转换原创 MP4 为 NVL1 并校验配套 ROM 的 SHA。
+该 CI 的 ROM 是**内部构建测试输入**，不是用户最终验收并内置星夜素材的发行 ROM，
+不能直接拿该构建的研究包替代正式版；仍需完整许可证、最终 ROM 配套及发行门槛。
 
 回归：`python -m unittest discover -s cpymo-tool/nds-converter/tests -v`，可用 NDS_TEST_FFMPEG 指定程序。
 app.py 的 `--self-test JSON` 通过真实 GUI 与工作进程完成转换，未指定压缩字段时使用实际界面默认值。
