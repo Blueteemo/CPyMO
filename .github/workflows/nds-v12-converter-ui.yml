@@ -46,7 +46,7 @@ jobs:
           import sys
           sys.path.insert(0,'cpymo-tool/nds-converter')
           from ui_i18n import tr
-          assert tr('选压缩包','English') == 'Open ZIP / APK'
+          assert tr('选压缩包','English') == 'Open ZIP'
           assert tr('游戏视频：','English') == 'Game videos:'
           assert tr('转换视频 NVL1（推荐：兼容优先）','English') == 'Convert to NVL1 (recommended)'
           print('English strings and default conversion labels: OK')
