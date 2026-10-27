@@ -17,13 +17,13 @@ CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏
 | 查看、修改或构建程序 | **`CPyMO-for-NDS-1.2.0-Sources.zip`**（发布时填入链接）。提供 CPyMO 与转换器的对应源码及子模块；随 FFmpeg 二进制交付时，另须提供与该二进制准确对应的 FFmpeg 源码、构建信息及许可证。 |
 | 核对下载文件是否完整 | **`CPyMO-for-NDS-1.2.0-SHA256SUMS.txt`**（发布时填入链接）。 |
 
-**安装套件不附具体游戏。** Windows 与符合条件的 Apple Silicon Mac 安装包都内置转换所需的运行组件，无须普通玩家另装 Python 或 FFmpeg。S60v3 / S60v5 / Android 指输入游戏的数据平台，而非转换助手运行的电脑系统。macOS ARM64 附件仅在本机验收通过后公开；Intel Mac、Linux 可按要求使用源码工具。转换助手默认简体中文，可切换 English。
+**安装套件不附具体游戏。** Windows 套件包含转换所需运行组件；Apple Silicon Mac ARM64 套件需通过本机验收后才会作为正式下载提供。二者均设计为无须普通玩家另装 Python 或 FFmpeg。S60v3 / S60v5 / Android 指输入游戏的数据平台，而非转换助手运行的电脑系统。Intel Mac、Linux 可按要求运行源码工具。转换助手默认简体中文，可切换 English。
 
 ## 第一次使用
 
-1. 在电脑上完整解压 Windows 安装套件，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。
-2. 选择自己的 PyMO 游戏 ZIP/APK 或包含 `gameconfig.txt` 的游戏文件夹。同包有多个平台时，一般优先选择 S60v3；选择新的输出位置，开始转换。游戏视频默认转换为 NVL1；也可选择压缩音轨的 NVA1，或主动选择跳过视频。
-3. 转换完成后阅读警告与“安装必读”，将**转换结果**中的 `cpymo-nds.nds` 和 `pymo` 文件夹复制到 TF 根目录。
+1. **Windows：** 完整解压 Windows 套件，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。**Apple Silicon Mac：** 如正式发行时提供 ARM64 套件，完整解压并从 Finder 打开 `CPyMO-NDS-Converter.app`；首次启动若出现 macOS 安全提示，应遵循系统对该应用的正式安全审查流程，不要关闭 Gatekeeper 或系统完整性保护。
+2. 在电脑转换助手中选择自己的 PyMO 游戏 ZIP/APK 或包含 `gameconfig.txt` 的游戏文件夹。同包有多个平台时，一般优先选择 S60v3；选择新的输出位置，开始转换。助手可切换简体中文／English；游戏视频默认转换为 NVL1，也可选压缩音轨的 NVA1 或主动跳过视频。
+3. 转换完成后阅读警告与输出目录的“安装必读”（英文界面还会生成 `INSTALL-READ-ME.txt`），将**转换结果**中的 `cpymo-nds.nds` 和 `pymo` 文件夹复制到 TF 根目录。
 4. 安全弹出 TF，装回烧录卡，在 DS/DSi 上启动 `cpymo-nds.nds`，从游戏库选择游戏。
 
 TF 卡上的游戏目录应为：
