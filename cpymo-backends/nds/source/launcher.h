@@ -421,15 +421,13 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
- /* A 26px row fully contains its 24px icon and 16px title;
-     the slightly larger inter-row gap leaves room for the 2-line footer. */
-  launcher_rect(6,y,244,26,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
+  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
- /* Leave the final 16-pixel bitmap-text row completely inside the
-     192-pixel LCD. Keep two-line hints without crowding the game cards. */
-  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,155,accent,250);
-  launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,173,muted,250);}
+ /* Preserve the original 28px game cards, touch hitboxes and 18px hint row spacing.
+    Move both hint lines 4px up; do not redesign the UI. */
+  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,156,accent,250);
+  launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,174,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}
 }
@@ -459,7 +457,7 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  if(down&KEY_LEFT){launcher_selected=launcher_selected>=4?launcher_selected-4:0;redraw=true;}if(down&KEY_RIGHT){launcher_selected+=4;if(launcher_selected>=launcher_count)launcher_selected=launcher_count-1;redraw=true;}
  if(down&KEY_TOUCH){touchPosition t;touchRead(&t);
   if(launcher_scrollbar_begin_touch(t.px,t.py)){redraw=true;}
-  else if(t.px>=6&&t.px<(launcher_count>4?LAUNCHER_SCROLL_TOUCH_X:250)&&t.py>=33&&t.py<154){
+  else if(t.px>=6&&t.px<(launcher_count>4?LAUNCHER_SCROLL_TOUCH_X:250)&&t.py>=33&&t.py<157){
    unsigned index=launcher_scroll_first+(t.py-33)/31;
    if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}
   }
