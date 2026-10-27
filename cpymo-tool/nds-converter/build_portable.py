@@ -70,14 +70,6 @@ def main():
         parser.error("Missing approved converter artwork: "+str(source_icon))
     paired_rom = resources/'cpymo-nds.nds'
     shutil.copy2(rom, paired_rom)
-    # Use the approved 04 PNG as the Windows executable icon when the master
-    # is present. Keep CI's old source-only smoke runnable until the binary
-    # asset is committed; final release MUST include this file.
-    icon_master = ROOT / 'assets/converter-icon.png'
-    icon_file = None
-    if icon_master.is_file():
-        from tools.prepare_desktop_icon import generate
-        icon_file = Path(generate(icon_master, build / 'icons', 'windows')['icon'])
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
                '--onedir', '--windowed', '--name', 'Converter',
                '--distpath', str(output/'app'), '--workpath', str(build),
@@ -88,8 +80,6 @@ def main():
                '--exclude-module', 'matplotlib', '--exclude-module', 'pytest',
                str(ROOT/'app.py')]
     command[-1:-1]=icon_args
-    if icon_file is not None:
-        command[-1:-1]=['--icon', str(icon_file)]
     if (ROOT/'lossless-native.dll').is_file():
         command[-1:-1]=['--add-binary',f'{ROOT / "lossless-native.dll"};.']
     with (output/'helper-build.log').open('w', encoding='utf8') as log:
@@ -98,8 +88,8 @@ def main():
     digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
     assert digest(rom) == digest(output/'app/Converter/_internal/cpymo-nds.nds')
     release.update(rom_sha256=digest(rom), ffmpeg_sha256=digest(ffmpeg),
-                   desktop_icon_source_sha256=digest(icon_master) if icon_file is not None else None,
-                   desktop_icon_included=icon_file is not None)
+                   desktop_icon="approved-PyMO-04" if icon_args else "default-not-public",
+                   desktop_icon_source_sha256=digest(source_icon) if icon_args else None)
     (output/'VERSION.json').write_text(json.dumps(release, indent=2)+'\n', encoding='utf8')
     (output/'BUILD-COMMAND.json').write_text(json.dumps(command, indent=2), encoding='utf8')
     print(json.dumps(release, indent=2))
