@@ -127,7 +127,6 @@ def run_job(job):
                 if not isinstance(cache_only,bool):raise ValueError('精简资源选项必须为 true 或 false。')
                 audio_mode=job.get('audio_lossless','voice')
                 if audio_mode not in ('off','voice','all'):raise ValueError('无损压缩模式无效。')
-                cache_only=cache_only or audio_mode!='off'
                 video_mode=job.get('video_mode','nvl1')
                 if video_mode not in ('skip','nvl1','nva1'):raise ValueError('视频转换模式无效。')
                 convert.convert(argparse.Namespace(source=game_source,destination=destination,ffmpeg=str(ffmpeg),font=None,jobs=4,missing_glyph_policy=job.get('missing_policy','box'),cache_only=cache_only,audio_lossless=audio_mode,compress_images=audio_mode!='off',video_mode=video_mode,video_fps=12))
