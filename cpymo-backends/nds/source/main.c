@@ -609,7 +609,7 @@ static void nds_dual_lower_background(bool ui,bool choices){
                              nds_dual_canvas_audio_tick,NULL);
  }
  if(!interactive && dialogue_visible)
-  launcher_text(nds_ui("A / 轻触：继续"),14,169,RGB15(19,25,28),248);
+  launcher_text(nds_ui("A / DOWN / 轻触：继续"),14,169,RGB15(19,25,28),248);
 }
 static PmEventCookie sleep_cookie;
 static u64 sleep_started;
