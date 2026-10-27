@@ -143,8 +143,20 @@ jobs:
 
   macos-rc:
     needs: [final-rom,converter-regression]
-    runs-on: macos-15-intel
-    timeout-minutes: 55
+    # Native arm64 avoids dependence on Rosetta, which ordinary applications
+    # cannot use after macOS 27. Preserve a separate Intel native build.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    env:
+      CPYMO_MAC_ARCH: ${{ matrix.arch }}
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -156,6 +168,7 @@ jobs:
           path: .release-rom
       - name: Build and verify LGPL-only FFmpeg from corresponding FFmpeg source
         run: |
+          test "$(uname -m)" = "$CPYMO_MAC_ARCH" || { echo "Host is not native $CPYMO_MAC_ARCH"; exit 1; }
           python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
           bash cpymo-tool/nds-converter/tools/build_ffmpeg_macos_lgpl.sh macos-ffmpeg-lgpl
           python - <<'PY'
@@ -171,24 +184,24 @@ jobs:
       - name: Build paired macOS .app using the exact VERIFIED ROM
         run: |
           python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds
-          python cpymo-tool/nds-converter/build_portable_macos.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$NDS_FFMPEG" --output macos-rc
-          python cpymo-tool/nds-converter/tests/smoke_macos_portable.py --portable macos-rc --ffmpeg "$NDS_FFMPEG"
-      - name: Package unsigned macOS RC for the user's DeepSeek Finder test
+          python cpymo-tool/nds-converter/build_portable_macos.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH" --output macos-rc
+          python cpymo-tool/nds-converter/tests/smoke_macos_portable.py --portable macos-rc --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH"
+      - name: Package native macOS ${{ matrix.arch }} RC for local Finder test
         run: |
-          mkdir -p out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC
-          ditto macos-rc/CPyMO-NDS-Converter.app out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/CPyMO-NDS-Converter.app
-          cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/
-          cp cpymo-tool/nds-converter/README.md out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/转换器说明.md
-          mkdir -p out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/FFmpeg-Corresponding-Source
-          cp -R macos-ffmpeg-lgpl/source/. out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/FFmpeg-Corresponding-Source/
+          folder="out/CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC"
+          mkdir -p "$folder/FFmpeg-Corresponding-Source"
+          ditto macos-rc/CPyMO-NDS-Converter.app "$folder/CPyMO-NDS-Converter.app"
+          cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt "$folder/"
+          cp cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
+          cp -R macos-ffmpeg-lgpl/source/. "$folder/FFmpeg-Corresponding-Source/"
           cd out
-          ditto -c -k --sequesterRsrc --keepParent CPyMO-for-NDS-1.2.0-Starter-macOS-RC ../CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
+          ditto -c -k --sequesterRsrc --keepParent "CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC" "../CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
           cd ..
-          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter "CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2-macOS-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
-          path: CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
+          name: CPyMO-1.2-macOS-${{ matrix.arch }}-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
+          path: CPyMO-for-NDS-1.2.0-Starter-macOS-${{ matrix.arch }}-RC.zip
           retention-days: 21
           if-no-files-found: error
 
