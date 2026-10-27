@@ -14,7 +14,7 @@
 - [x] Github 开发分支已加入确定性图标生成工具，Windows PyInstaller `--icon` / Tk、macOS ARM64 `--icon` / `CFBundleIconFile` 的接入及防默认图标校验；UI 回归测试已通过 [40533116706](https://github.com/Blueteemo/CPyMO/actions/runs/40533116706)。
 - [x] 04 原始 PNG 已按原字节入库：`cpymo-tool/nds-converter/assets/converter-icon-source.png`（1,538,865 字节），SHA-256 `3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62`；CI 严格核验固定来源。
 - [x] [paired CI #40536655608，attempt 2](https://github.com/Blueteemo/CPyMO/actions/runs/40536655608/attempts/2) **5/5 作业成功**：两端打包都强制 `--require-desktop-icon`。macOS 在 `.app` 内逐字节校验 `.icns`、写入 `CFBundleIconFile` 并在签名后复核；Windows 使用 PyInstaller `--icon`，但 Windows 外壳/任务栏的真人视觉检查尚未单独进行。
-- [ ] 正式公开附带用户选定的 PyMO 衍生视觉前，核对上游图案的使用/转载许可或取得必要授权。图像制作不意味着自动享有原版权。
+- [x] 已追溯高清图标的 PyMO 原始母题至 [pymo/pymo/images/pymo-icon.png](https://github.com/pymo/pymo/blob/master/images/pymo-icon.png)，查到该上游仓库 MIT LICENSE（Copyright (c) 2013 pymo），并在源码与两端打包流程内加入原许可证及“衍生/AI辅助图标”明确来源署名。未宣称独立原创原角色、亦未宣称上游背书。
 
 
 此清单仅用于发版操作，优先级高于早期 1.2 研究与阶段性试验文档。
@@ -29,7 +29,7 @@
 - [x] 已在本轮发版会话向用户提供**经过核验的 macOS LGPL RC ZIP**（SHA-256 `d99ca80e64ecdb098cb4e116f4eea7625109dbb9869c597e70dd6f4176168546`）及可直接交给 DeepSeek 的独立中文验收提示词；明确要求验证 Finder、ZIP/APK/目录、默认 NVL1/NVA1、缺字、源文件与存档保护、Apple Silicon/Rosetta，并禁止关闭 SIP 或 Gatekeeper。
 - [x] 本机 DeepSeek 的 macOS ARM64 7/7 GUI 修复复验报告已经收到并审核（run `40513187447`）；现有最终图标 RC 已通过 macOS CI，图标的 Finder/Dock 外观仍需最后视觉观察，不必重复 NDS 实机验收。
 - [ ] Windows/macOS 包、源码及许可证梳理、FFmpeg 构建信息、SHA256SUMS 与更新日志互相一致。Mac 未纳入公开资产前，不把它写成已发布。
-- [ ] Release 正文与 `nds-v1.0.0`、`nds-v1.1.0` 格式一致，明确 1.2 相对 1.1 的新增 DSi/TWL、缓存、跨存储卡游戏库、滚动列表、增强双屏、视频转换与游戏菜单；正式玩家介绍不提研究中的 FVDS，Android 用英文拼写，不增加多余的两 ROM 解释。
+- [x] Release 正文草稿已按 1.0/1.1 风格编写：准确描述 DSi/TWL、缓存、跨设备资料库、滚动与触控、三态双屏、NVL1/NVA1 视频、菜单存档，并明确输入支持 Android 游戏数据；排除研究中的 FVDS，补充桌面图标出处与 Mac 未公证说明。**附件下载 URL、最终 SHA256/文件大小仍待最后冻结后填入**。
 - [ ] 正式 1.2.0 Release 发出以后，再将此 Fork 根目录 README 替换为以 NDS 为主的全新 README，并最后更新原上游 PR #60 的描述、以已经存在的正式 Release 链接为准。
 
 ## M2 Pro 本机 DeepSeek GUI 验收结果（2026-10-27）
