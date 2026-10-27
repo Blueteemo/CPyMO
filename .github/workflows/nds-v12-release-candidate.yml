@@ -137,12 +137,19 @@ jobs:
         with:
           name: CPyMO-1.2-UNIVERSAL-VERIFIED-ROM-RC
           path: .release-rom
-      - name: Install FFmpeg and pinned macOS GUI build tools
+      - name: Build and verify LGPL-only FFmpeg from corresponding FFmpeg source
         run: |
-          python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt imageio-ffmpeg==0.6.0
+          python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
+          bash cpymo-tool/nds-converter/tools/build_ffmpeg_macos_lgpl.sh macos-ffmpeg-lgpl
           python - <<'PY'
-          import imageio_ffmpeg,os
-          with open(os.environ['GITHUB_ENV'],'a') as out:out.write('NDS_FFMPEG='+imageio_ffmpeg.get_ffmpeg_exe()+'\n')
+          import os,sys
+          from pathlib import Path
+          sys.path.insert(0,'cpymo-tool/nds-converter')
+          from video_nvl import validate_ffmpeg
+          ffmpeg=Path('macos-ffmpeg-lgpl/bin/ffmpeg').resolve()
+          validate_ffmpeg(str(ffmpeg))
+          with open(os.environ['GITHUB_ENV'],'a') as out:
+              out.write('NDS_FFMPEG='+str(ffmpeg)+'\n')
           PY
       - name: Build paired macOS .app using the exact VERIFIED ROM
         run: |
@@ -155,6 +162,8 @@ jobs:
           ditto macos-rc/CPyMO-NDS-Converter.app out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/CPyMO-NDS-Converter.app
           cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/
           cp cpymo-tool/nds-converter/README.md out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/转换器说明.md
+          mkdir -p out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/FFmpeg-Corresponding-Source
+          cp -R macos-ffmpeg-lgpl/source/. out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/FFmpeg-Corresponding-Source/
           cd out
           ditto -c -k --sequesterRsrc --keepParent CPyMO-for-NDS-1.2.0-Starter-macOS-RC ../CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
           cd ..
