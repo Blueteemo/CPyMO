@@ -65,6 +65,29 @@ class ConverterTests(unittest.TestCase):
             self.assertFalse(list((dst/'nds-cache/bgm').rglob('*.nar')))
             convert.verify(dst)
 
+    @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'), 'FFmpeg required')
+    def test_unchecked_prune_preserves_output_original_media_even_with_lossless_compression(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);src=base/'input';fixture(src,'s60v3')
+            (src/'voice').mkdir();shutil.copy2(src/'bgm/tone.wav',src/'voice/line.wav')
+            before=hashes(src)
+            report=helper_core.run_job({
+                'action':'convert','source':str(src),'output':str(base/'output'),
+                'result':str(base/'job/result.json'),'video_mode':'skip',
+                'cache_only':False,'audio_lossless':'voice',
+                'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
+            self.assertTrue(report['ok'],report)
+            self.assertFalse(report['cache_only'],
+                'Unchecking the UI option must not be overridden by cache compression')
+            self.assertEqual(report['lossless']['audio_mode'],'voice')
+            output=Path(report['game_directory'])
+            self.assertTrue((output/'bg/scene.png').is_file())
+            self.assertTrue((output/'bgm/tone.wav').is_file())
+            self.assertTrue(list((output/'nds-cache/voice').rglob('*.nar')))
+            self.assertTrue(list((output/'nds-cache/bgm').rglob('*.pcm')))
+            self.assertEqual(before,hashes(src))
+            convert.verify(output)
+
     @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),
                          'FFmpeg required')
     def test_optin_fvds_passthrough_and_default_omission(self):
