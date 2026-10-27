@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import stat
 from pathlib import Path
 import struct
 import zipfile
@@ -60,6 +61,12 @@ def verify_archive(path: Path, expected_sha: str) -> dict:
     with zipfile.ZipFile(path) as z:
         for item in z.infolist():
             if item.is_dir() or not item.filename.lower().endswith(".nds"):
+                continue
+            # macOS PyInstaller applications include symlink entries to the
+            # actual Contents/Resources ROM. ZIP stores a symlink's link text,
+            # not the image bytes; do not mistake that text for a second ROM.
+            # The real bundled ROM is validated during macOS app construction.
+            if stat.S_ISLNK(item.external_attr >> 16):
                 continue
             # Starter bundles include one copy for players and another inside
             # the frozen worker. All such copies must be byte-identical.
