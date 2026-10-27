@@ -22,6 +22,7 @@ cd "$OUT/build/ffmpeg-$VERSION"
 CONFIG_ARGS=(
   "--prefix=$OUT/install"
   "--disable-autodetect"
+  "--disable-x86asm"
   "--disable-gpl"
   "--disable-nonfree"
   "--disable-doc"
