@@ -56,7 +56,7 @@ int nds_language_take_refresh(void){int value=refresh_pending;refresh_pending=0;
 static const struct {const char* zh;const char* en;} strings[]={
  {"正在读取游戏列表...","Reading game list..."},
  {"游戏资料库","Game library"},{"选择游戏","Select a game"},{"关于与许可","About and licenses"},
- {"A / 轻触：继续","A / Touch: Continue"},{"X：菜单 · B：返回","X: Menu / B: Back"},
+ {"A / DOWN / 轻触：继续","A / DOWN / Touch: Next"},{"X：菜单 · B：返回","X: Menu / B: Back"},
  {"B：按住隐藏文字","Hold B: Hide text"},{"R：按设置快进","R: Skip (per settings)"},
  {"L：切换显示模式","L: Cycle display mode"},{"Y：隐藏／唤回辅助屏","Y: Toggle info screen"},
  {"START：快速保存到存档1","START: Save to slot 1"},{"SELECT：快速读取存档1","SELECT: Load slot 1"},
