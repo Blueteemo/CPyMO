@@ -54,7 +54,7 @@ class EmbeddedPictureTests(unittest.TestCase):
  def test_inplace_patch_in_rom_and_reject_corruption(self):
   with tempfile.TemporaryDirectory() as folder:
    folder=Path(folder)
-   image=(b"\\x01\\x80")*(256*192)
+   image=(b"\x01\x80")*(256*192)
    art=folder/"art.rgb555"
    art.write_bytes(patcher.ART_MAGIC+image)
    mark=patcher.WAIT+patcher.PLACEHOLDER
@@ -74,7 +74,7 @@ class EmbeddedPictureTests(unittest.TestCase):
    self.assertEqual(patched[-64:],raw[-64:])
    with self.assertRaises(ValueError):
     patcher.embed(out,art,folder/"second.nds")
-   art.write_bytes(patcher.ART_MAGIC+(b"\\x00\\x00")*(256*192))
+   art.write_bytes(patcher.ART_MAGIC+(b"\x00\x00")*(256*192))
    with self.assertRaises(ValueError):
     patcher.embed(rom,art,folder/"invalid.nds")
 
