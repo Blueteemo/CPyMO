@@ -149,19 +149,19 @@ def run_job(job):
                 (output/'安装必读.txt').write_text(instructions,encoding='utf-8-sig')
                 if job.get('ui_language')=='English':
                     english=(
-                        "CPyMO for NDS — installation guide\\n"
-                        "Back up the existing save/ folder for the same game first.\\n"
-                        "Copy cpymo-nds.nds and the pymo folder from this output\\n"
-                        "to the root of your DS / DSi storage card. Keep your\\n"
-                        "flashcart launcher/kernel and existing personal saves.\\n"
-                        "NEVER overwrite your save with this package's empty one.\\n"
-                        "The original game, scripts and localization credits are unchanged.\\n"
-                        "Video mode: "+video_mode.upper()+". Fonts lacking glyphs use □\\n"
-                        "with warnings, but source scripts are never rewritten.\\n"
-                        "Successful conversion does not guarantee compatibility\\n"
-                        "with every game, video or DS/DSi launch environment.\\n"
-                        "See 转换结果.json and nds-cache/manifest.json for the audit.\\n"
-                        "NDS port: 千岚之夏. Upstream and third-party credits retained.\\n"
+                        "CPyMO for NDS — installation guide\n"
+                        "Back up the existing save/ folder for the same game first.\n"
+                        "Copy cpymo-nds.nds and the pymo folder from this output\n"
+                        "to the root of your DS / DSi storage card. Keep your\n"
+                        "flashcart launcher/kernel and existing personal saves.\n"
+                        "NEVER overwrite your save with this package's empty one.\n"
+                        "The original game, scripts and localization credits are unchanged.\n"
+                        "Video mode: "+video_mode.upper()+". Fonts lacking glyphs use □\n"
+                        "with warnings, but source scripts are never rewritten.\n"
+                        "Successful conversion does not guarantee compatibility\n"
+                        "with every game, video or DS/DSi launch environment.\n"
+                        "See 转换结果.json and nds-cache/manifest.json for the audit.\n"
+                        "NDS port: 千岚之夏. Upstream and third-party credits retained.\n"
                     )
                     (output/'INSTALL-READ-ME.txt').write_text(english,encoding='utf8')
                 (output/'转换结果.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
