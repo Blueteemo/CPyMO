@@ -15,6 +15,16 @@
 - [ ] Release 正文与 `nds-v1.0.0`、`nds-v1.1.0` 格式一致，明确 1.2 相对 1.1 的新增 DSi/TWL、缓存、跨存储卡游戏库、滚动列表、增强双屏、视频转换与游戏菜单；正式玩家介绍不提研究中的 FVDS，Android 用英文拼写，不增加多余的两 ROM 解释。
 - [ ] 正式 1.2.0 Release 发出以后，再将此 Fork 根目录 README 替换为以 NDS 为主的全新 README，并最后更新原上游 PR #60 的描述、以已经存在的正式 Release 链接为准。
 
+## Apple Silicon / Rosetta 生命周期阻断检查（2026-10-27）
+
+**Apple 官方明确：Rosetta 在 macOS 27 及更早版本普遍可用；从 macOS 28 起只针对部分停更旧游戏保留。** https://support.apple.com/zh-cn/102527
+
+- [ ] **必须生成 ARM64 原生 macOS `.app`**，而不是让 Apple Silicon 玩家用 Intel RC + Rosetta。CI 采用 `macos-15` Apple Silicon M1 runner，PyInstaller 指定 `--target-arch arm64`，从源码编译 **ARM64** LGPL FFmpeg。整个应用／FFmpeg 的 Mach-O 架构必须明确包含 ARM64，且冻结进程实际运行视频转换与缺字回退。
+- [ ] 保留独立的 Intel `x86_64` Mac RC，在 `macos-15-intel` 上构建、测试，**两种架构的 macOS .app 不是两份 NDS ROM**：两端必须内嵌同一 `cpymo-nds.nds`，绝不改变已验收的 NTR/TWL 通用 ROM。
+- [ ] 默认推荐 Mac 玩家下载 `macOS-arm64`；Intel Mac 下载 `macOS-x86_64`。不以 Intel + Rosetta 当作 Apple Silicon 支持。将来若实现真正 Universal 2，必须是所有 PyInstaller/Python/FFmpeg 依赖均具备双架构切片的完整 Universal 2 应用，不能简单把两个 PyInstaller 输出用 lipo 拼接。
+- [ ] **本地 DeepSeek 的最终验收对象改为原生 ARM64 RC**（若用户的 Mac 是 Apple Silicon），需证明 Finder 的「显示简介」为 Apple 芯片应用、`file`／`lipo -archs` 校验 app 主程序及内嵌 FFmpeg；确认没有依赖安装 Rosetta、正常打开 GUI、默认 NVL1 实际转码、NVA1 及缺字策略、文件与存档保护。Intel RC 只对 Intel Mac 做独立验证。
+- [ ] 不自动在 macOS 28 已发布之前声称兼容性 100%；以 ARM64 独立本机运行消除 Rosetta 这一已知淘汰风险。Gatekeeper 签名／公证仍是另一个未解决的发行门槛。
+
 ## 发行依赖合规门槛（2026-10-27 增补）
 
 - [x] 已识别并隔离原 macOS imageio-ffmpeg 构建携带 `--enable-nonfree` 的发行风险，旧 RC 不可公开发布。
@@ -23,6 +33,6 @@
 - [x] 两端 RC 均通过实际冻结工作进程视频转换、完整 ZIP 测试和两份 ROM 副本哈希一致性检查。详见 `RELEASE-ARTIFACT-MANIFEST-1.2.0.md`。
 - [x] 已交付新 macOS LGPL RC 供本地 DeepSeek 测试，旧 nonfree 候选包明确作废。
 
-## macOS DeepSeek 介入触发条件
+## macOS DeepSeek 介入触发条件（优先 Apple Silicon 原生 RC）
 
 在上述前三项全部满足后、**正式 GitHub Release 创建之前**，立即向用户交付用于本地 DeepSeek 的单次验收提示词。这是发版阻断检查点，不是无限期索要实机测试。Mac .app 的 2026-10-27 CI 自测成功仅代表构建与冻结工作进程经过合成媒体测试，**不能**代替最终 ROM 配套与 Mac Finder 用户体验验收。
