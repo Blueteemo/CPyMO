@@ -52,12 +52,17 @@ class NVLConverterTests(unittest.TestCase):
                 'action':'convert','source':str(source),
                 'output':str(root/'result'),
                 'result':str(root/'jobs/result.json'),
+                'ui_language':'English',
                 'ffmpeg':shutil.which('ffmpeg')})
             self.assertTrue(report['ok'],report)
             self.assertEqual(report['video_policy'].split()[0],'playable')
             self.assertEqual(report['videos'][0]['format'],'NVL1')
             self.assertEqual(hashes(source),original)
             self.assertEqual(report['missing_policy'],'box')
+            english=(Path(report['output'])/'INSTALL-READ-ME.txt')
+            self.assertTrue(english.is_file())
+            self.assertIn('Video mode: NVL1',english.read_text(encoding='utf8'))
+            self.assertIn('Back up the existing save',english.read_text(encoding='utf8'))
             dst=Path(report['game_directory'])
             manifest=json.loads((dst/'nds-cache/manifest.json').read_text(encoding='utf8'))
             boxed={c for data in manifest['pixel_fonts'] for c in data['boxed_codepoints']}
