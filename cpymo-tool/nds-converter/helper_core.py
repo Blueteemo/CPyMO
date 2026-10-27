@@ -143,10 +143,27 @@ def run_job(job):
                 report.update(release_version=convert.VERSION,cache_format=manifest['format'],rom_sha256=hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None)
                 report.update(cache_only=cache_only,resource_policy=manifest['resource_policy'],redundant_media_bytes=sum(item['bytes'] for item in manifest.get('omitted_files',[]) if item.get('reason','').startswith('redundant original media')))
                 report.update(lossless=manifest['lossless'])
-                instructions='安装：先备份TF卡上同一游戏的save。将本目录中的cpymo-nds.nds和pymo文件夹复制到TF根目录，保留R4内核。不要用本包空save覆盖自己的存档。\n原游戏包、脚本和汉化内容未修改。视频按本次选择转换或省略。转换通过不等于已经验证所有剧情及R4兼容。\nNDS平台移植：千岚之夏；CPyMO/PyMO与依赖的原署名和许可证保留。\n'+('\n注意：\n'+'\n'.join(warnings) if warnings else '')
+                instructions='安装：先备份TF卡上同一游戏的save。将本目录中的cpymo-nds.nds和pymo文件夹复制到TF根目录，保留现有烧录卡内核。不要用本包空save覆盖自己的存档。\n原游戏包、脚本和汉化内容未修改。视频按本次选择转换或省略。转换通过不等于已经验证所有剧情、烧录卡或 DSi 启动方式的兼容性。\nNDS平台移植：千岚之夏；CPyMO/PyMO与依赖的原署名和许可证保留。\n'+('\n注意：\n'+'\n'.join(warnings) if warnings else '')
                 if cache_only:instructions+='\n本次使用精简资源：仅省去已有NDS缓存的重复媒体；画质音质不变，脚本与署名保留。精简后的目录用于NDS，请保留原包供其他平台使用。\n'
                 if audio_mode!='off':instructions+=f'\n本次启用无损缓存压缩，请使用随附的 {VERSION} 引擎。像素和音频采样与未压缩 NDS 缓存一致；BGM/音效默认保持 PCM。\n' if audio_mode=='voice' else f'\n本次启用实验性全部音频压缩，请使用随附的 {VERSION} 引擎；此选项不属于默认性能基线。\n'
                 (output/'安装必读.txt').write_text(instructions,encoding='utf-8-sig')
+                if job.get('ui_language')=='English':
+                    english=(
+                        "CPyMO for NDS — installation guide\\n"
+                        "Back up the existing save/ folder for the same game first.\\n"
+                        "Copy cpymo-nds.nds and the pymo folder from this output\\n"
+                        "to the root of your DS / DSi storage card. Keep your\\n"
+                        "flashcart launcher/kernel and existing personal saves.\\n"
+                        "NEVER overwrite your save with this package's empty one.\\n"
+                        "The original game, scripts and localization credits are unchanged.\\n"
+                        "Video mode: "+video_mode.upper()+". Fonts lacking glyphs use □\\n"
+                        "with warnings, but source scripts are never rewritten.\\n"
+                        "Successful conversion does not guarantee compatibility\\n"
+                        "with every game, video or DS/DSi launch environment.\\n"
+                        "See 转换结果.json and nds-cache/manifest.json for the audit.\\n"
+                        "NDS port: 千岚之夏. Upstream and third-party credits retained.\\n"
+                    )
+                    (output/'INSTALL-READ-ME.txt').write_text(english,encoding='utf8')
                 (output/'转换结果.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     except Exception as error:
         report={'ok':False,'error':str(error),'source_modified':False,'partial_output_may_remain':True}
