@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import plistlib
 import platform
 import shutil
 import subprocess
@@ -90,6 +91,23 @@ def main():
     app = build / "dist/CPyMO-NDS-Converter.app"
     if not app.is_dir():
         raise RuntimeError("Missing .app from PyInstaller")
+    # PyInstaller defaults to Finder's 0.0.0 even though the UI says 1.2.0.
+    # Set the release metadata and re-apply only an ad-hoc local code signature:
+    # this is NOT Apple Developer ID signing or notarization.
+    info = app / "Contents/Info.plist"
+    with info.open("rb") as file:
+        plist = plistlib.load(file)
+    plist["CFBundleShortVersionString"] = metadata["version"]
+    plist["CFBundleVersion"] = metadata["version"]
+    plist["CFBundleGetInfoString"] = f"CPyMO NDS Converter {metadata['version']}"
+    with info.open("wb") as file:
+        plistlib.dump(plist, file)
+    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)],
+                   check=True, capture_output=True, text=True, timeout=180)
+    subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)],
+                   check=True, capture_output=True, text=True, timeout=90)
+    with info.open("rb") as file:
+        assert plistlib.load(file)["CFBundleShortVersionString"] == metadata["version"]
     require_arch(app / "Contents/MacOS/CPyMO-NDS-Converter")
     for resource in ("cpymo-nds.nds", "ffmpeg", "release.json"):
         present = any((app / location / resource).is_file() for location in
@@ -116,6 +134,7 @@ def main():
     shutil.copy2(rom, output / "cpymo-nds.nds")
     shutil.rmtree(build)
     metadata.update(macos_architecture=args.target_arch,
+                    app_bundle_version=metadata["version"],
                     rosetta_required=False if args.target_arch=="arm64" else "Apple silicon only",
                     rom_sha256=digest(rom),
                     ffmpeg_input_sha256=ffmpeg_input_sha,
