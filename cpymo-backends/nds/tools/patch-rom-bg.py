@@ -18,7 +18,7 @@ import struct
 WAIT=b"CPYMO_BG_AWAIT12"
 READY=b"CPYMO_BG_READY12"
 PLACEHOLDER=b"\\x5a\\x5a" * (256*192)
-ART_MAGIC=b"CPYBG12\\0"
+ART_MAGIC=b"CPYBG12"+bytes([0])
 ART_SIZE=8+len(PLACEHOLDER)
 
 def embed(rom: Path, art: Path, dest: Path) -> dict:
