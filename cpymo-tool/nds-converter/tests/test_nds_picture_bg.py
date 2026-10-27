@@ -45,8 +45,8 @@ class NativePictureTests(unittest.TestCase):
    subprocess.run(["gcc","-std=c11","-Wall","-Wextra","-Werror","-O2",
                    "-fsanitize=undefined","-I",str(root),str(c),"-o",str(exe)],
                   capture_output=True,text=True,check=True)
-   image_path.write_bytes(b"CPYBG12\\0"+b"\\x01\\x80" +
-       b"\\xff\\xff"*(256*192-2)+b"\\xff\\xff")
+   image_path.write_bytes(b"CPYBG12\0"+b"\x01\x80" +
+       b"\xff\xff"*(256*192-2)+b"\xff\xff")
    subprocess.run([str(exe),"valid"],check=True,
                   capture_output=True,text=True)
    image_path.write_bytes(b"bad-data")
