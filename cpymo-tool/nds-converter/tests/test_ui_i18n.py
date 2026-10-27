@@ -34,7 +34,7 @@ class ConverterLanguageTests(unittest.TestCase):
         self.assertNotIn('保留R4内核',guide)
 
     def test_known_diagnostic_prefixes_are_translated_only_for_view(self):
-        raw='字库缺字以□显示，原脚本未改：U+1F984\\nError detail unknown: x'
+        raw='字库缺字以□显示，原脚本未改：U+1F984\nError detail unknown: x'
         translated=tr_log(raw,'English')
         self.assertIn('Missing glyphs displayed as □',translated)
         self.assertIn('U+1F984',translated)
