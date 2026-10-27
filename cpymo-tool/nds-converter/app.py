@@ -8,9 +8,25 @@ from helper_core import run_job
 from release_info import VERSION
 from ui_i18n import tr, tr_log, LANGUAGES
 
+def apply_desktop_icon(window):
+    """Use the bundled PyMO icon for the live window; .ico/.icns cover OS UI."""
+    base=Path(sys._MEIPASS) if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
+    icon=base/'assets/converter-icon-64.png'
+    if not icon.is_file():
+        return False
+    try:
+        photo=tk.PhotoImage(master=window,file=str(icon))
+        window.iconphoto(True,photo)
+        window._cpymo_icon_photo=photo  # Keep a live Tk image reference.
+        return True
+    except tk.TclError:
+        return False  # Never block conversion over a window manager limitation.
+
+
 class App:
     def __init__(self,window,state_root=None,self_test=None):
         self.window=window;self.process=None;self.self_test=self_test;self.test_started=False
+        apply_desktop_icon(window)
         self.state_root=Path(state_root or (Path(os.environ['LOCALAPPDATA'])/'CPyMO-NDS-转换助手'/'jobs' if os.name=='nt' and os.environ.get('LOCALAPPDATA') else Path.home()/'Library/Application Support/CPyMO-NDS-Converter/jobs' if sys.platform=='darwin' else Path.home()/'.local/share/CPyMO-NDS-Converter/jobs'))
         self.preference_file=self.state_root.parent/'ui-preferences.json'
         try:
