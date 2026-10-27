@@ -21,7 +21,7 @@ CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏
 
 ## 第一次使用
 
-1. **Windows：** 完整解压 Windows 套件，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。**Apple Silicon Mac：** 如正式发行时提供 ARM64 套件，完整解压并从 Finder 打开 `CPyMO-NDS-Converter.app`；首次启动若出现 macOS 安全提示，应遵循系统对该应用的正式安全审查流程，不要关闭 Gatekeeper 或系统完整性保护。
+1. **Windows：** 完整解压 Windows 套件，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。**Apple Silicon Mac：** 如正式发行时提供 ARM64 套件，完整解压并从 Finder 打开 `CPyMO-NDS-Converter.app`。**该版本未使用 Apple Developer ID 签名，也未经 Apple 公证。**若 macOS 拦截首次运行，请先确认从本项目官方发行页下载并核对 SHA-256；只有在确认信任后，按 [Apple 官方说明](https://support.apple.com/zh-cn/102445)前往「系统设置 → 隐私与安全性 → 仍要打开」。不要在终端执行全局关闭 Gatekeeper、删除安全属性或关闭 SIP 的命令。
 2. 在电脑转换助手中选择自己的 PyMO 游戏 ZIP/APK 或包含 `gameconfig.txt` 的游戏文件夹。同包有多个平台时，一般优先选择 S60v3；选择新的输出位置，开始转换。助手可切换简体中文／English；游戏视频默认转换为 NVL1，也可选压缩音轨的 NVA1 或主动跳过视频。
 3. 转换完成后阅读警告与输出目录的“安装必读”（英文界面还会生成 `INSTALL-READ-ME.txt`），将**转换结果**中的 `cpymo-nds.nds` 和 `pymo` 文件夹复制到 TF 根目录。
 4. 安全弹出 TF，装回烧录卡，在 DS/DSi 上启动 `cpymo-nds.nds`，从游戏库选择游戏。
@@ -97,4 +97,4 @@ TF 根目录/
 
 [NDS 后端说明](https://github.com/Blueteemo/CPyMO/blob/nds-v1.2.0/cpymo-backends/nds/README.md) · [转换器说明](https://github.com/Blueteemo/CPyMO/blob/nds-v1.2.0/cpymo-tool/nds-converter/README.md) · [上游 PR #60](https://github.com/Strrationalism/CPyMO/pull/60)
 
-NDS 平台移植：**千岚之夏**。CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。引擎／后端为 AGPL-3.0-or-later，独立转换器为 MIT，字体与第三方依赖保留各自许可，随转换助手及源码提供。游戏原作与汉化署名按原包保留，本发行不附游戏素材。NDS 发行版本号独立于 CPyMO 全平台版本。
+NDS 平台移植：**千岚之夏**。CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。引擎／后端为 AGPL-3.0-or-later，独立转换器为 MIT，字体与第三方依赖保留各自许可，随转换助手及源码提供。游戏原作与汉化署名按原包保留，本发行不附游戏素材。桌面转换器图标为基于 PyMO 原始图标的高清像素衍生图：原始图案及许可来自 [PyMO 原仓库](https://github.com/pymo/pymo/tree/master/images)，遵循原仓库 MIT 版权声明；安装套件附 `图标来源与署名.txt` 与 `PYMO-ORIGINAL-MIT-LICENSE.txt`。修改图标不代表 PyMO 原作者认可或参与本版发行。NDS 发行版本号独立于 CPyMO 全平台版本。
