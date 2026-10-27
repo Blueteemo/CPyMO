@@ -46,7 +46,7 @@ class NVLConverterTests(unittest.TestCase):
             root=Path(tmp);source=root/'source';fixture(source,'s60v3')
             shutil.copyfile(NVLVideoTests().make_movie(root),source/'video/omitted.mp4')
             script=source/'script/START.txt'
-            script.write_text(script.read_text(encoding='utf8')+'\\n#say 🦄\\n',encoding='utf8')
+            script.write_text(script.read_text(encoding='utf8')+'\n#say 🦄\n',encoding='utf8')
             original=hashes(source)
             report=helper_core.run_job({
                 'action':'convert','source':str(source),
