@@ -34,18 +34,18 @@ class App:
         self.language_box.pack(side='right')
         ttk.Label(head,text='界面语言：').pack(side='right',padx=(0,8))
         self.language_box.bind('<<ComboboxSelected>>',self.change_language)
-        ttk.Label(frame,text='选择游戏包，生成可复制到 DS / DSi 存储卡的游戏目录。无需另装 Python 或 FFmpeg。',wraplength=780).pack(anchor='w',pady=(6,16))
+        ttk.Label(frame,text='选择自己的 PyMO 游戏，转换好后复制到 DS / DSi 的存储卡即可。',wraplength=780).pack(anchor='w',pady=(6,16))
         ttk.Label(frame,text='1  选择游戏',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,8))
         ttk.Entry(row,textvariable=self.source,state='readonly').pack(side='left',fill='x',expand=True)
         self.zip_button=ttk.Button(row,text='选压缩包',command=self.pick_zip);self.zip_button.pack(side='left',padx=(8,4))
         self.folder_button=ttk.Button(row,text='选文件夹',command=self.pick_folder);self.folder_button.pack(side='left')
         self.games=tk.Listbox(frame,height=3,exportselection=False,activestyle='none',selectbackground='#27659c',relief='solid',borderwidth=1)
-        self.games.pack(fill='x');ttk.Label(frame,text='支持 S60v3 / S60v5 / Android PyMO 数据；同包有多个版本时优先推荐 S60v3。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(5,12))
+        self.games.pack(fill='x');ttk.Label(frame,text='自动识别游戏版本；如果找到多个版本，会优先推荐适合 NDS 的版本。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(5,12))
         ttk.Label(frame,text='2  选择保存位置',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,6));ttk.Entry(row,textvariable=self.output,state='readonly').pack(side='left',fill='x',expand=True)
         self.output_button=ttk.Button(row,text='选保存位置',command=self.pick_output);self.output_button.pack(side='left',padx=(8,0))
-        ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频默认转换为 NVL1。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(0,10))
+        ttk.Label(frame,text='转换后保存在新文件夹，不会修改原游戏或覆盖已有存档。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(0,10))
         ttk.Label(frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579',wraplength=780).pack(anchor='w')
         # Media de-duplication is a safe default, not a player decision.
         # Keep the variable for existing CLI and GUI self-test fixtures.
@@ -132,6 +132,8 @@ class App:
         self.video.set(self.video_modes[video_idx])
         self._apply_language()
         self._update_advanced_caption()
+        if self.last_output and self.last_result and not self.last_result.get('ok'):
+            self.open_button.configure(text=self.tr('查看错误日志'))
         if self.candidates:
             selected=self.games.curselection()
             self.games.delete(0,'end')
@@ -217,7 +219,8 @@ class App:
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
-        self.last_output=Path(report['output']);self.open_button.configure(state='normal',text=self.tr('打开结果文件夹'));self.set_status(report['status']+'。点击“打开结果文件夹”查看安装必读。')
+        self.last_output=Path(report['output']);self.open_button.configure(state='normal',text=self.tr('打开结果文件夹'))
+        self.set_status('转换完成！有一些提示，建议先查看下方记录。' if report.get('warnings') else '转换完成！请打开结果文件夹，按说明复制到 TF 卡。')
         self.log.insert('end','\n'+('\n'.join(self.tr(w) for w in report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
         if report.get('cache_only'):
             self.log.insert('end',self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n');self.log.see('end')
