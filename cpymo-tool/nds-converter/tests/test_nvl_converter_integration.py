@@ -5,6 +5,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from test_converter import fixture,hashes
 from test_video_nvl import NVLVideoTests
 import convert
+import helper_core
 
 
 @unittest.skipUnless(shutil.which('ffmpeg'),'FFmpeg required')
@@ -36,6 +37,34 @@ class NVLConverterTests(unittest.TestCase):
                 self.assertFalse((dst/'video/omitted.mp4').exists())
                 hashed=convert.key('omitted')
                 self.assertEqual(item['path'],f'nds-cache/video/{hashed[:2]}/{hashed}.nvl')
+
+
+    def test_default_helper_converts_movie_and_warns_for_missing_glyph(self):
+        # A first-time player should get working video and best-effort fonts
+        # without enabling advanced checkboxes or passing --video-mode.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source';fixture(source,'s60v3')
+            shutil.copyfile(NVLVideoTests().make_movie(root),source/'video/omitted.mp4')
+            script=source/'script/START.txt'
+            script.write_text(script.read_text(encoding='utf8')+'\\n#say 🦄\\n',encoding='utf8')
+            original=hashes(source)
+            report=helper_core.run_job({
+                'action':'convert','source':str(source),
+                'output':str(root/'result'),
+                'result':str(root/'jobs/result.json'),
+                'ffmpeg':shutil.which('ffmpeg')})
+            self.assertTrue(report['ok'],report)
+            self.assertEqual(report['video_policy'].split()[0],'playable')
+            self.assertEqual(report['videos'][0]['format'],'NVL1')
+            self.assertEqual(hashes(source),original)
+            self.assertEqual(report['missing_policy'],'box')
+            dst=Path(report['game_directory'])
+            manifest=json.loads((dst/'nds-cache/manifest.json').read_text(encoding='utf8'))
+            boxed={c for data in manifest['pixel_fonts'] for c in data['boxed_codepoints']}
+            self.assertIn('U+1F984',boxed)
+            self.assertTrue(any('U+1F984' in item for item in report['warnings']))
+            self.assertIn('🦄',(dst/'script/START.txt').read_text(encoding='utf8'))
+            convert.verify(dst)
 
 
 if __name__=='__main__':unittest.main()
