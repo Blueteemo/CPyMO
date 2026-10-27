@@ -25,6 +25,7 @@ class App:
         self.candidates=[];self.serial=0;self.last_result=None;self.last_output=None
         self._log_disk_text=''
         self._log_extra_text=''
+        self._log_extra_report=None
         self._last_log_display=''
         window.title('CPyMO NDS 转换助手');window.geometry(f"840x{min(890,max(700,window.winfo_screenheight()-110))}");window.minsize(760,670)
         ui_font='PingFang SC' if sys.platform=='darwin' else 'Microsoft YaHei UI'
@@ -199,6 +200,7 @@ class App:
     def start(self,job,callback):
         self._log_disk_text=''
         self._log_extra_text=''
+        self._log_extra_report=None
         self._render_log(force=True)
         self.serial+=1;stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f');folder=self.state_root/(stamp+'-'+str(self.serial));folder.mkdir(parents=True)
         self.job_file=folder/'job.json';self.result_file=folder/'result.json';self.log_file=folder/'log.txt'
@@ -207,9 +209,20 @@ class App:
         self.process=subprocess.Popen(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=0x08000000 if os.name=='nt' else 0)
         self.callback=callback;self.busy(True);self.window.after(200,self.poll)
 
+    def _format_conversion_notes(self,report):
+        notes=['\n'+('\n'.join(self.tr(w) for w in report['warnings'])
+                       if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n']
+        if report.get('cache_only'):
+            notes.append(self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n')
+        comp=report.get('lossless',{})
+        if comp.get('audio_mode','off')!='off':
+            notes.append(self.tr('无损缓存另节省 {size:.2f} MiB。请使用随附的 {version} 引擎。').format(size=(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576,version=VERSION)+'\n')
+        return ''.join(notes)
+
     def _render_log(self,force=False):
-        displayed=(tr_log(self._log_disk_text,self.language.get())+
-                   self._log_extra_text)[-12000:]
+        extra=(self._format_conversion_notes(self._log_extra_report)
+               if self._log_extra_report is not None else self._log_extra_text)
+        displayed=(tr_log(self._log_disk_text,self.language.get())+extra)[-12000:]
         if not force and displayed==self._last_log_display:
             return
         self.log.configure(state='normal')
@@ -262,14 +275,9 @@ class App:
         if not report['ok']:self.failed(report);return
         self.last_output=Path(report['output']);self.open_button.configure(state='normal',text=self.tr('打开结果文件夹'))
         self.set_status('转换完成！有一些提示，建议先查看下方记录。' if report.get('warnings') else '转换完成！请打开结果文件夹，按说明复制到 TF 卡。')
-        notes=['\n'+('\n'.join(self.tr(w) for w in report['warnings'])
-                       if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n']
-        if report.get('cache_only'):
-            notes.append(self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n')
-        comp=report.get('lossless',{})
-        if comp.get('audio_mode','off')!='off':
-            notes.append(self.tr('无损缓存另节省 {size:.2f} MiB。请使用随附的 {version} 引擎。').format(size=(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576,version=VERSION)+'\n')
-        self._log_extra_text=''.join(notes)
+        # Keep the original structured result: the displayed summary must
+        # follow UI language changes, without rewriting diagnostic files.
+        self._log_extra_report=report
         self._render_log()
         if self.self_test:self.finish_test(report)
 
