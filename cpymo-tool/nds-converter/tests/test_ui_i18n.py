@@ -86,6 +86,37 @@ class ConverterLanguageTests(unittest.TestCase):
         self.assertIn('"codesign", "--verify", "--deep", "--strict"',builder)
         self.assertIn("app_bundle_version=metadata[\"version\"]",builder)
 
+    def test_staging_progress_translates_only_in_chinese_view(self):
+        worker='Staging: /tmp/new-output\\nDetected: s60v3'
+        self.assertIn('正在准备输出： /tmp/new-output',tr_log(worker,'简体中文'))
+        self.assertIn('Detected: s60v3',tr_log(worker,'English'))
+        self.assertNotIn('正在准备输出',tr_log(worker,'English'))
+
+    def test_conversion_notes_retranslate_after_language_switch(self):
+        # Test the actual report-to-label formatter without opening Tk or
+        # rerunning video conversion. Raw report stays unchanged.
+        from app import App
+        obj=App.__new__(App)
+        sample={
+            'warnings':['字库缺字以□显示，原脚本未改：U+1F984'],
+            'cache_only':True,
+            'redundant_media_bytes':1048576,
+            'lossless':{'audio_mode':'voice','audio_saved_bytes':524288,
+                        'image_saved_bytes':0},
+        }
+        obj.tr=lambda value: tr(value,'English')
+        en=obj._format_conversion_notes(sample)
+        self.assertIn('Missing glyphs displayed as □',en)
+        self.assertIn('Removed 1.00 MiB',en)
+        self.assertIn('Lossless caching saved another 0.50 MiB',en)
+        obj.tr=lambda value: tr(value,'简体中文')
+        zh=obj._format_conversion_notes(sample)
+        self.assertIn('字库缺字以□显示',zh)
+        self.assertIn('已省去重复媒体 1.00 MiB',zh)
+        self.assertIn('无损缓存另节省 0.50 MiB',zh)
+        self.assertNotIn('Lossless caching',zh)
+        self.assertEqual(sample['warnings'][0],'字库缺字以□显示，原脚本未改：U+1F984')
+
     def test_unknown_diagnostics_are_preserved(self):
         raw='Unmapped PyMO error for source investigation: /tmp/foo'
         self.assertEqual(tr(raw,'English'),raw)
