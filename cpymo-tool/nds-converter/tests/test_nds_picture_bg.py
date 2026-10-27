@@ -78,6 +78,24 @@ class EmbeddedPictureTests(unittest.TestCase):
    with self.assertRaises(ValueError):
     patcher.embed(rom,art,folder/"invalid.nds")
 
+ def test_movie_playback_clears_previous_lower_screen_dialogue_once(self):
+  # The video player bypasses ordinary engine draws while pushing frames
+  # straight to top LCD VRAM. It must redraw the lower LCD without say text.
+  player=(SRC/"movie-lz4-r7.h").read_text(encoding="utf8")
+  helper=player[player.index("static void nds_movie_prepare_lower_screen(void)"):]
+  helper=helper[:helper.index("\n}")]
+  self.assertIn("if(!nds_dual_active() || !launcher_sub)return;",helper)
+  self.assertIn("nds_picture_draw(framebuffer,false)",helper)
+  self.assertIn("nds_dual_canvas_draw_yield(framebuffer,false,false,",helper)
+  self.assertIn("dmaCopy(framebuffer,launcher_sub,sizeof framebuffer)",helper)
+  self.assertIn("if(failed)goto done;",player)
+  self.assertLess(player.index("if(failed)goto done;"),
+                  player.index("nds_movie_prepare_lower_screen();"))
+  self.assertLess(player.index("nds_movie_prepare_lower_screen();"),
+                  player.index("memset(framebuffer,0,sizeof framebuffer);movie_state[1]=1;"))
+  self.assertEqual(player.count("nds_movie_prepare_lower_screen();"),1)
+  self.assertIn("cpymo_engine_request_redraw(e);return CPYMO_ERR_SUCC;",player)
+
  def test_ui_and_confirmation_both_select_approved_art(self):
   source=(SRC/"main.c").read_text(encoding="utf8")
   self.assertIn("nds_picture_draw(framebuffer,interactive)",source)
