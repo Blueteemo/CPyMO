@@ -14,7 +14,7 @@ from tools.build_desktop_icons import build, SOURCE_SHA256, WINDOWS_SIZES
 class DesktopIconBuildTests(unittest.TestCase):
     def test_source_hash_is_pinned(self):
         self.assertEqual(len(SOURCE_SHA256),64)
-        self.assertIn("approved 04", (ROOT/"build_portable_macos.py").read_text(encoding="utf8"))
+        self.assertIn("assets/converter-icon-source.png", (ROOT/"build_portable_macos.py").read_text(encoding="utf8"))
         self.assertIn("--require-desktop-icon", (ROOT/"build_portable.py").read_text(encoding="utf8"))
 
     def test_generator_produces_actual_multi_resolution_icons(self):
