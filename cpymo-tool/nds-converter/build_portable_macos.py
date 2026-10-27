@@ -104,6 +104,16 @@ def main():
     app = build / "dist/CPyMO-NDS-Converter.app"
     if not app.is_dir():
         raise RuntimeError("Missing .app from PyInstaller")
+    # Confirm the actual bundle icon is our selected design rather than
+    # PyInstaller's default icon, irrespective of its eventual basename.
+    icon_name=None
+    if icon_args:
+        expected_icon=digest(branding/"converter-icon.icns")
+        candidates=list((app/"Contents/Resources").glob("*.icns"))
+        verified=[p for p in candidates if digest(p)==expected_icon]
+        if len(verified)!=1:
+            raise RuntimeError("Configured Finder/Dock icon does not match approved PyMO 04 ICNS")
+        icon_name=verified[0].name
     # PyInstaller defaults to Finder's 0.0.0 even though the UI says 1.2.0.
     # Set the release metadata and re-apply only an ad-hoc local code signature:
     # this is NOT Apple Developer ID signing or notarization.
@@ -113,8 +123,8 @@ def main():
     plist["CFBundleShortVersionString"] = metadata["version"]
     plist["CFBundleVersion"] = metadata["version"]
     plist["CFBundleGetInfoString"] = f"CPyMO NDS Converter {metadata['version']}"
-    if icon_args:
-        plist["CFBundleIconFile"] = "converter-icon.icns"
+    if icon_name:
+        plist["CFBundleIconFile"] = icon_name
     with info.open("wb") as file:
         plistlib.dump(plist, file)
     subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)],
@@ -124,13 +134,9 @@ def main():
     with info.open("rb") as file:
         assert plistlib.load(file)["CFBundleShortVersionString"] == metadata["version"]
     require_arch(app / "Contents/MacOS/CPyMO-NDS-Converter")
-    if icon_args:
-        icon_candidates = [
-            app/"Contents/Resources/converter-icon.icns",
-            app/"Contents/Resources/icon-windowed.icns",
-        ]
-        if not any(p.is_file() for p in icon_candidates):
-            raise RuntimeError("macOS .app is missing the packaged Finder/Dock icon")
+    if icon_name:
+        if digest(app/"Contents/Resources"/icon_name)!=expected_icon:
+            raise RuntimeError("Packaged Finder/Dock icon changed after ad-hoc signing")
     for resource in ("cpymo-nds.nds", "ffmpeg", "release.json"):
         present = any((app / location / resource).is_file() for location in
                       ("Contents/Resources", "Contents/Frameworks", "Contents/MacOS"))
