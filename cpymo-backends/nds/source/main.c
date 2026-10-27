@@ -40,6 +40,10 @@ static int pump_eof(void* user){PumpIO* io=user;return io->cb->eof(io->user);}
 stbi_uc* __wrap_stbi_load_from_callbacks(const stbi_io_callbacks* cb,void* user,int* w,int* h,int* channels,int requested){PumpIO io={cb,user,tickGetCount()};stbi_io_callbacks pump={pump_read,pump_skip,pump_eof};return __real_stbi_load_from_callbacks(&pump,&io,w,h,channels,requested);}
 
 static cpymo_engine engine;
+/* UI requests only set this latch; the main game loop owns cleanup. */
+static bool nds_library_exit_requested;
+void nds_request_exit_to_library(void){nds_library_exit_requested=true;}
+
 static u16 framebuffer[256*192] __attribute__((aligned(32)));
 static u16 *vram;
 /* Cache the exact immutable base-layer command sequence, never dialogue/UI/effects. */
@@ -579,6 +583,7 @@ static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3]
 #include "aux-screen-nds.h"
 #include "visual-capture-nds.h"
 #include "dual-canvas-nds.h"
+#include "nds-picture-bg.h"
 /* Refined lower-LCD presentation for the 1.2 enhanced screen.
  * Native RGB555 decoration sits BEHIND the game's own speaker/name/text.
  * Do not stretch a captured upper screen or allocate a second framebuffer.
@@ -593,8 +598,14 @@ static void nds_dual_lower_background(bool ui,bool choices){
            !engine.input.hide_window && !engine.say.hide_window;
  /* Same RGB555 canvas function is compiled and pixel-tested on desktop;
     CPyMO's REAL namebox, textbox, text and menu render over it afterward. */
- nds_dual_canvas_draw_yield(framebuffer,interactive,dialogue_visible,
-                            nds_dual_canvas_audio_tick,NULL);
+ if(!interactive && nds_picture_get()){
+  /* Copy the approved artwork before rendering game-owned names and text. */
+  memcpy(framebuffer,nds_picture_pixels,sizeof framebuffer);
+  nds_audio_pump_if_due();
+ }else{
+  nds_dual_canvas_draw_yield(framebuffer,interactive,dialogue_visible,
+                             nds_dual_canvas_audio_tick,NULL);
+ }
  if(!interactive && dialogue_visible)
   launcher_text(nds_ui("A / 轻触：继续"),14,169,RGB15(19,25,28),248);
 }
@@ -774,6 +785,7 @@ int main(int argc,char** argv){
  memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
+ nds_library_exit_requested=false;
  nds_dual_load(game_dir);
  nds_capture_init(game_dir);
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
@@ -824,6 +836,14 @@ int main(int argc,char** argv){
  engine_state[33+(interval_us<=20000?0:interval_us<=34000?1:interval_us<=50000?2:interval_us<=100000?3:4)]++;
  u64 update_start=tickGetCount();loaded_image=false;
  err=cpymo_engine_update(&engine,dt,&redraw);
+ if(nds_library_exit_requested){
+  /* The confirmation callback has already exited its UI. Leave the
+     engine alive until the common teardown below; do not restart ROM. */
+  trace=trace_open("ab");
+  if(trace){fputs("EXIT_TO_LIBRARY\n",trace);fclose(trace);}
+  engine_state[1]=0;
+  break;
+ }
  if(!err){
   enforce_text_readability();
   /* Only narrative dialogue ends the opening/title screen. No script-name
