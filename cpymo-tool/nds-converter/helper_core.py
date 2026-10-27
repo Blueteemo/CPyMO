@@ -116,17 +116,19 @@ def run_job(job):
                 name=Path(candidate['root'].rstrip('/\\')).name or 'Game'
                 name=''.join(c for c in name if c.isascii() and (c.isalnum() or c in '_-')) or 'Game'
                 destination=output/'pymo/games'/name
-                ffmpeg=ROOT/'ffmpeg.exe'
-                if not ffmpeg.is_file():
-                    ffmpeg=Path(job.get('ffmpeg') or shutil.which('ffmpeg') or '')
-                if not ffmpeg.is_file():raise ValueError('缺少自带的音频转换组件，请完整解压转换助手，不要只移动 EXE。')
+                bundle=Path(getattr(sys,'_MEIPASS',ROOT))
+                ffmpeg=next((p for p in (bundle/'ffmpeg.exe',bundle/'ffmpeg',ROOT/'ffmpeg.exe',ROOT/'ffmpeg') if p.is_file()),None)
+                if ffmpeg is None:
+                    external=job.get('ffmpeg') or shutil.which('ffmpeg')
+                    ffmpeg=Path(external) if external else None
+                if ffmpeg is None or not ffmpeg.is_file():raise ValueError('缺少视频和音频转换组件 FFmpeg，请完整解压转换助手。')
                 print('正在转换图片、音频和字体，游戏较大时需要等待……',flush=True)
                 cache_only=job.get('cache_only',True)
                 if not isinstance(cache_only,bool):raise ValueError('精简资源选项必须为 true 或 false。')
                 audio_mode=job.get('audio_lossless','voice')
                 if audio_mode not in ('off','voice','all'):raise ValueError('无损压缩模式无效。')
                 cache_only=cache_only or audio_mode!='off'
-                video_mode=job.get('video_mode','skip')
+                video_mode=job.get('video_mode','nvl1')
                 if video_mode not in ('skip','nvl1','nva1'):raise ValueError('视频转换模式无效。')
                 convert.convert(argparse.Namespace(source=game_source,destination=destination,ffmpeg=str(ffmpeg),font=None,jobs=4,missing_glyph_policy=job.get('missing_policy','box'),cache_only=cache_only,audio_lossless=audio_mode,compress_images=audio_mode!='off',video_mode=video_mode,video_fps=12))
                 manifest=json.loads((destination/'nds-cache/manifest.json').read_text(encoding='utf8'))
@@ -135,7 +137,7 @@ def run_job(job):
                     if audit[key]:warnings.append(f'{label}：{len(audit[key])}项')
                 boxed=sorted(set(c for font in manifest.get('pixel_fonts',[]) for c in font.get('boxed_codepoints',[])))
                 if boxed:warnings.append('字库缺字以□显示，原脚本未改：'+', '.join(boxed))
-                rom=ROOT/'cpymo-nds.nds'
+                rom=Path(getattr(sys,'_MEIPASS',ROOT))/'cpymo-nds.nds'
                 if rom.is_file():shutil.copy2(rom,output/'cpymo-nds.nds')
                 report={'ok':True,'status':'已转换，仍需实际运行确认' if warnings else '转换和完整性检查通过，仍需实际运行确认','game':candidate['title'],'platform':candidate['platform'],'game_directory':str(destination),'output':str(output),'original_files_checked':len(manifest.get('source_files',manifest['original_files'])),'cache_files_checked':len(manifest['cache_files']),'warnings':warnings,'compatibility_certified':False,'video_policy':manifest['video_policy'],'videos':manifest.get('videos',[]),'missing_policy':job.get('missing_policy','box'),'source_modified':False}
                 report.update(release_version=convert.VERSION,cache_format=manifest['format'],rom_sha256=hashlib.sha256(rom.read_bytes()).hexdigest() if rom.is_file() else None)
