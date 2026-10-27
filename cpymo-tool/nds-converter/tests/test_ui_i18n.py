@@ -12,7 +12,7 @@ class ConverterLanguageTests(unittest.TestCase):
     def test_player_facing_language_choices(self):
         self.assertEqual(LANGUAGES,('简体中文','English'))
         self.assertEqual(tr('选压缩包'), '选压缩包')
-        self.assertEqual(tr('选压缩包','English'),'Open ZIP / APK')
+        self.assertEqual(tr('选压缩包','English'),'Open ZIP')
         self.assertEqual(tr('转换视频 NVL1（推荐：兼容优先）','English'),
                          'Convert to NVL1 (recommended)')
         self.assertEqual(tr('转换视频 NVA1（压缩音频）','English'),

@@ -15,6 +15,8 @@ from PIL import Image
 
 SOURCE_SHA256 = "3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62"
 WINDOWS_SIZES = ((16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256))
+# Only desktop derivatives are horizontally balanced; the source master is unchanged.
+OPTICAL_WIDTH_SCALE = 0.976
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -35,7 +37,11 @@ def build(source: Path, dest: Path, *, allow_alternate_source: bool=False) -> di
     if image.getchannel("A").getextrema()[0] >= 255:
         raise ValueError("Expected genuine transparency, not an opaque white/black square")
     dest.mkdir(parents=True,exist_ok=True)
-    master=image.resize((1024,1024),Image.Resampling.LANCZOS)
+    balanced=Image.new("RGBA",image.size,(0,0,0,0))
+    width=round(image.width*OPTICAL_WIDTH_SCALE)
+    balanced.alpha_composite(image.resize((width,image.height),Image.Resampling.LANCZOS),
+                             ((image.width-width)//2,0))
+    master=balanced.resize((1024,1024),Image.Resampling.LANCZOS)
     paths={
         "png":dest/"converter-icon.png",
         "png_64":dest/"converter-icon-64.png",
@@ -43,7 +49,7 @@ def build(source: Path, dest: Path, *, allow_alternate_source: bool=False) -> di
         "icns":dest/"converter-icon.icns",
     }
     master.save(paths["png"],format="PNG",optimize=True)
-    image.resize((64,64),Image.Resampling.LANCZOS).save(paths["png_64"],format="PNG",optimize=True)
+    balanced.resize((64,64),Image.Resampling.LANCZOS).save(paths["png_64"],format="PNG",optimize=True)
     master.save(paths["ico"],format="ICO",sizes=list(WINDOWS_SIZES))
     master.save(paths["icns"],format="ICNS")
     with Image.open(paths["ico"]) as check:
@@ -52,6 +58,7 @@ def build(source: Path, dest: Path, *, allow_alternate_source: bool=False) -> di
         assert check.size == (1024,1024)
         assert (512,512,2) in check.info["sizes"]
     manifest={"source_sha256":actual,
+        "optical_width_scale":OPTICAL_WIDTH_SCALE,
         "source":"04_高清像素图标_透明外框.png",
         "upstream_artwork_license":"review-required-before-public-redistribution",
         "outputs":{name:{"sha256":sha(path),"bytes":path.stat().st_size}

@@ -11,7 +11,7 @@ UI_EN = {
     "选择游戏包，生成可复制到 DS / DSi 存储卡的游戏目录。无需另装 Python 或 FFmpeg。":
         "Choose a PyMO game and prepare its DS / DSi files. No separate Python or FFmpeg installation.",
     "1  选择游戏": "1  Select a game",
-    "选压缩包": "Open ZIP / APK",
+    "选压缩包": "Open ZIP",
     "选文件夹": "Open folder",
     "支持 S60v3 / S60v5 / Android PyMO 数据；同包有多个版本时优先推荐 S60v3。":
         "Supports S60v3 / S60v5 / Android PyMO data. If multiple versions exist, S60v3 is preferred.",
@@ -42,7 +42,7 @@ UI_EN = {
     "打开结果文件夹": "Open output folder",
     "NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 {version}":
         "NDS port: 千岚之夏  ·  Based on CPyMO / PyMO  ·  Converter {version}",
-    "先选择游戏压缩包或游戏文件夹。": "Select a game ZIP / APK or folder to begin.",
+    "先选择游戏压缩包或游戏文件夹。": "Select a game ZIP or folder to begin.",
     "选择 PyMO 游戏包": "Select a PyMO game package",
     "游戏包": "Game packages",
     "全部文件": "All files",

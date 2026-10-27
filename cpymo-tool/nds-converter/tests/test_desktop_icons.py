@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from tools.build_desktop_icons import build, SOURCE_SHA256, WINDOWS_SIZES
+from tools.build_desktop_icons import build, SOURCE_SHA256, WINDOWS_SIZES, OPTICAL_WIDTH_SCALE
 
 
 class DesktopIconBuildTests(unittest.TestCase):
@@ -32,8 +32,14 @@ class DesktopIconBuildTests(unittest.TestCase):
             output=root/"generated"
             manifest=build(source,output,allow_alternate_source=True)
             self.assertIn("outputs",manifest)
+            self.assertEqual(manifest["optical_width_scale"],0.976)
+            self.assertAlmostEqual(OPTICAL_WIDTH_SCALE,0.976)
             for item in ("png","png_64","ico","icns"):
                 self.assertGreater(manifest["outputs"][item]["bytes"],100)
+            with Image.open(output/"converter-icon.png") as im:
+                self.assertEqual(im.size,(1024,1024))
+                bbox=im.getchannel("A").getbbox()
+                self.assertLessEqual(abs((bbox[2]-bbox[0])-(bbox[3]-bbox[1])),18)
             with Image.open(output/"converter-icon.ico") as im:
                 self.assertTrue(set(WINDOWS_SIZES)<=set(im.info["sizes"]))
             with Image.open(output/"converter-icon.icns") as im:

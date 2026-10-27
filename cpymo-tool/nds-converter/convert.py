@@ -176,7 +176,7 @@ def verify(destination):
     print(f'VERIFIED {len(manifest["original_files"])} original files and {len(manifest["cache_files"])} cache files')
 
 def inspect_source(src):
-    if not (src/'gameconfig.txt').is_file(): raise ValueError('Choose the extracted GAME folder containing gameconfig.txt, not the platform bundle or APK')
+    if not (src/'gameconfig.txt').is_file(): raise ValueError('Choose the extracted GAME folder containing gameconfig.txt, not the platform bundle or Android installer')
     config={}
     for line in (src/'gameconfig.txt').read_text(encoding='utf-8-sig').splitlines():
         k,sep,v=line.partition(',')

@@ -49,7 +49,7 @@ def discover(source,temp):
             if 'gameconfig.txt' in files:
                 p=Path(folder)/'gameconfig.txt';c=configuration(p.read_bytes())
                 candidates.append({'chain':[],'root':str(Path(folder).resolve()),'title':c.get('gametitle',Path(folder).name).replace('\\n',' / '),'platform':c.get('platform','未知'),'kind':'folder'})
-    elif source.suffix.casefold() in ('.zip','.apk'):
+    elif source.suffix.casefold() in ('.zip',):
         def scan(path,chain,depth):
             with zipfile.ZipFile(path) as archive:
                 entries=archive_entries(archive)
@@ -59,14 +59,14 @@ def discover(source,temp):
                         c=configuration(archive.read(entry));root=name[:-len('gameconfig.txt')]
                         candidates.append({'chain':chain,'root':root,'title':c.get('gametitle',PurePosixPath(root).name or source.stem).replace('\\n',' / '),'platform':c.get('platform','未知'),'kind':'archive','archive':str(path)})
                 if depth<2:
-                    nested=sorted((e for e in entries if Path(e.filename).suffix.casefold() in ('.zip','.apk') and not e.is_dir()),key=lambda e:e.filename.casefold())
+                    nested=sorted((e for e in entries if Path(e.filename).suffix.casefold() in ('.zip',) and not e.is_dir()),key=lambda e:e.filename.casefold())
                     if len(nested)>12:raise ValueError('嵌套游戏包太多，请单独选择要转换的游戏包。')
                     for entry in nested:
                         name=checked_name(entry.filename);next_path=temp/(hashlib.sha256(('/'.join(chain+[name])).encode()).hexdigest()+'.zip')
                         with archive.open(entry) as inp,next_path.open('wb') as out:shutil.copyfileobj(inp,out,1024*1024)
                         scan(next_path,chain+[name],depth+1)
         scan(source,[],0)
-    else:raise ValueError('请选择游戏文件夹，或 ZIP / APK 压缩包。')
+    else:raise ValueError('请选择游戏文件夹，或 ZIP 压缩包。')
     rank={'s60v3':0,'symbian':0,'s60v5':1,'android':2,'pygame':3}
     candidates.sort(key=lambda c:(rank.get(c['platform'].casefold(),9),c['title'],c['chain'],c['root']))
     for index,candidate in enumerate(candidates):candidate['id']=index

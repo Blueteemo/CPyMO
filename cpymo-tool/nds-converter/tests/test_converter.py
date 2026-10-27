@@ -178,12 +178,21 @@ class ConverterTests(unittest.TestCase):
                     with zipfile.ZipFile(nested,'w') as inner:
                         for p in game.rglob('*'):
                             if p.is_file():inner.writestr('Game/'+p.relative_to(game).as_posix(),p.read_bytes())
-                    outer.writestr(platform+('.apk' if platform=='android' else '.zip'),nested.getvalue())
+                    outer.writestr(platform+'.zip',nested.getvalue())
             candidates=helper_core.discover(source,base)
             self.assertEqual([c['platform'] for c in candidates],['s60v3','s60v5','android'])
             dest=helper_core.extract_game(candidates[0],base/'selected')
             self.assertEqual(helper_core.configuration((dest/'gameconfig.txt').read_bytes())['platform'],'s60v3')
             self.assertFalse((dest/'save').exists())
+
+    def test_apk_installers_are_not_game_package_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp)
+            apk=base/'android-engine.apk'
+            with zipfile.ZipFile(apk,'w') as z:
+                z.writestr('Game/gameconfig.txt','gametitle,example\nplatform,android\n')
+            with self.assertRaisesRegex(ValueError,'ZIP'):
+                helper_core.discover(apk,base)
 
     @unittest.skipUnless(shutil.which('ffmpeg') or os.environ.get('NDS_TEST_FFMPEG'),'FFmpeg required')
     def test_uppercase_packed_and_loose_symbian_masks(self):

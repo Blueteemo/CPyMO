@@ -191,7 +191,7 @@ class App:
         self._update_advanced_caption()
 
     def pick_zip(self):
-        p=filedialog.askopenfilename(title=self.tr('选择 PyMO 游戏包'),filetypes=[(self.tr('游戏包'),'*.zip *.apk'),(self.tr('全部文件'),'*.*')])
+        p=filedialog.askopenfilename(title=self.tr('选择 PyMO 游戏包'),filetypes=[(self.tr('游戏包'),'*.zip'),(self.tr('全部文件'),'*.*')])
         if p:self.source.set(p);self.inspect()
 
     def pick_folder(self):
