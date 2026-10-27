@@ -424,7 +424,10 @@ static void launcher_draw(const char* message){
  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
- launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,160,accent,250);launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,178,muted,250);}
+ /* Leave the final 16-pixel bitmap-text row completely inside the
+     192-pixel LCD. Keep two-line hints without crowding the game cards. */
+  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,155,accent,250);
+  launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,173,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}
 }
