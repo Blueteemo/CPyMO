@@ -20,9 +20,9 @@
 **Apple 官方明确：Rosetta 在 macOS 27 及更早版本普遍可用；从 macOS 28 起只针对部分停更旧游戏保留。** https://support.apple.com/zh-cn/102527
 
 - [ ] **必须生成 ARM64 原生 macOS `.app`**，而不是让 Apple Silicon 玩家用 Intel RC + Rosetta。CI 采用 `macos-15` Apple Silicon M1 runner，PyInstaller 指定 `--target-arch arm64`，从源码编译 **ARM64** LGPL FFmpeg。整个应用／FFmpeg 的 Mach-O 架构必须明确包含 ARM64，且冻结进程实际运行视频转换与缺字回退。
-- [ ] 保留独立的 Intel `x86_64` Mac RC，在 `macos-15-intel` 上构建、测试，**两种架构的 macOS .app 不是两份 NDS ROM**：两端必须内嵌同一 `cpymo-nds.nds`，绝不改变已验收的 NTR/TWL 通用 ROM。
-- [ ] 默认推荐 Mac 玩家下载 `macOS-arm64`；Intel Mac 下载 `macOS-x86_64`。不以 Intel + Rosetta 当作 Apple Silicon 支持。将来若实现真正 Universal 2，必须是所有 PyInstaller/Python/FFmpeg 依赖均具备双架构切片的完整 Universal 2 应用，不能简单把两个 PyInstaller 输出用 lipo 拼接。
-- [ ] **本地 DeepSeek 的最终验收对象改为原生 ARM64 RC**（若用户的 Mac 是 Apple Silicon），需证明 Finder 的「显示简介」为 Apple 芯片应用、`file`／`lipo -archs` 校验 app 主程序及内嵌 FFmpeg；确认没有依赖安装 Rosetta、正常打开 GUI、默认 NVL1 实际转码、NVA1 及缺字策略、文件与存档保护。Intel RC 只对 Intel Mac 做独立验证。
+- [x] **用户决定只提供 ARM64 原生 macOS 安装包。** 不再维护 Intel x86_64 公开发行附件；Intel Mac 可选择从源码运行转换工具。这一决定不涉及 NDS ROM 分裂或功能变更。
+- [x] 正式发行仅列 `macOS-arm64`，不再提供 `macOS-x86_64`。不以 Intel + Rosetta 作为 Apple Silicon 支持；没有必要为 1.2 制作 Universal 2。
+- [ ] **本地 DeepSeek 的最终验收对象是原生 ARM64 RC**（用户在 Apple Silicon Mac 上执行），需证明 Finder 的「显示简介」为 Apple 芯片应用、`file`／`lipo -archs` 校验 app 主程序及内嵌 FFmpeg；确认无需 Rosetta、正常打开 GUI、默认 NVL1 实际转码、NVA1、英文切换、缺字策略、文件与存档保护。不要求测试 Intel RC。
 - [ ] 不自动在 macOS 28 已发布之前声称兼容性 100%；以 ARM64 独立本机运行消除 Rosetta 这一已知淘汰风险。Gatekeeper 签名／公证仍是另一个未解决的发行门槛。
 
 ## 发行依赖合规门槛（2026-10-27 增补）
