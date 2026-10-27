@@ -174,9 +174,12 @@ def main():
     (output / "README-macOS.txt").write_text(
         "CPyMO NDS 转换助手 macOS 开发候选包（非正式发行版）\n"
         "打开 CPyMO-NDS-Converter.app 转换原版 PyMO 游戏。\n"
-        "如遇到 macOS 安全提示，不要禁用 Gatekeeper 或系统完整性保护。\n"
-        "此开发候选版没有 Apple Developer ID 签名及公证，正式公开发布前\n"
-        "还需要原生 GUI 测试、相应许可证材料及平台发行安全审查。\n"
+        "本候选版没有 Apple Developer ID 签名，也未经 Apple 公证。\n"
+        "请确认从可信发布来源获取并核对 SHA-256 后再决定是否打开。\n"
+        "若被 Gatekeeper 拦截，可参照 Apple 官方说明在「系统设置 > 隐私与安全性」\n"
+        "中检查「仍要打开」；不要全局关闭 Gatekeeper 或系统完整性保护。\n"
+        "官方文档：https://support.apple.com/zh-cn/102445\n"
+        "正式公开发布前仍须核对第三方来源与发行安全注意事项。\n"
         "可运行游戏程序为同目录 cpymo-nds.nds，不含商业游戏。\n",
         encoding="utf8")
     print(json.dumps({"version": metadata["version"], "architecture":args.target_arch,
