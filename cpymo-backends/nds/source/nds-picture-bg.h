@@ -12,6 +12,7 @@
 #ifndef CPYMO_NDS_PICTURE_BG_H
 #define CPYMO_NDS_PICTURE_BG_H
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define NDS_PICTURE_PIXELS (256u * 192u)
@@ -30,7 +31,7 @@ typedef struct {
  * below prevent constant folding of the staging marker by -O2/LTO. */
 static const nds_picture_embedded_record nds_picture_embedded
  __attribute__((used,aligned(4))) = {
- .marker=NDS_PICTURE_WAIT_MARKER,
+ .marker={'C','P','Y','M','O','_','B','G','_','A','W','A','I','T','1','2'},
  .pixels={[0 ... NDS_PICTURE_PIXELS-1] = NDS_PICTURE_PLACEHOLDER}
 };
 
@@ -39,8 +40,8 @@ static const nds_picture_embedded_record nds_picture_embedded
 static inline const uint16_t* nds_picture_get(void){
  const volatile unsigned char* found=
     (const volatile unsigned char*)nds_picture_embedded.marker;
- static const unsigned char wanted[NDS_PICTURE_MARKER_SIZE]=
-    NDS_PICTURE_READY_MARKER;
+ static const unsigned char wanted[NDS_PICTURE_MARKER_SIZE]={
+    'C','P','Y','M','O','_','B','G','_','R','E','A','D','Y','1','2'};
  for(unsigned i=0;i<NDS_PICTURE_MARKER_SIZE;i++)
   if(found[i]!=wanted[i])return NULL;
  return nds_picture_embedded.pixels;
