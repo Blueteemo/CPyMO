@@ -7,6 +7,12 @@
 - macOS `.app` 的 `CFBundleIconFile`、生成 ICNS 一致性、ad-hoc 签名后资源哈希已由打包脚本验证。Windows PE 已经由 PyInstaller `--icon` 嵌入并成功完成 Windows 端的合成视频转换测试；未做 Windows 任务栏人工外观验证。
 - 仍属于 **发行候选 RC**，不是公开 GitHub Release。公开发布前仍须完成视觉源图 MIT 署名、Gatekeeper 未公证说明、最终发布源代码与完整 SHA256SUMS、跨资产核对。
 
+## 2026-10-28：最后界面微调与输入范围冻结
+
+- 04 原图保持原始 1254×1254 RGBA 字节与 SHA-256 不变；Windows/macOS 图标仅将可见图案横向收窄 2.4% 并居中。NDS 32×32 图标保持原样。
+- 依据原版 PyMO Android 安装说明，游戏数据应在解压后的游戏文件夹中，并无实际 APK 游戏包测试依据。发布版桌面转换器仅接收 ZIP/游戏文件夹，不再接受 Android APK 安装包；Android PyMO 游戏数据的转换支持不变。已更新 Android ZIP 测试和 APK 拒绝回归测试。
+- 新图标的 Finder/Dock、Windows Shell 实际外观与最后文案需要轻量验收，不重复 DS/NTR、DSi/TWL 已通过的实机测试。
+
 ## 桌面转换器正式应用图标（2026-10-27）
 
 - [x] 视觉方案：采用 10 月 25 日资料库的 **04_高清像素图标_透明外框.png**，而非 02 黑底版本。原件尺寸 1254×1254 RGBA，SHA-256 `3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62`。
@@ -26,7 +32,7 @@
 - [x] 生成且校验通用 `cpymo-nds.nds` 的 1.2 候选：NTR/TWL 使用同一 ROM，02-B 星夜背景 SHA-256 与实机验收素材一致，未保留 placeholder；后续冻结发布提交时须再次核对输出哈希。对应 CI：https://github.com/Blueteemo/CPyMO/actions/runs/40490746670
 - [x] Windows Starter **RC** 嵌入相同 SHA-256 的通用 ROM；默认 NVL1、缺字自动方框、输入源完整性及实际 FFmpeg 视频转换的冻结工作进程测试通过。正式发行提交冻结后须重建并重复核验。
 - [x] macOS Intel `.app` **RC** 完整打包并通过 CI 视频转换及配套 ROM 校验；附 FFmpeg 7.1.5 完整对应源码与 LGPL 编译参数。**尚未通过用户自己的 Finder/Apple Silicon 图形验收**。
-- [x] 已在本轮发版会话向用户提供**经过核验的 macOS LGPL RC ZIP**（SHA-256 `d99ca80e64ecdb098cb4e116f4eea7625109dbb9869c597e70dd6f4176168546`）及可直接交给 DeepSeek 的独立中文验收提示词；明确要求验证 Finder、ZIP/APK/目录、默认 NVL1/NVA1、缺字、源文件与存档保护、Apple Silicon/Rosetta，并禁止关闭 SIP 或 Gatekeeper。
+- [x] 已在本轮发版会话向用户提供**经过核验的 macOS LGPL RC ZIP**（SHA-256 `d99ca80e64ecdb098cb4e116f4eea7625109dbb9869c597e70dd6f4176168546`）及可直接交给 DeepSeek 的独立中文验收提示词；明确要求验证 Finder、ZIP/目录（旧 RC 也测过 APK，正式版已移除该输入）、默认 NVL1/NVA1、缺字、源文件与存档保护、Apple Silicon/Rosetta，并禁止关闭 SIP 或 Gatekeeper。
 - [x] 本机 DeepSeek 的 macOS ARM64 7/7 GUI 修复复验报告已经收到并审核（run `40513187447`）；现有最终图标 RC 已通过 macOS CI，图标的 Finder/Dock 外观仍需最后视觉观察，不必重复 NDS 实机验收。
 - [ ] Windows/macOS 包、源码及许可证梳理、FFmpeg 构建信息、SHA256SUMS 与更新日志互相一致。Mac 未纳入公开资产前，不把它写成已发布。
 - [x] Release 正文草稿已按 1.0/1.1 风格编写：准确描述 DSi/TWL、缓存、跨设备资料库、滚动与触控、三态双屏、NVL1/NVA1 视频、菜单存档，并明确输入支持 Android 游戏数据；排除研究中的 FVDS，补充桌面图标出处与 Mac 未公证说明。**附件下载 URL、最终 SHA256/文件大小仍待最后冻结后填入**。
