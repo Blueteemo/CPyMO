@@ -31,7 +31,6 @@ static inline uint16_t nds_dual_canvas_row(unsigned y){
 static inline void nds_dual_canvas_draw_yield(uint16_t *pixels,
                                         int interactive,int dialogue_visible,
                                         void (*audio_tick)(void*),void* audio_ctx){
- (void)interactive;
  (void)dialogue_visible;
  if(!pixels)return;
  for(unsigned y=0;y<NDS_DUAL_CANVAS_H;y++){
@@ -41,11 +40,30 @@ static inline void nds_dual_canvas_draw_yield(uint16_t *pixels,
   /* Preserve the six per-frame audio servicing opportunities on ARM9. */
   if(audio_tick && (y&31u)==0)audio_tick(audio_ctx);
  }
- /* Minimal upper guide rail, deliberately outside the dialogue content. */
+ /* Quiet inset-edge frame, not a textbox imitation or a second image.
+  * Edge accents are rendered behind the game's own dialogue and names;
+  * menu/choice state suppresses the vertical frame to protect legibility.
+  * RGB555-native, fixed pixels, no textures or extra framebuffer. */
  const uint16_t bright=nds_dual_canvas_color(12,18,23);
  const uint16_t muted=nds_dual_canvas_color(7,12,17);
  for(unsigned x=12;x<244;x++)pixels[7*NDS_DUAL_CANVAS_W+x]=muted;
  for(unsigned x=12;x<38;x++)pixels[7*NDS_DUAL_CANVAS_W+x]=bright;
+ if(!interactive){
+  for(unsigned y=16;y<181;y++){
+   const uint16_t base=nds_dual_canvas_row(y);
+   const unsigned r=base&31u,g=(base>>5)&31u,b=(base>>10)&31u;
+   const uint16_t edge=nds_dual_canvas_color(r+1u,g+2u,b+2u);
+   pixels[y*NDS_DUAL_CANVAS_W+7]=edge;
+   pixels[y*NDS_DUAL_CANVAS_W+248]=edge;
+  }
+  /* Short understated corner marks; intentionally no full-width footer.
+   * The game's own textbox and touch regions remain unobstructed. */
+  const uint16_t corner=nds_dual_canvas_color(6,9,13);
+  for(unsigned x=12;x<30;x++){
+   pixels[181*NDS_DUAL_CANVAS_W+x]=corner;
+   pixels[181*NDS_DUAL_CANVAS_W+(255u-x)]=corner;
+  }
+ }
 }
 static inline void nds_dual_canvas_draw(uint16_t *pixels,
                                         int interactive,int dialogue_visible){
