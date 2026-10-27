@@ -10,29 +10,29 @@ from release_info import VERSION
 class App:
     def __init__(self,window,state_root=None,self_test=None):
         self.window=window;self.process=None;self.self_test=self_test;self.test_started=False
-        self.state_root=Path(state_root or Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/'CPyMO-NDS-转换助手'/'jobs')
+        self.state_root=Path(state_root or (Path(os.environ['LOCALAPPDATA'])/'CPyMO-NDS-转换助手'/'jobs' if os.name=='nt' and os.environ.get('LOCALAPPDATA') else Path.home()/'Library/Application Support/CPyMO-NDS-Converter/jobs' if sys.platform=='darwin' else Path.home()/'.local/share/CPyMO-NDS-Converter/jobs'))
         self.source=tk.StringVar();self.output=tk.StringVar(value=str(Path.home()/'Desktop'))
         self.status=tk.StringVar(value='先选择游戏压缩包或游戏文件夹。')
         self.candidates=[];self.serial=0;self.last_result=None;self.last_output=None
-        window.title('CPyMO NDS 转换助手');window.geometry('840x890');window.minsize(760,870)
-        window.option_add('*Font',('Microsoft YaHei UI',10))
-        style=ttk.Style();style.theme_use('clam');style.configure('TButton',padding=(12,7));style.configure('Title.TLabel',font=('Microsoft YaHei UI',19,'bold'))
+        window.title('CPyMO NDS 转换助手');window.geometry(f"840x{min(890,max(700,window.winfo_screenheight()-110))}");window.minsize(760,670)
+        ui_font='PingFang SC' if sys.platform=='darwin' else 'Microsoft YaHei UI'
+        window.option_add('*Font',(ui_font,10))
+        style=ttk.Style();style.theme_use('clam');style.configure('TButton',padding=(12,7));style.configure('Title.TLabel',font=(ui_font,19,'bold'))
         frame=ttk.Frame(window,padding=22);frame.pack(fill='both',expand=True)
         ttk.Label(frame,text='CPyMO NDS 转换助手',style='Title.TLabel').pack(anchor='w')
         ttk.Label(frame,text='选择游戏包，生成可复制到 R4 的游戏目录。无需另装 Python 或 FFmpeg。').pack(anchor='w',pady=(6,16))
-        ttk.Label(frame,text='1  选择游戏',font=('Microsoft YaHei UI',11,'bold')).pack(anchor='w')
+        ttk.Label(frame,text='1  选择游戏',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,8))
         ttk.Entry(row,textvariable=self.source,state='readonly').pack(side='left',fill='x',expand=True)
         self.zip_button=ttk.Button(row,text='选压缩包',command=self.pick_zip);self.zip_button.pack(side='left',padx=(8,4))
         self.folder_button=ttk.Button(row,text='选文件夹',command=self.pick_folder);self.folder_button.pack(side='left')
         self.games=tk.Listbox(frame,height=3,exportselection=False,activestyle='none',selectbackground='#27659c',relief='solid',borderwidth=1)
-        self.games.pack(fill='x');ttk.Label(frame,text='支持 S60v3 / S60v5 / 安卓 PyMO 数据；同包有多个版本时优先推荐 S60v3。',foreground='#526579').pack(anchor='w',pady=(5,12))
-        ttk.Label(frame,text='2  选择保存位置',font=('Microsoft YaHei UI',11,'bold')).pack(anchor='w')
+        self.games.pack(fill='x');ttk.Label(frame,text='支持 S60v3 / S60v5 / Android PyMO 数据；同包有多个版本时优先推荐 S60v3。',foreground='#526579').pack(anchor='w',pady=(5,12))
+        ttk.Label(frame,text='2  选择保存位置',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,6));ttk.Entry(row,textvariable=self.output,state='readonly').pack(side='left',fill='x',expand=True)
         self.output_button=ttk.Button(row,text='选保存位置',command=self.pick_output);self.output_button.pack(side='left',padx=(8,0))
         ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频可选择转换。',foreground='#526579').pack(anchor='w',pady=(0,10))
-        self.box=tk.BooleanVar(value=True)
-        ttk.Checkbutton(frame,text='遇到字库缺字时显示 □ 并记录，保留原脚本内容',variable=self.box).pack(anchor='w')
+        ttk.Label(frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579').pack(anchor='w')
         self.cache_only=tk.BooleanVar(value=True)
         ttk.Checkbutton(frame,text='精简重复媒体：省去已有 NDS 缓存的原媒体，保留脚本与署名',variable=self.cache_only).pack(anchor='w')
         self.compression=tk.StringVar(value='无损压缩语音与适合的图片（推荐）')
@@ -42,7 +42,7 @@ class App:
         self.compression_box.bind('<<ComboboxSelected>>',lambda _:self.cache_only.set(True) if self.compression_modes.index(self.compression.get()) else None)
         ttk.Label(frame,text='请使用随附的 '+VERSION+' 引擎；无损缓存压缩不额外降低画质或音质。',foreground='#526579').pack(anchor='w',pady=(3,0))
         self.video_modes=['不转换视频（兼容旧流程）','转换视频 NVL1（推荐：兼容优先）','转换视频 NVA1（压缩音频）']
-        self.video=tk.StringVar(value=self.video_modes[0])
+        self.video=tk.StringVar(value=self.video_modes[1])
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='游戏视频：').pack(side='left')
         ttk.Combobox(row,textvariable=self.video,values=self.video_modes,
                      state='readonly',width=47).pack(side='left')
@@ -54,7 +54,7 @@ class App:
         self.open_button=ttk.Button(row,text='打开结果文件夹',command=self.open_output,state='disabled');self.open_button.pack(side='right')
         self.progress=ttk.Progressbar(frame,mode='indeterminate');self.progress.pack(fill='x')
         ttk.Label(frame,textvariable=self.status,wraplength=790).pack(anchor='w',pady=(8,4))
-        self.log=tk.Text(frame,height=4,wrap='word',background='#f1f4f8',relief='flat',font=('Microsoft YaHei UI',9));self.log.pack(fill='both',expand=True,pady=(4,8))
+        self.log=tk.Text(frame,height=4,wrap='word',background='#f1f4f8',relief='flat',font=(ui_font,9));self.log.pack(fill='both',expand=True,pady=(4,8))
         ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579').pack(anchor='w')
         window.protocol('WM_DELETE_WINDOW',self.close)
         if self_test:
@@ -120,7 +120,7 @@ class App:
         self.status.set('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
         audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
         if audio_mode!='off':self.cache_only.set(True)
-        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box' if self.box.get() else 'error','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())]},self.converted)
+        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())]},self.converted)
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
@@ -155,7 +155,10 @@ class App:
         self.process=None;self.busy(False);self.status.set('已取消。原游戏包未改动；未完成目录和日志保留供检查。')
 
     def open_output(self):
-        if self.last_output:os.startfile(self.last_output)
+        if self.last_output:
+            if sys.platform=='darwin':subprocess.Popen(['open',str(self.last_output)])
+            elif os.name=='nt':os.startfile(self.last_output)
+            else:subprocess.Popen(['xdg-open',str(self.last_output)])
 
     def close(self):
         if self.process:self.cancel()
