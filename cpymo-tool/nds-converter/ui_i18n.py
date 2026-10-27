@@ -76,6 +76,24 @@ UI_EN = {
         "The conversion worker exited unexpectedly. Please keep the diagnostic logs.",
     "界面语言：": "Language:",
     "检测到不支持的素材；请查看诊断日志。": "Unsupported assets were detected; see diagnostic logs.",
+    "默认保留并转换游戏视频；如不需要视频，也可以选择跳过。":
+        "Videos are converted automatically. Choose Skip only if you do not want them.",
+    "更多设置（可选）": "More settings (optional)",
+    "收起更多设置": "Hide additional settings",
+    "文件体积与读取：": "Storage and loading:",
+    "默认设置兼顾体积和读取速度，普通使用无需调整。":
+        "Recommended settings balance file size and loading speed. Usually no changes are needed.",
+    "查看错误日志": "Open diagnostic logs",
+    "转换完成！请打开结果文件夹，按说明复制到 TF 卡。":
+        "Done! Open the output folder and follow the instructions to copy files to your storage card.",
+    "转换完成！有一些提示，建议先查看下方记录。":
+        "Conversion finished with some notes. Please read the messages below.",
+    "自动识别游戏版本；如果找到多个版本，会优先推荐适合 NDS 的版本。":
+        "Game versions are detected automatically. A recommended version is selected if multiple are found.",
+    "转换后保存在新文件夹，不会修改原游戏或覆盖已有存档。":
+        "A new output folder is created. Your original game and existing saves are left untouched.",
+    "选择自己的 PyMO 游戏，转换好后复制到 DS / DSi 的存储卡即可。":
+        "Select your PyMO game, convert it, then copy the result to your DS / DSi storage card.",
     "缺少视频和音频转换组件 FFmpeg，请完整解压转换助手。":
         "FFmpeg is missing. Extract the complete converter package.",
     "视频转换模式无效。": "Invalid video conversion mode.",
