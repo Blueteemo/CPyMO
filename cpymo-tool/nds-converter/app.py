@@ -40,13 +40,16 @@ class App:
         ttk.Entry(row,textvariable=self.source,state='readonly').pack(side='left',fill='x',expand=True)
         self.zip_button=ttk.Button(row,text='选压缩包',command=self.pick_zip);self.zip_button.pack(side='left',padx=(8,4))
         self.folder_button=ttk.Button(row,text='选文件夹',command=self.pick_folder);self.folder_button.pack(side='left')
-        self.games=tk.Listbox(frame,height=3,exportselection=False,activestyle='none',background='#ffffff',foreground='#233247',selectbackground='#27659c',selectforeground='#ffffff',relief='solid',borderwidth=1)
-        self.games.pack(fill='x');ttk.Label(frame,text='自动识别游戏版本；如果找到多个版本，会优先推荐适合 NDS 的版本。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(5,12))
+        game_row=ttk.Frame(frame);game_row.pack(fill='x')
+        self.games=tk.Listbox(game_row,height=3,exportselection=False,activestyle='none',background='#ffffff',foreground='#233247',selectbackground='#27659c',selectforeground='#ffffff',relief='solid',borderwidth=1)
+        self.games.pack(side='left',fill='x',expand=True)
+        game_scroll=ttk.Scrollbar(game_row,orient='vertical',command=self.games.yview)
+        game_scroll.pack(side='right',fill='y');self.games.configure(yscrollcommand=game_scroll.set)
+        ttk.Label(frame,text='自动识别游戏版本；如果找到多个版本，会优先推荐适合 NDS 的版本。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(5,12))
         ttk.Label(frame,text='2  选择保存位置',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,6));ttk.Entry(row,textvariable=self.output,state='readonly').pack(side='left',fill='x',expand=True)
         self.output_button=ttk.Button(row,text='选保存位置',command=self.pick_output);self.output_button.pack(side='left',padx=(8,0))
         ttk.Label(frame,text='转换后保存在新文件夹，不会修改原游戏或覆盖已有存档。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(0,10))
-        ttk.Label(frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579',wraplength=780).pack(anchor='w')
         # Media de-duplication is a safe default, not a player decision.
         # Keep the variable for existing CLI and GUI self-test fixtures.
         self.cache_only=tk.BooleanVar(value=True)
@@ -64,6 +67,7 @@ class App:
         self.advanced_button=ttk.Button(frame,text='更多设置（可选）',command=self.toggle_advanced)
         self.advanced_button.pack(anchor='w',pady=(8,0))
         self.advanced_frame=ttk.Frame(frame)
+        ttk.Label(self.advanced_frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(4,3))
         row=ttk.Frame(self.advanced_frame);row.pack(fill='x',pady=(5,0))
         ttk.Label(row,text='文件体积与读取：').pack(side='left')
         self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,
@@ -175,6 +179,10 @@ class App:
         for button in (self.zip_button,self.folder_button,self.output_button):button.configure(state='disabled' if value else 'normal')
         self.cancel_button.configure(state='normal' if value else 'disabled')
         self.convert_button.configure(state='normal' if not value and self.candidates else 'disabled')
+        self.games.configure(state='disabled' if value else 'normal')
+        for widget in (self.video_box,self.compression_box,self.language_box):
+            widget.configure(state='disabled' if value else 'readonly')
+        self.advanced_button.configure(state='disabled' if value else 'normal')
         if value:self.progress.start(12)
         else:self.progress.stop()
 
