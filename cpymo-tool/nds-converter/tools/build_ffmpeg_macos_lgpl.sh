@@ -9,6 +9,7 @@ OUT="$1"
 if [[ -e "$OUT" ]]; then echo "Output exists: $OUT" >&2; exit 2; fi
 mkdir -p "$OUT/bin" "$OUT/source" "$OUT/build"
 OUT="$(cd "$OUT" && pwd -P)"
+trap 'rc=$?; echo "FFmpeg source build failed; recent diagnostics:" >&2; for log in "$OUT/source/configure.log" "$OUT/source/make.log"; do if [[ -f "$log" ]]; then echo "$log" >&2; tail -n 90 "$log" >&2; fi; done; exit "$rc"' ERR
 VERSION="7.1.5"
 ARCHIVE="ffmpeg-${VERSION}.tar.xz"
 URL="https://ffmpeg.org/releases/${ARCHIVE}"
