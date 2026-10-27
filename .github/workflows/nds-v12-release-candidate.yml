@@ -143,19 +143,11 @@ jobs:
 
   macos-rc:
     needs: [final-rom,converter-regression]
-    # Native arm64 avoids dependence on Rosetta, which ordinary applications
-    # cannot use after macOS 27. Preserve a separate Intel native build.
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            arch: arm64
-          - runner: macos-15-intel
-            arch: x86_64
-    runs-on: ${{ matrix.runner }}
+    # Public release targets native Apple Silicon only, no Rosetta.
+    # Intel macOS users can use the source converter on supported Python.
+    runs-on: macos-15
     env:
-      CPYMO_MAC_ARCH: ${{ matrix.arch }}
+      CPYMO_MAC_ARCH: arm64
     timeout-minutes: 65
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -186,7 +178,7 @@ jobs:
           python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds
           python cpymo-tool/nds-converter/build_portable_macos.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH" --output macos-rc
           python cpymo-tool/nds-converter/tests/smoke_macos_portable.py --portable macos-rc --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH"
-      - name: Package native macOS ${{ matrix.arch }} RC for local Finder test
+      - name: Package native macOS ARM64 RC for local Finder test
         run: |
           folder="out/CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC"
           mkdir -p "$folder/FFmpeg-Corresponding-Source"
@@ -200,8 +192,8 @@ jobs:
           python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter "CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2-macOS-${{ matrix.arch }}-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
-          path: CPyMO-for-NDS-1.2.0-Starter-macOS-${{ matrix.arch }}-RC.zip
+          name: CPyMO-1.2-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
+          path: CPyMO-for-NDS-1.2.0-Starter-macOS-arm64-RC.zip
           retention-days: 21
           if-no-files-found: error
 
