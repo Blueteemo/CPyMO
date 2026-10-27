@@ -1,0 +1,53 @@
+name: CPyMO NDS 1.2 Converter UI and i18n Regression
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/nds-v1.2-pico-acceptance-20261027
+    paths:
+      - cpymo-tool/nds-converter/app.py
+      - cpymo-tool/nds-converter/ui_i18n.py
+      - cpymo-tool/nds-converter/helper_core.py
+      - cpymo-tool/nds-converter/tests/**
+      - .github/workflows/nds-v12-converter-ui.yml
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install converter dependencies and a test-only FFmpeg
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements.txt imageio-ffmpeg==0.6.0
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import imageio_ffmpeg
+          bin_dir=Path(os.environ['RUNNER_TEMP'])/'cpymo-test-bin'
+          bin_dir.mkdir()
+          (bin_dir/'ffmpeg').symlink_to(imageio_ffmpeg.get_ffmpeg_exe())
+          with open(os.environ['GITHUB_PATH'],'a') as f:
+              f.write(str(bin_dir)+'\n')
+          PY
+      - name: Compile UI and run full converter regression
+        run: |
+          python -m py_compile cpymo-tool/nds-converter/app.py cpymo-tool/nds-converter/helper_core.py cpymo-tool/nds-converter/ui_i18n.py
+          python cpymo-backends/nds/tools/generate-ui-font.py
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -v
+      - name: Verify translations and stored language without changing game data
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0,'cpymo-tool/nds-converter')
+          from ui_i18n import tr
+          assert tr('选压缩包','English') == 'Open ZIP / APK'
+          assert tr('游戏视频：','English') == 'Game videos:'
+          assert tr('转换视频 NVL1（推荐：兼容优先）','English') == 'Convert to NVL1 (recommended)'
+          print('English strings and default conversion labels: OK')
+          PY
