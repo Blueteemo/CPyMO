@@ -6,7 +6,7 @@ from tkinter import ttk, filedialog, messagebox
 from helper_core import run_job
 
 from release_info import VERSION
-from ui_i18n import tr, LANGUAGES
+from ui_i18n import tr, tr_log, LANGUAGES
 
 class App:
     def __init__(self,window,state_root=None,self_test=None):
@@ -166,7 +166,7 @@ class App:
     def poll(self):
         if not self.process:return
         if self.log_file.exists():
-            text=self.log_file.read_text(encoding='utf8',errors='replace');self.log.delete('1.0','end');self.log.insert('end',text[-5000:]);self.log.see('end')
+            text=self.log_file.read_text(encoding='utf8',errors='replace');self.log.delete('1.0','end');self.log.insert('end',tr_log(text,self.language.get())[-5000:]);self.log.see('end')
         if self.process.poll() is None:self.window.after(300,self.poll);return
         self.process=None;self.busy(False)
         report=json.loads(self.result_file.read_text(encoding='utf8')) if self.result_file.exists() else {'ok':False,'error':'转换进程意外退出，请保留诊断日志。'}
@@ -198,7 +198,7 @@ class App:
     def converted(self,report):
         if not report['ok']:self.failed(report);return
         self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.set_status(report['status']+'。点击“打开结果文件夹”查看安装必读。')
-        self.log.insert('end','\n'+('\n'.join(report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
+        self.log.insert('end','\n'+('\n'.join(self.tr(w) for w in report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
         if report.get('cache_only'):
             self.log.insert('end',self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n');self.log.see('end')
         comp=report.get('lossless',{})
