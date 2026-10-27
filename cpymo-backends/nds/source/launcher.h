@@ -421,7 +421,9 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
- launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
+ /* A 26px row fully contains its 24px icon and 16px title;
+     the slightly larger inter-row gap leaves room for the 2-line footer. */
+  launcher_rect(6,y,244,26,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
  /* Leave the final 16-pixel bitmap-text row completely inside the
@@ -457,7 +459,7 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  if(down&KEY_LEFT){launcher_selected=launcher_selected>=4?launcher_selected-4:0;redraw=true;}if(down&KEY_RIGHT){launcher_selected+=4;if(launcher_selected>=launcher_count)launcher_selected=launcher_count-1;redraw=true;}
  if(down&KEY_TOUCH){touchPosition t;touchRead(&t);
   if(launcher_scrollbar_begin_touch(t.px,t.py)){redraw=true;}
-  else if(t.px>=6&&t.px<(launcher_count>4?LAUNCHER_SCROLL_TOUCH_X:250)&&t.py>=33&&t.py<157){
+  else if(t.px>=6&&t.px<(launcher_count>4?LAUNCHER_SCROLL_TOUCH_X:250)&&t.py>=33&&t.py<154){
    unsigned index=launcher_scroll_first+(t.py-33)/31;
    if(index<launcher_count){start=index==launcher_selected;launcher_selected=index;redraw=true;}
   }
