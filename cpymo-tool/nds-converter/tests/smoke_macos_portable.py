@@ -7,6 +7,7 @@ from pathlib import Path
 import argparse
 import hashlib
 import json
+import platform
 import subprocess
 import sys
 import tempfile
@@ -22,19 +23,28 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--portable", type=Path, required=True)
     p.add_argument("--ffmpeg", type=Path, required=True)
+    p.add_argument("--target-arch", choices=("arm64","x86_64"), required=True)
     a=p.parse_args()
+    assert platform.machine()==a.target_arch, f"Host is {platform.machine()}, not {a.target_arch}"
     root=a.portable.resolve()
     app=root/"CPyMO-NDS-Converter.app"
     exe=app/"Contents/MacOS/CPyMO-NDS-Converter"
     assert exe.is_file(), "Frozen .app executable is missing"
+    def check_arch(binary):
+        out=subprocess.run(["lipo","-archs",str(binary)],check=True,
+                           capture_output=True,text=True,timeout=30)
+        assert a.target_arch in out.stdout.split(), (str(binary),out.stdout,a.target_arch)
+    check_arch(exe)
     rom=root/"cpymo-nds.nds"
     assert rom.is_file()
     metadata=json.loads((root/"VERSION.json").read_text())
+    assert metadata["macos_architecture"]==a.target_arch
     assert digest(rom)==metadata["rom_sha256"]
     bundled=app/"Contents/Frameworks/ffmpeg"
     if not bundled.is_file():
         bundled=app/"Contents/Resources/ffmpeg"
     assert bundled.is_file(), "Bundled FFmpeg missing from frozen application"
+    check_arch(bundled)
     bundled_hash=digest(bundled)
     expected_hash=metadata.get("ffmpeg_bundled_sha256")
     if expected_hash:
@@ -70,7 +80,8 @@ def main():
         print(json.dumps({"mac_frozen_worker":"PASS","default_video":"NVL1",
                           "missing_glyph_policy":"box","paired_rom":"MATCH",
                           "source_integrity":"PASS","ffmpeg_license_flags":"LGPL-compatible",
-                          "ffmpeg_bundle_sha256":bundled_hash},ensure_ascii=False))
+                          "ffmpeg_bundle_sha256":bundled_hash,"native_arch":a.target_arch,
+                          "rosetta_required":"NO" if a.target_arch=="arm64" else "Intel native"},ensure_ascii=False))
 
 
 if __name__=="__main__":
