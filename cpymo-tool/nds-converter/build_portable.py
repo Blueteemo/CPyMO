@@ -37,10 +37,10 @@ def main():
     # Developer builds that omit --rom remain possible, but cannot be
     # mistaken for the explicitly validated single-ROM release path.
     if args.rom:
-        import importlib.util
+        from importlib import util as importlib_util
         verifier = BACKEND / 'tools/verify-release-artifact.py'
-        spec = importlib.util.spec_from_file_location('cpymo_release_gate', verifier)
-        module = importlib.util.module_from_spec(spec)
+        spec = importlib_util.spec_from_file_location('cpymo_release_gate', verifier)
+        module = importlib_util.module_from_spec(spec)
         spec.loader.exec_module(module)
         module.validate_rom_bytes(rom.read_bytes())
     # Old 1.1 Starter's custom ffmpeg.exe intentionally had --disable-swscale
