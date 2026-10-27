@@ -85,7 +85,14 @@ class App:
 
     def set_status(self,raw):
         self._status_zh=raw
-        self.status.set(self.tr(raw))
+        suffix='。点击“打开结果文件夹”查看安装必读。'
+        if raw.endswith(suffix):
+            translated=self.tr(raw[:-len(suffix)])+self.tr(suffix)
+        elif raw.startswith('未完成：'):
+            translated=self.tr('未完成：')+self.tr(raw[len('未完成：'):])
+        else:
+            translated=self.tr(raw)
+        self.status.set(translated)
 
     def _capture_localizable_widgets(self,parent):
         for widget in parent.winfo_children():
@@ -98,7 +105,7 @@ class App:
         self.window.title(self.tr('CPyMO NDS 转换助手'))
         for widget,source in self._ui_sources.items():
             widget.configure(text=self.tr(source))
-        self.status.set(self.tr(self._status_zh))
+        self.set_status(self._status_zh)
 
     def change_language(self,_event=None):
         audio_idx=self.compression_modes.index(self.compression.get())
@@ -190,7 +197,7 @@ class App:
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
-        self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.set_status(self.tr(report['status'])+self.tr('。点击“打开结果文件夹”查看安装必读。'))
+        self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.set_status(report['status']+'。点击“打开结果文件夹”查看安装必读。')
         self.log.insert('end','\n'+('\n'.join(report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
         if report.get('cache_only'):
             self.log.insert('end',self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n');self.log.see('end')
@@ -200,7 +207,7 @@ class App:
         if self.self_test:self.finish_test(report)
 
     def failed(self,report):
-        self.set_status(self.tr('未完成：')+self.tr(report['error']))
+        self.set_status('未完成：'+report['error'])
         if self.self_test:self.finish_test(report)
         else:messagebox.showerror(self.tr('暂时不能完成转换'),self.tr(report['error'])+'\n\n'+self.tr('原游戏包未改动。诊断目录：')+str(self.result_file.parent))
 
