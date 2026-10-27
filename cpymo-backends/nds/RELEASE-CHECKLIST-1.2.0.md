@@ -1,12 +1,19 @@
 # CPyMO for NDS 1.2.0 — 发行工程与最后验收
 
+## 最终桌面图标对应构建（2026-10-27）
+
+- 成功运行：[paired CI #40536655608 / attempt 2](https://github.com/Blueteemo/CPyMO/actions/runs/40536655608/attempts/2)，源码提交 `71942aafb9a45029f7f595137fae80783f4c40d0`。首次 macOS 作业无任何日志步骤记录而在 15m01s 后取消；单独重试后真实 Apple Silicon 运行器正常启动且成功。
+- 产物：macOS arm64 Actions artifact ID `12749434038`（外层 ZIP 55,040,816 字节）、Windows artifact ID `12748358625`（57,576,049 字节）、ROM ID `12748567395`、源码 ID `12747583214`。这些是 **Actions 外层 artifact** 的大小，不是最终分发 ZIP 的 SHA-256。
+- macOS `.app` 的 `CFBundleIconFile`、生成 ICNS 一致性、ad-hoc 签名后资源哈希已由打包脚本验证。Windows PE 已经由 PyInstaller `--icon` 嵌入并成功完成 Windows 端的合成视频转换测试；未做 Windows 任务栏人工外观验证。
+- 仍属于 **发行候选 RC**，不是公开 GitHub Release。公开发布前仍须完成视觉源图 MIT 署名、Gatekeeper 未公证说明、最终发布源代码与完整 SHA256SUMS、跨资产核对。
+
 ## 桌面转换器正式应用图标（2026-10-27）
 
 - [x] 视觉方案：采用 10 月 25 日资料库的 **04_高清像素图标_透明外框.png**，而非 02 黑底版本。原件尺寸 1254×1254 RGBA，SHA-256 `3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62`。
 - [x] 已在本地导出并校验 1024px PNG、64px GUI PNG、16–256px Windows ICO、支持 Retina 的 macOS ICNS；交付完整 04 原件与图标包。
 - [x] Github 开发分支已加入确定性图标生成工具，Windows PyInstaller `--icon` / Tk、macOS ARM64 `--icon` / `CFBundleIconFile` 的接入及防默认图标校验；UI 回归测试已通过 [40533116706](https://github.com/Blueteemo/CPyMO/actions/runs/40533116706)。
-- [ ] **图标源 PNG 二进制尚未写入 GitHub。** 从提供的 `CPyMO_1.2_桌面转换器04号图标_完整交付包.zip` 中，将 `GitHub-ready/cpymo-tool/nds-converter/assets/converter-icon-source.png` 按原字节放入对应 repo 路径。上传后必须核对 SHA-256 与上述 digest；不拿低分辨率备选代替。
-- [ ] 重新运行两端构建并传入 `--require-desktop-icon`，复核 Windows `.exe` PE icon / 任务栏以及 macOS `.app` 的 Dock/Finder 图标、Info.plist 与源 ICNS 一致；软件逻辑和 NDS ROM 不做重测。
+- [x] 04 原始 PNG 已按原字节入库：`cpymo-tool/nds-converter/assets/converter-icon-source.png`（1,538,865 字节），SHA-256 `3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62`；CI 严格核验固定来源。
+- [x] [paired CI #40536655608，attempt 2](https://github.com/Blueteemo/CPyMO/actions/runs/40536655608/attempts/2) **5/5 作业成功**：两端打包都强制 `--require-desktop-icon`。macOS 在 `.app` 内逐字节校验 `.icns`、写入 `CFBundleIconFile` 并在签名后复核；Windows 使用 PyInstaller `--icon`，但 Windows 外壳/任务栏的真人视觉检查尚未单独进行。
 - [ ] 正式公开附带用户选定的 PyMO 衍生视觉前，核对上游图案的使用/转载许可或取得必要授权。图像制作不意味着自动享有原版权。
 
 
@@ -20,7 +27,7 @@
 - [x] Windows Starter **RC** 嵌入相同 SHA-256 的通用 ROM；默认 NVL1、缺字自动方框、输入源完整性及实际 FFmpeg 视频转换的冻结工作进程测试通过。正式发行提交冻结后须重建并重复核验。
 - [x] macOS Intel `.app` **RC** 完整打包并通过 CI 视频转换及配套 ROM 校验；附 FFmpeg 7.1.5 完整对应源码与 LGPL 编译参数。**尚未通过用户自己的 Finder/Apple Silicon 图形验收**。
 - [x] 已在本轮发版会话向用户提供**经过核验的 macOS LGPL RC ZIP**（SHA-256 `d99ca80e64ecdb098cb4e116f4eea7625109dbb9869c597e70dd6f4176168546`）及可直接交给 DeepSeek 的独立中文验收提示词；明确要求验证 Finder、ZIP/APK/目录、默认 NVL1/NVA1、缺字、源文件与存档保护、Apple Silicon/Rosetta，并禁止关闭 SIP 或 Gatekeeper。
-- [ ] 收到 DeepSeek 的 Mac 实测回报并复核。未通过或有 blocker 时修正候选后再决策；不将内部 macOS CI 冒充用户本机 Finder 验收。若最终无法满足 macOS 发行门槛，Mac 版本可延后，但须明示。
+- [x] 本机 DeepSeek 的 macOS ARM64 7/7 GUI 修复复验报告已经收到并审核（run `40513187447`）；现有最终图标 RC 已通过 macOS CI，图标的 Finder/Dock 外观仍需最后视觉观察，不必重复 NDS 实机验收。
 - [ ] Windows/macOS 包、源码及许可证梳理、FFmpeg 构建信息、SHA256SUMS 与更新日志互相一致。Mac 未纳入公开资产前，不把它写成已发布。
 - [ ] Release 正文与 `nds-v1.0.0`、`nds-v1.1.0` 格式一致，明确 1.2 相对 1.1 的新增 DSi/TWL、缓存、跨存储卡游戏库、滚动列表、增强双屏、视频转换与游戏菜单；正式玩家介绍不提研究中的 FVDS，Android 用英文拼写，不增加多余的两 ROM 解释。
 - [ ] 正式 1.2.0 Release 发出以后，再将此 Fork 根目录 README 替换为以 NDS 为主的全新 README，并最后更新原上游 PR #60 的描述、以已经存在的正式 Release 链接为准。
@@ -40,10 +47,10 @@
 
 **Apple 官方明确：Rosetta 在 macOS 27 及更早版本普遍可用；从 macOS 28 起只针对部分停更旧游戏保留。** https://support.apple.com/zh-cn/102527
 
-- [ ] **必须生成 ARM64 原生 macOS `.app`**，而不是让 Apple Silicon 玩家用 Intel RC + Rosetta。CI 采用 `macos-15` Apple Silicon M1 runner，PyInstaller 指定 `--target-arch arm64`，从源码编译 **ARM64** LGPL FFmpeg。整个应用／FFmpeg 的 Mach-O 架构必须明确包含 ARM64，且冻结进程实际运行视频转换与缺字回退。
+- [x] 原生 macOS ARM64 `.app` 已构建：实际 Apple Silicon 本机 7/7 复验 PASS（上一候选），最新嵌入 04 图标的产物见 paired CI `40536655608`，无需 Rosetta，FFmpeg 与主程序均检查 ARM64 架构。
 - [x] **用户决定只提供 ARM64 原生 macOS 安装包。** 不再维护 Intel x86_64 公开发行附件；Intel Mac 可选择从源码运行转换工具。这一决定不涉及 NDS ROM 分裂或功能变更。
 - [x] 正式发行仅列 `macOS-arm64`，不再提供 `macOS-x86_64`。不以 Intel + Rosetta 作为 Apple Silicon 支持；没有必要为 1.2 制作 Universal 2。
-- [ ] **本地 DeepSeek 的最终验收对象是原生 ARM64 RC**（用户在 Apple Silicon Mac 上执行），需证明 Finder 的「显示简介」为 Apple 芯片应用、`file`／`lipo -archs` 校验 app 主程序及内嵌 FFmpeg；确认无需 Rosetta、正常打开 GUI、默认 NVL1 实际转码、NVA1、英文切换、缺字策略、文件与存档保护。不要求测试 Intel RC。
+- [x] 本地 DeepSeek 已独立完成原生 ARM64 Finder/GUI 核心和 7/7 UI 复验（在图标更换前）；最终图标版本由 CI 自动检查 `.icns`，仍需 Finder/Dock 图形展示复核，不能误称该视觉点已有人眼通过。
 - [ ] 不自动在 macOS 28 已发布之前声称兼容性 100%；以 ARM64 独立本机运行消除 Rosetta 这一已知淘汰风险。Gatekeeper 签名／公证仍是另一个未解决的发行门槛。
 
 ## 发行依赖合规门槛（2026-10-27 增补）
