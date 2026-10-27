@@ -1,4 +1,4 @@
-name: CPyMO 1.2 DSpico repair candidate
+name: CPyMO 1.2 DSpico final artwork and game library candidate
 on:
   push:
     branches:
@@ -12,8 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Test save creation, screen routing and actual C canvas
+      - name: Test save creation, native artwork, library UI and font coverage
         run: |
+          python3 cpymo-backends/nds/tools/generate-ui-font.py
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_picture_bg.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_ui_font_coverage.py' -v
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_rom_banner.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_save_dir.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_canvas.py' -v
           python -m unittest discover -s cpymo-tool/nds-converter/tests -p 'test_nds_dual_layout.py' -v
@@ -46,10 +50,11 @@ jobs:
       - name: Create non-destructive DSpico test handoff
         run: |
           mkdir -p dist/CPyMO_1.2_PICO_TWL_Fix_01-05
-          cp cpymo-backends/nds/cpymo-dsi-experiment.nds dist/CPyMO_1.2_PICO_TWL_Fix_01-05/CPyMO_1.2_PICO_TWL_Fix_01-05.nds
+          cp cpymo-backends/nds/cpymo-dsi-experiment.nds dist/CPyMO_1.2_PICO_TWL_Fix_01-05/CPyMO_1.2_PICO_TWL_Art_Library_Candidate.nds
           cat > dist/CPyMO_1.2_PICO_TWL_Fix_01-05/验收说明.txt <<'EOF'
-          CPyMO 1.2 DSpico / DSi TWL 修复候选包，仅用于实机复验。
-          只替换启动用的 .nds；继续使用此前《双卡回廊：终章验收》
+          CPyMO 1.2.0 DSpico / DSi TWL 最终功能候选包，仅用于实机复验。
+          新增强双屏绘画需配套 pymo/nds-dual-bg.rgb555 素材；缺少时自动回退旧背景。
+          ROM 与已选定素材应组合安装。继续使用此前《双卡回廊：终章验收》
           和 NVL1/NVA1/水仙2真实OP 的同一份游戏数据。
           请勿删除或覆盖任何既有游戏资源、存档目录及存档文件。
           确认运行时显示 DSi 模式 · 16 MiB。
@@ -60,7 +65,9 @@ jobs:
               有保存/读取反馈时显示提示，结束后恢复常态。
           #04 X 设置菜单：文字速度、文字大小一字值居于 +/- 中间；
               检查其他音量选项、符号对齐和触控正常。
-          #05 增强双屏下方为轻量RGB555深蓝面板，检查对白/菜单不受影响。
+          #05 增强双屏故事界面使用02-B柔和星夜 RGB555 背景；交互菜单保留简约底。
+          #06 X 菜单新增「退出到游戏库」，确认后应回到保留选中位置的游戏库；取消须继续游戏。
+          #07 CPyMO 启动界面与 ROM 元数据应显示 1.2.0。
           仅需 DSpico 的实机复验；R4 已完成上一轮测试且无新问题。
           此为候选版，未确认实机通过，非公开发布版。
           EOF
