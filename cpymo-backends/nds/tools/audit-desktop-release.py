@@ -130,7 +130,10 @@ def main():
             assert metadata["version"] == VERSION
             assert metadata["rom_sha256"] == digest(rom)
             assert metadata["desktop_icon"] == "approved-PyMO-04"
-            for label in ("图标来源与署名.txt", "PYMO-ORIGINAL-MIT-LICENSE.txt"):
+            # Windows Compress-Archive preserves the Chinese filename.
+            # macOS ditto may mangle UTF-8 entry names; ship ASCII filenames there.
+            label = "图标来源与署名.txt" if kind == "windows" else "ICON-ATTRIBUTION.txt"
+            for label in (label, "PYMO-ORIGINAL-MIT-LICENSE.txt"):
                 contents = z.read(member(z, label))
                 assert len(contents) > 100 and b"pymo" in contents.lower(), label
             src = z.read(member(z, "FFmpeg-Corresponding-Source/ffmpeg-7.1.5.tar.xz"))
