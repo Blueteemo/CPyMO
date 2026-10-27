@@ -15,6 +15,16 @@
 - [ ] Release 正文与 `nds-v1.0.0`、`nds-v1.1.0` 格式一致，明确 1.2 相对 1.1 的新增 DSi/TWL、缓存、跨存储卡游戏库、滚动列表、增强双屏、视频转换与游戏菜单；正式玩家介绍不提研究中的 FVDS，Android 用英文拼写，不增加多余的两 ROM 解释。
 - [ ] 正式 1.2.0 Release 发出以后，再将此 Fork 根目录 README 替换为以 NDS 为主的全新 README，并最后更新原上游 PR #60 的描述、以已经存在的正式 Release 链接为准。
 
+## M2 Pro 本机 DeepSeek GUI 验收结果（2026-10-27）
+
+- [x] 原生 ARM64、Finder、双语、NVL1/NVA1、缺字、源码及存档保护、FFmpeg LGPL、ROM 配对本机 PASS；测试对象为 run `40505159429`。
+- [ ] **阻断正式发布：** 用户本机报告总结论 FAIL；English 的缓存压缩 Combobox 显示截断，以及完成转换后 macOS 日志 Text 重影/叠字，均需新版打包后复验。
+- [x] 源分支已增补英文长选项的横向伸缩、固定日志配色/行距、按变化增量更新而非每 300ms 重绘，列表颜色一致性、Finder 版本 `1.2.0` 及辅助截图容错。
+- [ ] 下一个 ARM64 原生 RC 完成 CI 后进行**精准 UI 复核**：英文更多设置、中文/英文日志正常显示、Finder 显示版本、深色模式下可读性；通过后方可标记完整 PASS。
+- [ ] 浏览器下载的 Gatekeeper 隔离路径仍未实测；不能把 CLI 下载的 Finder 启动 PASS 等同于正式开发者签名或公证。
+
+完整缺陷分析见 `MACOS-ARM64-RC-UI-REVIEW-20261027.md`。
+
 ## Apple Silicon / Rosetta 生命周期阻断检查（2026-10-27）
 
 **Apple 官方明确：Rosetta 在 macOS 27 及更早版本普遍可用；从 macOS 28 起只针对部分停更旧游戏保留。** https://support.apple.com/zh-cn/102527
