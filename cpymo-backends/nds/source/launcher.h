@@ -305,7 +305,10 @@ static void launcher_play_panel(const char* message){
  /* The two shortcuts fit on one line in the native small bitmap font;
     leave a calm last row, used only for save/load/action feedback. */
  launcher_text(nds_ui("START：快速保存  SELECT：快速读取"),12,158,muted,245);
- if(message && *message)launcher_text(nds_ui(message),12,176,accent,245);
+ /* Keep the last help row useful without placeholder text: status overlays
+    native runtime mode metadata and resets when its toast expires. */
+ launcher_text(message&&*message?nds_ui(message):nds_runtime_mode_label(),
+               12,176,message&&*message?accent:muted,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
  if(!nds_aux_clock_suppressed)nds_clock_paint(framebuffer,196,96,RGB15(21,24,27));clock_state[6]++;
  launcher_publish(launcher_sub);
