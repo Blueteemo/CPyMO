@@ -48,13 +48,12 @@ class App:
         ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频默认转换为 NVL1。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(0,10))
         ttk.Label(frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579',wraplength=780).pack(anchor='w')
         self.cache_only=tk.BooleanVar(value=True)
-        ttk.Checkbutton(frame,text='精简重复媒体：省去已有 NDS 缓存的原媒体，保留脚本与署名',variable=self.cache_only).pack(anchor='w')
+        ttk.Checkbutton(frame,text='精简输出：不重复保存已转换的图片／音频（原游戏、脚本与署名不变）',variable=self.cache_only).pack(anchor='w')
         self.compression=tk.StringVar(value='无损压缩语音与适合的图片（推荐）')
         self.compression_modes=['不压缩缓存（读取优先）','无损压缩语音与适合的图片（推荐）','无损压缩全部音频与适合的图片（实验）']
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='缓存压缩：').pack(side='left')
         self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,state='readonly',width=47);self.compression_box.pack(side='left')
-        self.compression_box.bind('<<ComboboxSelected>>',lambda _:self.cache_only.set(True) if self.compression_modes.index(self.compression.get()) else None)
-        ttk.Label(frame,text='安装包已包含 CPyMO '+VERSION+'；缓存压缩不会进一步降低转换后素材质量。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
+                ttk.Label(frame,text='安装包已包含 CPyMO '+VERSION+'；缓存压缩不会进一步降低转换后素材质量。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
         self.video_modes=['不转换视频（兼容旧流程）','转换视频 NVL1（推荐：兼容优先）','转换视频 NVA1（压缩音频）']
         self.video=tk.StringVar(value=self.video_modes[1])
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='游戏视频：').pack(side='left')
@@ -192,7 +191,6 @@ class App:
         name='CPyMO_NDS_转换结果_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f');output=base/name
         self.set_status('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
         audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
-        if audio_mode!='off':self.cache_only.set(True)
         self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())],'ui_language':self.language.get()},self.converted)
 
     def converted(self,report):
