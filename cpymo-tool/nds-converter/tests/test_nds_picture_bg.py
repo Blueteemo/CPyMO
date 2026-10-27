@@ -1,55 +1,86 @@
-"""Exercise the real optional lower-LCD artwork reader on a host filesystem.
-A missing/corrupt asset must not harm gameplay and valid images stay cached.
+"""ROM-owned CPyMO 1.2 enhanced touch-screen artwork regression.
+
+No per-card external bitmap is required: immutable bytes are patched into the
+ROM's fixed-size ARM9 placeholder. Verify safe unpatched fallback, low-contrast
+UI RGB555 dimming, and deterministic no-relocation ROM injection.
 """
+from pathlib import Path
+import importlib.util
 import shutil
+import struct
 import subprocess
 import tempfile
 import unittest
-from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[3]
-SRC=ROOT/"cpymo-backends/nds/source"
-C=r"""
+ROOT = Path(__file__).resolve().parents[3]
+SRC = ROOT / "cpymo-backends/nds/source"
+PATCHER = ROOT / "cpymo-backends/nds/tools/patch-rom-bg.py"
+spec = importlib.util.spec_from_file_location("patch_rom_bg", PATCHER)
+patcher = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(patcher)
+
+C_PROGRAM = r"""
+#include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <assert.h>
 #include "nds-picture-bg.h"
-#define CHECK(x) do{if(!(x))abort();}while(0)
-int main(int argc,char** argv){
- (void)argv;
- if(argc!=2)return 2;
- /* Source file must be placed in a test-mapped /pymo path by a host macro. */
- const uint16_t* px=nds_picture_get();
- CHECK(px!=NULL);
- CHECK(px[0]==0x8001u);
- CHECK(px[256u*192u-1u]==0xFFFFu);
- CHECK(nds_picture_get()==px);
- CHECK(nds_picture_checked);
+int main(void) {
+ uint16_t pixels[NDS_PICTURE_PIXELS] = {0};
+ /* An unpatched developer build should never display staging pixels. */
+ assert(nds_picture_get() == 0);
+ assert(!nds_picture_draw(pixels, false));
+ assert(!nds_picture_draw(pixels, true));
+ assert(nds_picture_dim_color(0x8000) == 0x8000);
+ assert(nds_picture_dim_color(0xffff) == (0x8000 | 23 | (23<<5) | (23<<10)));
+ assert(nds_picture_dim_color(0x801f) == (0x8000 | 23));
  return 0;
 }
 """
-# The standard source uses /pymo in production. For tests we replace only
-# its root-file-path literal in a temporary copy of the actual header.
-@unittest.skipUnless(shutil.which("gcc"),"GCC unavailable")
-class NativePictureTests(unittest.TestCase):
- def test_exact_image_header_cache_and_reject_bad_input(self):
-  with tempfile.TemporaryDirectory() as tmp:
-   root=Path(tmp)
-   header=(SRC/"nds-picture-bg.h").read_text(encoding="utf8")
-   image_path=root/"pic.rgb555"
-   header=header.replace('"/pymo/nds-dual-bg.rgb555"',
-       '"'+str(image_path).replace('\\','/')+'"')
-   (root/"nds-picture-bg.h").write_text(header,encoding="utf8")
-   c=root/"picture.c";c.write_text(C,encoding="utf8")
-   exe=root/"picture"
-   subprocess.run(["gcc","-std=c11","-Wall","-Wextra","-Werror","-O2",
-                   "-fsanitize=undefined","-I",str(root),str(c),"-o",str(exe)],
-                  capture_output=True,text=True,check=True)
-   image_path.write_bytes(b"CPYBG12\0"+b"\x01\x80" +
-       b"\xff\xff"*(256*192-2)+b"\xff\xff")
-   subprocess.run([str(exe),"valid"],check=True,
-                  capture_output=True,text=True)
-   image_path.write_bytes(b"bad-data")
-   proc=subprocess.run([str(exe),"bad"],capture_output=True,text=True)
-   self.assertNotEqual(proc.returncode,0)
+
+@unittest.skipUnless(shutil.which("gcc"), "host GCC unavailable")
+class EmbeddedPictureTests(unittest.TestCase):
+ def test_unpatched_fallback_and_rgb555_dimming(self):
+  with tempfile.TemporaryDirectory() as folder:
+   folder=Path(folder)
+   src=folder/"test.c"
+   src.write_text(C_PROGRAM,encoding="utf8")
+   exe=folder/"test"
+   cmd=["gcc","-std=gnu11","-O2","-Wall","-Wextra","-Werror",
+        "-fsanitize=undefined","-I",str(SRC),str(src),"-o",str(exe)]
+   run=subprocess.run(cmd,capture_output=True,text=True)
+   self.assertEqual(run.returncode,0,run.stderr)
+   subprocess.run([str(exe)],capture_output=True,text=True,check=True)
+
+ def test_inplace_patch_in_rom_and_reject_corruption(self):
+  with tempfile.TemporaryDirectory() as folder:
+   folder=Path(folder)
+   image=(b"\\x01\\x80")*(256*192)
+   art=folder/"art.rgb555"
+   art.write_bytes(patcher.ART_MAGIC+image)
+   mark=patcher.WAIT+patcher.PLACEHOLDER
+   raw=bytearray(0x200+len(mark)+64)
+   struct.pack_into("<I",raw,0x20,0x200)
+   struct.pack_into("<I",raw,0x2c,len(mark)+64)
+   raw[0x200:0x200+len(mark)]=mark
+   rom=folder/"input.nds";rom.write_bytes(raw)
+   out=folder/"patched.nds"
+   report=patcher.embed(rom,art,out)
+   patched=out.read_bytes()
+   self.assertTrue(report["single_nds"])
+   self.assertEqual(len(patched),len(raw))
+   self.assertEqual(patched[:0x200],raw[:0x200])
+   self.assertEqual(patched[0x200:0x200+16],patcher.READY)
+   self.assertEqual(patched[0x210:0x210+len(image)],image)
+   self.assertEqual(patched[-64:],raw[-64:])
+   with self.assertRaises(ValueError):
+    patcher.embed(out,art,folder/"second.nds")
+   art.write_bytes(patcher.ART_MAGIC+(b"\\x00\\x00")*(256*192))
+   with self.assertRaises(ValueError):
+    patcher.embed(rom,art,folder/"invalid.nds")
+
+ def test_ui_and_confirmation_both_select_approved_art(self):
+  source=(SRC/"main.c").read_text(encoding="utf8")
+  self.assertIn("nds_picture_draw(framebuffer,interactive)",source)
+  self.assertIn("nds_dual_lower_background(cpymo_ui_enabled(&engine),nds_dual_has_choice())",source)
+  self.assertIn("cpymo_engine_draw(&engine)",source)
+
