@@ -4,7 +4,7 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 
 ## 给玩家
 
-完整解压 Windows Starter，双击“启动转换器.bat”，或运行“转换器/Converter.exe”。
+完整解压 Windows Starter，双击“启动转换器.bat”，或运行“Converter/Converter.exe”。
 无需安装 Python、FFmpeg 或编译器。选择游戏 ZIP/APK 或含 gameconfig.txt 的文件夹，
 支持嵌套 ZIP 与 S60v3 / S60v5 / Android PyMO 数据（指输入数据平台，非电脑系统）。
 同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
