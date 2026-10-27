@@ -6,21 +6,35 @@ from tkinter import ttk, filedialog, messagebox
 from helper_core import run_job
 
 from release_info import VERSION
+from ui_i18n import tr, LANGUAGES
 
 class App:
     def __init__(self,window,state_root=None,self_test=None):
         self.window=window;self.process=None;self.self_test=self_test;self.test_started=False
         self.state_root=Path(state_root or (Path(os.environ['LOCALAPPDATA'])/'CPyMO-NDS-转换助手'/'jobs' if os.name=='nt' and os.environ.get('LOCALAPPDATA') else Path.home()/'Library/Application Support/CPyMO-NDS-Converter/jobs' if sys.platform=='darwin' else Path.home()/'.local/share/CPyMO-NDS-Converter/jobs'))
+        self.preference_file=self.state_root.parent/'ui-preferences.json'
+        try:
+            saved=json.loads(self.preference_file.read_text(encoding='utf8')).get('language')
+        except (OSError, ValueError, TypeError):
+            saved=None
+        self.language=tk.StringVar(value=saved if saved in LANGUAGES else LANGUAGES[0])
+        self._ui_sources={}
+        self._status_zh='先选择游戏压缩包或游戏文件夹。'
         self.source=tk.StringVar();self.output=tk.StringVar(value=str(Path.home()/'Desktop'))
-        self.status=tk.StringVar(value='先选择游戏压缩包或游戏文件夹。')
+        self.status=tk.StringVar(value=self.tr(self._status_zh))
         self.candidates=[];self.serial=0;self.last_result=None;self.last_output=None
         window.title('CPyMO NDS 转换助手');window.geometry(f"840x{min(890,max(700,window.winfo_screenheight()-110))}");window.minsize(760,670)
         ui_font='PingFang SC' if sys.platform=='darwin' else 'Microsoft YaHei UI'
         window.option_add('*Font',(ui_font,10))
         style=ttk.Style();style.theme_use('clam');style.configure('TButton',padding=(12,7));style.configure('Title.TLabel',font=(ui_font,19,'bold'))
         frame=ttk.Frame(window,padding=22);frame.pack(fill='both',expand=True)
-        ttk.Label(frame,text='CPyMO NDS 转换助手',style='Title.TLabel').pack(anchor='w')
-        ttk.Label(frame,text='选择游戏包，生成可复制到 R4 的游戏目录。无需另装 Python 或 FFmpeg。').pack(anchor='w',pady=(6,16))
+        head=ttk.Frame(frame);head.pack(fill='x')
+        ttk.Label(head,text='CPyMO NDS 转换助手',style='Title.TLabel').pack(side='left')
+        self.language_box=ttk.Combobox(head,textvariable=self.language,values=LANGUAGES,state='readonly',width=12)
+        self.language_box.pack(side='right')
+        ttk.Label(head,text='界面语言：').pack(side='right',padx=(0,8))
+        self.language_box.bind('<<ComboboxSelected>>',self.change_language)
+        ttk.Label(frame,text='选择游戏包，生成可复制到 DS / DSi 存储卡的游戏目录。无需另装 Python 或 FFmpeg。').pack(anchor='w',pady=(6,16))
         ttk.Label(frame,text='1  选择游戏',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,8))
         ttk.Entry(row,textvariable=self.source,state='readonly').pack(side='left',fill='x',expand=True)
@@ -31,7 +45,7 @@ class App:
         ttk.Label(frame,text='2  选择保存位置',font=(ui_font,11,'bold')).pack(anchor='w')
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,6));ttk.Entry(row,textvariable=self.output,state='readonly').pack(side='left',fill='x',expand=True)
         self.output_button=ttk.Button(row,text='选保存位置',command=self.pick_output);self.output_button.pack(side='left',padx=(8,0))
-        ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频可选择转换。',foreground='#526579').pack(anchor='w',pady=(0,10))
+        ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频默认转换为 NVL1。',foreground='#526579').pack(anchor='w',pady=(0,10))
         ttk.Label(frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579').pack(anchor='w')
         self.cache_only=tk.BooleanVar(value=True)
         ttk.Checkbutton(frame,text='精简重复媒体：省去已有 NDS 缓存的原媒体，保留脚本与署名',variable=self.cache_only).pack(anchor='w')
@@ -40,13 +54,14 @@ class App:
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='缓存压缩：').pack(side='left')
         self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,state='readonly',width=47);self.compression_box.pack(side='left')
         self.compression_box.bind('<<ComboboxSelected>>',lambda _:self.cache_only.set(True) if self.compression_modes.index(self.compression.get()) else None)
-        ttk.Label(frame,text='请使用随附的 '+VERSION+' 引擎；无损缓存压缩不额外降低画质或音质。',foreground='#526579').pack(anchor='w',pady=(3,0))
+        ttk.Label(frame,text='安装包已包含 CPyMO '+VERSION+'；缓存压缩不会进一步降低转换后素材质量。',foreground='#526579').pack(anchor='w',pady=(3,0))
         self.video_modes=['不转换视频（兼容旧流程）','转换视频 NVL1（推荐：兼容优先）','转换视频 NVA1（压缩音频）']
         self.video=tk.StringVar(value=self.video_modes[1])
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='游戏视频：').pack(side='left')
-        ttk.Combobox(row,textvariable=self.video,values=self.video_modes,
-                     state='readonly',width=47).pack(side='left')
-        ttk.Label(frame,text='视频以 256×192 / 12 FPS 转换；需要 CPyMO 1.2 引擎。',
+        self.video_box=ttk.Combobox(row,textvariable=self.video,values=self.video_modes,
+                     state='readonly',width=47)
+        self.video_box.pack(side='left')
+        ttk.Label(frame,text='视频默认转换为 256×192 / 12 FPS；可选 NVA1 或跳过，安装包已含对应引擎。',
                   foreground='#526579').pack(anchor='w',pady=(3,0))
         row=ttk.Frame(frame);row.pack(fill='x',pady=(13,8))
         self.convert_button=ttk.Button(row,text='3  开始转换',command=self.begin,state='disabled');self.convert_button.pack(side='left')
@@ -57,22 +72,72 @@ class App:
         self.log=tk.Text(frame,height=4,wrap='word',background='#f1f4f8',relief='flat',font=(ui_font,9));self.log.pack(fill='both',expand=True,pady=(4,8))
         ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579').pack(anchor='w')
         window.protocol('WM_DELETE_WINDOW',self.close)
+        self._capture_localizable_widgets(self.window)
+        self._apply_language()
         if self_test:
             if 'cache_only' in self_test:self.cache_only.set(self_test['cache_only'])
             if 'audio_lossless' in self_test:self.compression.set(self.compression_modes[{'off':0,'voice':1,'all':2}[self_test['audio_lossless']]])
             if 'video_mode' in self_test:self.video.set(self.video_modes[{'skip':0,'nvl1':1,'nva1':2}[self_test['video_mode']]])
             self.source.set(self_test['source']);self.output.set(self_test['output_base']);window.after(300,self.inspect)
 
+    def tr(self,text):
+        return tr(text,self.language.get())
+
+    def set_status(self,raw):
+        self._status_zh=raw
+        self.status.set(self.tr(raw))
+
+    def _capture_localizable_widgets(self,parent):
+        for widget in parent.winfo_children():
+            if 'text' in widget.keys():
+                original=widget.cget('text')
+                if original:self._ui_sources[widget]=original
+            self._capture_localizable_widgets(widget)
+
+    def _apply_language(self):
+        for widget,source in self._ui_sources.items():
+            widget.configure(text=self.tr(source))
+        self.status.set(self.tr(self._status_zh))
+
+    def change_language(self,_event=None):
+        audio_idx=self.compression_modes.index(self.compression.get())
+        video_idx=self.video_modes.index(self.video.get())
+        raw_compression=['不压缩缓存（读取优先）',
+            '无损压缩语音与适合的图片（推荐）',
+            '无损压缩全部音频与适合的图片（实验）']
+        raw_video=['不转换视频（兼容旧流程）',
+            '转换视频 NVL1（推荐：兼容优先）',
+            '转换视频 NVA1（压缩音频）']
+        self.compression_modes=[self.tr(x) for x in raw_compression]
+        self.video_modes=[self.tr(x) for x in raw_video]
+        self.compression_box.configure(values=self.compression_modes)
+        self.video_box.configure(values=self.video_modes)
+        self.compression.set(self.compression_modes[audio_idx])
+        self.video.set(self.video_modes[video_idx])
+        self._apply_language()
+        if self.candidates:
+            selected=self.games.curselection()
+            self.games.delete(0,'end')
+            for i,c in enumerate(self.candidates):
+                prefix=self.tr('推荐  ') if i==0 else ''
+                self.games.insert('end',f"{prefix}[{c['platform']}]  {c['title']}")
+            if selected:self.games.selection_set(selected[0])
+        try:
+            self.preference_file.parent.mkdir(parents=True,exist_ok=True)
+            self.preference_file.write_text(json.dumps({'language':self.language.get()},ensure_ascii=False),encoding='utf8')
+        except OSError:
+            pass  # Keep a usable UI if preferences are read-only.
+
     def pick_zip(self):
-        p=filedialog.askopenfilename(title='选择 PyMO 游戏包',filetypes=[('游戏包','*.zip *.apk'),('全部文件','*.*')])
+        p=filedialog.askopenfilename(title=self.tr('选择 PyMO 游戏包'),filetypes=[(self.tr('游戏包'),'*.zip *.apk'),(self.tr('全部文件'),'*.*')])
         if p:self.source.set(p);self.inspect()
 
     def pick_folder(self):
-        p=filedialog.askdirectory(title='选择含 gameconfig.txt 的游戏数据目录')
+        p=filedialog.askdirectory(title=self.tr('选择含 gameconfig.txt 的游戏数据目录'))
         if p:self.source.set(p);self.inspect()
 
     def pick_output(self):
-        p=filedialog.askdirectory(title='选择保存位置')
+        p=filedialog.askdirectory(title=self.tr('选择保存位置'))
         if p:self.output.set(p)
 
     def busy(self,value):
@@ -100,43 +165,43 @@ class App:
         self.last_result=report;self.callback(report)
 
     def inspect(self):
-        self.candidates=[];self.games.delete(0,'end');self.status.set('正在识别游戏包里的平台版本……')
+        self.candidates=[];self.games.delete(0,'end');self.set_status('正在识别游戏包里的平台版本……')
         self.start({'action':'inspect','source':self.source.get()},self.inspected)
 
     def inspected(self,report):
         if not report['ok']:self.failed(report);return
         self.candidates=report['candidates']
-        for i,c in enumerate(self.candidates):self.games.insert('end',f"{'推荐  ' if i==0 else ''}[{c['platform']}]  {c['title']}")
+        for i,c in enumerate(self.candidates):self.games.insert('end',f"{self.tr('推荐  ') if i==0 else ''}[{c['platform']}]  {c['title']}")
         selected=self.self_test.get('candidate',0) if self.self_test else 0
-        self.games.selection_set(selected);self.convert_button.configure(state='normal');self.status.set('已识别游戏。确认保存位置后，点击“开始转换”。')
+        self.games.selection_set(selected);self.convert_button.configure(state='normal');self.set_status('已识别游戏。确认保存位置后，点击“开始转换”。')
         if self.self_test and not self.test_started:self.test_started=True;self.window.after(200,self.begin)
 
     def begin(self):
         selected=self.games.curselection()
         if not selected:return
         source=Path(self.source.get()).resolve();base=Path(self.output.get()).resolve()
-        if source.is_dir() and base.is_relative_to(source):self.failed({'ok':False,'error':'保存位置不能位于原游戏目录内部。'});return
+        if source.is_dir() and base.is_relative_to(source):self.failed({'ok':False,'error':self.tr('保存位置不能位于原游戏目录内部。')});return
         name='CPyMO_NDS_转换结果_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f');output=base/name
-        self.status.set('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
+        self.set_status('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
         audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
         if audio_mode!='off':self.cache_only.set(True)
         self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())]},self.converted)
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
-        self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.status.set(report['status']+'。点击“打开结果文件夹”查看安装必读。')
-        self.log.insert('end','\n'+('\n'.join(report['warnings']) if report['warnings'] else '未发现静态兼容性警告。')+'\n');self.log.see('end')
+        self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.set_status(self.tr(report['status'])+self.tr('。点击“打开结果文件夹”查看安装必读。'))
+        self.log.insert('end','\n'+('\n'.join(report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
         if report.get('cache_only'):
-            self.log.insert('end',f"已省去重复媒体 {report['redundant_media_bytes']/1048576:.2f} MiB。脚本与署名保留，原包未修改。\n");self.log.see('end')
+            self.log.insert('end',self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n');self.log.see('end')
         comp=report.get('lossless',{})
         if comp.get('audio_mode','off')!='off':
-            self.log.insert('end',f"无损缓存另节省 {(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576:.2f} MiB。请使用随附的 {VERSION} 引擎。\n");self.log.see('end')
+            self.log.insert('end',self.tr('无损缓存另节省 {size:.2f} MiB。请使用随附的 {version} 引擎。').format(size=(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576,version=VERSION)+'\n');self.log.see('end')
         if self.self_test:self.finish_test(report)
 
     def failed(self,report):
-        self.status.set('未完成：'+report['error'])
+        self.set_status(self.tr('未完成：')+self.tr(report['error']))
         if self.self_test:self.finish_test(report)
-        else:messagebox.showerror('暂时不能完成转换',report['error']+'\n\n原游戏包未改动。诊断目录：'+str(self.result_file.parent))
+        else:messagebox.showerror(self.tr('暂时不能完成转换'),self.tr(report['error'])+'\n\n'+self.tr('原游戏包未改动。诊断目录：')+str(self.result_file.parent))
 
     def finish_test(self,report):
         def capture():
@@ -152,7 +217,7 @@ class App:
         if self.process and self.process.poll() is None:
             if os.name=='nt':subprocess.run(['taskkill','/PID',str(self.process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=0x08000000)
             else:self.process.terminate()
-        self.process=None;self.busy(False);self.status.set('已取消。原游戏包未改动；未完成目录和日志保留供检查。')
+        self.process=None;self.busy(False);self.set_status('已取消。原游戏包未改动；未完成目录和日志保留供检查。')
 
     def open_output(self):
         if self.last_output:
