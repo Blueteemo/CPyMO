@@ -49,7 +49,8 @@ def build(source: Path, dest: Path, *, allow_alternate_source: bool=False) -> di
     with Image.open(paths["ico"]) as check:
         assert set(check.info["sizes"]) >= set(WINDOWS_SIZES)
     with Image.open(paths["icns"]) as check:
-        assert (1024,1024) in check.info["sizes"]
+        assert check.size == (1024,1024)
+        assert (512,512,2) in check.info["sizes"]
     manifest={"source_sha256":actual,
         "source":"04_高清像素图标_透明外框.png",
         "upstream_artwork_license":"review-required-before-public-redistribution",
