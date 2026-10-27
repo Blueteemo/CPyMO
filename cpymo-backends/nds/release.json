@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "cache_format": 6,
   "video_policy": "1.2 integration: FFmpeg source MP4/AVI/MKV/MOV to playable NVL1 PCM or NVA1 NAR2 via optional GUI/CLI; legacy video-skip remains selectable; game/device compatibility not yet certified",
   "baseline": "0.5.6.3-test",
