@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -27,9 +28,14 @@ def main():
     parser.add_argument("--ffmpeg", type=Path, required=True)
     parser.add_argument("--rom", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--target-arch", choices=("arm64", "x86_64"), default=platform.machine(),
+                        help="Build a native single-architecture app; ARM64 requires Apple silicon.")
     args = parser.parse_args()
     if sys.platform != "darwin":
         parser.error("Build native macOS applications on a macOS host.")
+    if platform.machine() != args.target_arch:
+        parser.error(f"Host architecture {platform.machine()} != {args.target_arch}; "
+                     "use a matching native macOS runner, never Rosetta for arm64 builds.")
     for module in ("PyInstaller", "PIL.Image", "lz4.block", "tkinter"):
         try:
             importlib.import_module(module)
@@ -42,6 +48,14 @@ def main():
         parser.error("Choose a NEW output directory and valid ROM / FFmpeg inputs.")
     from video_nvl import validate_ffmpeg
     validate_ffmpeg(str(ffmpeg))
+    def require_arch(binary: Path) -> None:
+        probe = subprocess.run(["lipo", "-archs", str(binary)], check=True,
+                               capture_output=True, text=True, timeout=30)
+        arches = probe.stdout.strip().split()
+        if args.target_arch not in arches:
+            raise RuntimeError(f"{binary} is {arches}, expected {args.target_arch}; "
+                               "do not ship an x86_64-only app on Apple silicon.")
+    require_arch(ffmpeg)
     metadata = json.loads((BACKEND / "release.json").read_text(encoding="utf8"))
     if metadata["version"] != (BACKEND / "VERSION").read_text().strip():
         parser.error("Engine version metadata mismatch.")
@@ -57,6 +71,7 @@ def main():
     command = [sys.executable, "-m", "PyInstaller",
                "--noconfirm", "--clean", "--onedir", "--windowed",
                "--name", "CPyMO-NDS-Converter",
+               "--target-arch", args.target_arch,
                "--osx-bundle-identifier", "dev.blueteemo.cpymo-nds-converter",
                "--distpath", str(build / "dist"),
                "--workpath", str(build / "temp"),
@@ -75,6 +90,7 @@ def main():
     app = build / "dist/CPyMO-NDS-Converter.app"
     if not app.is_dir():
         raise RuntimeError("Missing .app from PyInstaller")
+    require_arch(app / "Contents/MacOS/CPyMO-NDS-Converter")
     for resource in ("cpymo-nds.nds", "ffmpeg", "release.json"):
         present = any((app / location / resource).is_file() for location in
                       ("Contents/Resources", "Contents/Frameworks", "Contents/MacOS"))
@@ -90,6 +106,7 @@ def main():
     ) if p.is_file()), None)
     if bundled_ffmpeg is None:
         raise RuntimeError("Bundled FFmpeg executable not found")
+    require_arch(bundled_ffmpeg)
     # PyInstaller applies an ad-hoc macOS code signature to its collected
     # binaries; the app's actual executable can differ byte-for-byte from
     # the source-built input. Record BOTH hashes, not a misleading single one.
@@ -98,7 +115,9 @@ def main():
     shutil.copytree(app, output / app.name, symlinks=True)
     shutil.copy2(rom, output / "cpymo-nds.nds")
     shutil.rmtree(build)
-    metadata.update(rom_sha256=digest(rom),
+    metadata.update(macos_architecture=args.target_arch,
+                    rosetta_required=False if args.target_arch=="arm64" else "Apple silicon only",
+                    rom_sha256=digest(rom),
                     ffmpeg_input_sha256=ffmpeg_input_sha,
                     ffmpeg_bundled_sha256=ffmpeg_bundle_sha,
                     ffmpeg_sha256=ffmpeg_input_sha,
@@ -112,7 +131,8 @@ def main():
         "还需要原生 GUI 测试、相应许可证材料及平台发行安全审查。\n"
         "可运行游戏程序为同目录 cpymo-nds.nds，不含商业游戏。\n",
         encoding="utf8")
-    print(json.dumps({"version": metadata["version"], "rom_sha256": digest(rom),
+    print(json.dumps({"version": metadata["version"], "architecture":args.target_arch,
+                      "rom_sha256": digest(rom),
                       "app": str(output / app.name), "macos_candidate": True},
                      ensure_ascii=False, indent=2))
 
