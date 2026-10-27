@@ -68,7 +68,7 @@ python cpymo-tool/nds-converter/convert.py verify /path/to/new-output
 CLI 默认也将缺字替换为 □ 并记录；若开发者希望针对字体严格检查，可明确传入 `--missing-glyph-policy error`。CLI 保留便于对照的原媒体／未压缩缓存，GUI 默认启用精简与推荐压缩方案。
 缓存格式6按哈希前两位分目录，兼容引擎旧格式1～5；`--cache-layout flat` 用于对照测试。
 图像/音频去重不改脚本资源名称。保留 fonts/ 的字体文件和全部许可，不要只拷单个 Python 文件。
-版本从 cpymo-backends/nds/release.json 读取。
+版本从 cpymo-backends/nds/release.json 读取。macOS ARM64 构建由 `build_portable_macos.py --target-arch arm64` 在 Apple Silicon CI 上完成，打包器会对主程序和 FFmpeg 都做 ARM64 架构校验。
 
 构建 Windows 包：先构建 ROM，安装 requirements-build.txt，使用可信 Windows x86_64 C 编译器构建加速库：
 
