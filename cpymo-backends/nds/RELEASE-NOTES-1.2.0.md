@@ -97,4 +97,4 @@ TF 根目录/
 
 [NDS 后端说明](https://github.com/Blueteemo/CPyMO/blob/nds-v1.2.0/cpymo-backends/nds/README.md) · [转换器说明](https://github.com/Blueteemo/CPyMO/blob/nds-v1.2.0/cpymo-tool/nds-converter/README.md) · [上游 PR #60](https://github.com/Strrationalism/CPyMO/pull/60)
 
-NDS 平台移植：**千岚之夏**。CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。引擎／后端为 AGPL-3.0-or-later，独立转换器为 MIT，字体与第三方依赖保留各自许可，随转换助手及源码提供。游戏原作与汉化署名按原包保留，本发行不附游戏素材。桌面转换器图标为基于 PyMO 原始图标的高清像素衍生图：原始图案及许可来自 [PyMO 原仓库](https://github.com/pymo/pymo/tree/master/images)，遵循原仓库 MIT 版权声明；安装套件附 `图标来源与署名.txt` 与 `PYMO-ORIGINAL-MIT-LICENSE.txt`。修改图标不代表 PyMO 原作者认可或参与本版发行。NDS 发行版本号独立于 CPyMO 全平台版本。
+NDS 平台移植：**千岚之夏**。CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。引擎／后端为 AGPL-3.0-or-later，独立转换器为 MIT，字体与第三方依赖保留各自许可，随转换助手及源码提供。游戏原作与汉化署名按原包保留，本发行不附游戏素材。桌面转换器图标为基于 PyMO 原始图标的高清像素衍生图：原始图案及许可来自 [PyMO 原仓库](https://github.com/pymo/pymo/tree/master/images)，遵循原仓库 MIT 版权声明；Windows 套件附 `图标来源与署名.txt`，macOS 套件附 `ICON-ATTRIBUTION.txt`；两者均附 `PYMO-ORIGINAL-MIT-LICENSE.txt`。修改图标不代表 PyMO 原作者认可或参与本版发行。NDS 发行版本号独立于 CPyMO 全平台版本。
