@@ -1,0 +1,192 @@
+name: CPyMO 1.2 Universal ROM and Paired Desktop RC
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/nds-v1.2-pico-acceptance-20261027
+    paths:
+      - .github/workflows/nds-v12-release-candidate.yml
+      - .github/ci-requests/nds-rc.txt
+permissions:
+  contents: read
+
+jobs:
+  final-rom:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:20260610
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Build the SINGLE universal NTR/TWL ROM from tagged source
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init stb endianness.h
+          test -f cpymo-backends/nds/assets/nds-dual-bg.rgb555
+          python3 cpymo-backends/nds/build.py --dsi-experiment
+      - name: Embed approved 02-B and forbid placeholder release
+        run: |
+          python3 cpymo-backends/nds/tools/patch-rom-bg.py \
+            --rom cpymo-backends/nds/cpymo-dsi-experiment.nds \
+            --art cpymo-backends/nds/assets/nds-dual-bg.rgb555 \
+            --output release-rom/cpymo-nds.nds
+          python3 cpymo-backends/nds/tools/verify-release-artifact.py \
+            --rom release-rom/cpymo-nds.nds --report release-rom/ROM-VERIFICATION.json
+          sha256sum release-rom/cpymo-nds.nds
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-UNIVERSAL-VERIFIED-ROM-RC
+          path: release-rom/
+          retention-days: 21
+          if-no-files-found: error
+
+  converter-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install conversion tools
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements.txt
+          python -m pip install imageio-ffmpeg==0.6.0
+          python - <<'PY'
+          import os,pathlib,imageio_ffmpeg
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'ffmpeg'
+          p.symlink_to(imageio_ffmpeg.get_ffmpeg_exe())
+          with open(os.environ['GITHUB_PATH'],'a') as out:out.write(str(p.parent)+'\n')
+          PY
+      - name: Generate multilingual UI font; all host regression tests
+        run: |
+          python cpymo-backends/nds/tools/generate-ui-font.py
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -v
+
+  windows-rc:
+    needs: [final-rom,converter-regression]
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: CPyMO-1.2-UNIVERSAL-VERIFIED-ROM-RC
+          path: .release-rom
+      - name: Install pinned converter dependencies
+        run: python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
+      - name: Resolve VIDEO-CAPABLE FFmpeg for Windows
+        shell: pwsh
+        run: |
+          $ff = (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue).Source
+          if (-not $ff) {
+            choco install ffmpeg -y --no-progress
+            $ff = (Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          }
+          if (-not $ff) { throw 'Video-capable FFmpeg not found' }
+          "NDS_FFMPEG=$ff" >> $env:GITHUB_ENV
+      - name: Verify final ROM before and after packaging
+        shell: pwsh
+        run: |
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds
+          python cpymo-tool/nds-converter/build_portable.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$env:NDS_FFMPEG" --output windows-rc
+          python cpymo-tool/nds-converter/tests/smoke_windows_portable.py --portable windows-rc --ffmpeg "$env:NDS_FFMPEG"
+      - name: Assemble user-facing Windows RC without copyrighted game content
+        shell: pwsh
+        run: |
+          $folder = 'out/CPyMO-for-NDS-1.2.0-Starter-Windows-RC'
+          New-Item -ItemType Directory -Force -Path "$folder/转换器", "$folder/pymo/games" | Out-Null
+          Copy-Item -Recurse 'windows-rc/app/Converter/*' "$folder/转换器/"
+          Copy-Item windows-rc/cpymo-nds.nds "$folder/cpymo-nds.nds"
+          Copy-Item cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
+          Copy-Item windows-rc/VERSION.json "$folder/VERSION.json"
+          Set-Content -Path "$folder/启动转换器.bat" -Value '@echo off' -Encoding ascii
+          Add-Content -Path "$folder/启动转换器.bat" -Value 'start "" "%~dp0转换器\Converter.exe"' -Encoding ascii
+          @'
+          CPyMO for NDS 1.2.0 -- RELEASE CANDIDATE FOR INTERNAL REVIEW
+          This Windows package has been tested with synthetic video.
+          Missing third-party redistribution notices and FFmpeg corresponding
+          sources MUST be resolved before a public GitHub Release.
+          Back up old save folders and do not overwrite personal game files.
+          '@ | Set-Content -Path "$folder/发行前须知.txt" -Encoding UTF8
+          Compress-Archive -Path "$folder" -DestinationPath CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --windows-starter CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE
+          path: CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip
+          retention-days: 21
+          if-no-files-found: error
+
+  macos-rc:
+    needs: [final-rom,converter-regression]
+    runs-on: macos-15-intel
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: CPyMO-1.2-UNIVERSAL-VERIFIED-ROM-RC
+          path: .release-rom
+      - name: Install FFmpeg and pinned macOS GUI build tools
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt imageio-ffmpeg==0.6.0
+          python - <<'PY'
+          import imageio_ffmpeg,os
+          with open(os.environ['GITHUB_ENV'],'a') as out:out.write('NDS_FFMPEG='+imageio_ffmpeg.get_ffmpeg_exe()+'\n')
+          PY
+      - name: Build paired macOS .app using the exact VERIFIED ROM
+        run: |
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds
+          python cpymo-tool/nds-converter/build_portable_macos.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$NDS_FFMPEG" --output macos-rc
+          python cpymo-tool/nds-converter/tests/smoke_macos_portable.py --portable macos-rc --ffmpeg "$NDS_FFMPEG"
+      - name: Package unsigned macOS RC for the user's DeepSeek Finder test
+        run: |
+          mkdir -p out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC
+          ditto macos-rc/CPyMO-NDS-Converter.app out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/CPyMO-NDS-Converter.app
+          cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/
+          cp cpymo-tool/nds-converter/README.md out/CPyMO-for-NDS-1.2.0-Starter-macOS-RC/转换器说明.md
+          cd out
+          ditto -c -k --sequesterRsrc --keepParent CPyMO-for-NDS-1.2.0-Starter-macOS-RC ../CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
+          cd ..
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-macOS-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
+          path: CPyMO-for-NDS-1.2.0-Starter-macOS-RC.zip
+          retention-days: 21
+          if-no-files-found: error
+
+  source-rc:
+    needs: [final-rom,converter-regression]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Capture checked-out submodule code and full license tree
+        run: |
+          git submodule update --init stb endianness.h
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root=Path('.')
+          name='CPyMO-for-NDS-1.2.0-Sources-RC.zip'
+          with zipfile.ZipFile(name,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+              for p in sorted(root.rglob('*')):
+                  if not p.is_file() or '.git' in p.parts or any(s in p.parts for s in ('node_modules','__pycache__','.pytest_cache')):
+                      continue
+                  if p==Path(name):continue
+                  z.write(p, 'CPyMO-for-NDS-1.2.0-Sources/'+p.as_posix())
+          print('Source tree ZIP',Path(name).stat().st_size)
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-SOURCES-RC-LICENSE-REVIEW
+          path: CPyMO-for-NDS-1.2.0-Sources-RC.zip
+          retention-days: 21
+          if-no-files-found: error
