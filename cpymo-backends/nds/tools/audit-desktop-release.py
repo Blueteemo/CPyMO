@@ -120,6 +120,9 @@ def main():
     ffmpeg_sources = []
     for kind in ("windows", "macos"):
         with read_zip(paths[kind]) as z:
+            if kind == "macos":
+                mangled = [name for name in z.namelist() if not name.isascii()]
+                assert not mangled, ("macOS ZIP names must be ASCII to avoid ditto mojibake", mangled)
             info = {"bytes": paths[kind].stat().st_size,
                     "sha256": digest(paths[kind].read_bytes())}
             roms = [p for p in z.namelist() if p.endswith("/cpymo-nds.nds")
