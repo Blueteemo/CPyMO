@@ -1,4 +1,4 @@
-# CPyMO for Nintendo DS 1.1.0
+# CPyMO for Nintendo DS 1.2.0（实机验收候选）
 
 面向普通 DS / DS Lite、4 MiB RAM 和 FAT/DLDI Slot-1 烧录卡。不依赖 DSi 软破。
 NDS 平台移植：千岚之夏；CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。
