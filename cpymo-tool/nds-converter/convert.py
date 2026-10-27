@@ -1,7 +1,8 @@
 """CPyMO NDS cache converter, MIT. Python 3.10+, Pillow, external FFmpeg.
 
 Scripts/config and retained resources remain byte-identical in a new directory.
-Video files are omitted from NDS copies, with source hashes retained in the manifest.
+Normal CLI conversion defaults to playable NVL1 movie caches; users can opt out.
+Original source video bytes stay untouched and hashes remain in the manifest.
 No game names, chapters, translated text, or machine-specific paths are assumed.
 """
 from __future__ import annotations
