@@ -163,7 +163,7 @@ def main():
         assert digest(source_icon) == APPROVED_ICON_SOURCE_SHA256
         for name in ("ICON-ATTRIBUTION.txt", "PYMO-ORIGINAL-MIT-LICENSE.txt"):
             assert z.getinfo(member(z, "cpymo-tool/nds-converter/assets/" + name)).file_size > 100
-        assert z.getinfo(member(z, "LICENSE")).file_size > 100
+        assert z.getinfo("CPyMO-for-NDS-1.2.0-Sources/LICENSE").file_size > 100
     report["distributions"]["sources"] = {"bytes": paths["sources"].stat().st_size,
                                            "sha256": digest(paths["sources"].read_bytes()),
                                            "approved_icon_source_sha256": digest(source_icon)}
