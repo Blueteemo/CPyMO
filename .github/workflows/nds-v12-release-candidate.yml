@@ -100,13 +100,13 @@ jobs:
         shell: pwsh
         run: |
           $folder = 'out/CPyMO-for-NDS-1.2.0-Starter-Windows-RC'
-          New-Item -ItemType Directory -Force -Path "$folder/转换器", "$folder/pymo/games" | Out-Null
-          Copy-Item -Recurse 'windows-rc/app/Converter/*' "$folder/转换器/"
+          New-Item -ItemType Directory -Force -Path "$folder/Converter", "$folder/pymo/games" | Out-Null
+          Copy-Item -Recurse 'windows-rc/app/Converter/*' "$folder/Converter/"
           Copy-Item windows-rc/cpymo-nds.nds "$folder/cpymo-nds.nds"
           Copy-Item cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
           Copy-Item windows-rc/VERSION.json "$folder/VERSION.json"
           Set-Content -Path "$folder/启动转换器.bat" -Value '@echo off' -Encoding ascii
-          Add-Content -Path "$folder/启动转换器.bat" -Value 'start "" "%~dp0转换器\Converter.exe"' -Encoding ascii
+          Add-Content -Path "$folder/启动转换器.bat" -Value 'start "" "%~dp0Converter\Converter.exe"' -Encoding ascii
           @'
           CPyMO for NDS 1.2.0 -- RELEASE CANDIDATE FOR INTERNAL REVIEW
           This Windows package has been tested with synthetic video.
@@ -115,6 +115,7 @@ jobs:
           Back up old save folders and do not overwrite personal game files.
           '@ | Set-Content -Path "$folder/发行前须知.txt" -Encoding UTF8
           Compress-Archive -Path "$folder" -DestinationPath CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "Windows zip stage failed" }
           python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --windows-starter CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
