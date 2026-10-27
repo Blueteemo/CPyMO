@@ -19,3 +19,25 @@ Verification:
 **Important non-final constraints:** The run predates a later packager metadata-only adjustment (`8b17e7f`). This package set therefore remains an immutable RC snapshot, not the final release. Regenerate all public files and final SHA256SUMS from one frozen commit after local Mac acceptance; do not silently rename these RC hashes to final Release assets. Keep the prior macOS prebuilt `--enable-nonfree` candidate entirely out of public distribution.
 
 Release order: resolve owner-local Mac review; final source/license/notices audit; freeze; rebuild all, compare checksums; publish GitHub Release `nds-v1.2.0`; then promote the second PyMO logo and bespoke NDS README to repository root; lastly revise upstream PR #60 body using real Release link.
+
+## Latest bilingual ARM64 / Windows RC cross-platform audit (2026-10-27)
+
+All five jobs succeeded on [GitHub Actions run 40505159429](https://github.com/Blueteemo/CPyMO/actions/runs/40505159429), source commit `83c0b6e9bd9118780c962508f1db50d6e3a2d041`. This is the **paired ARM64-only macOS + bilingual converter** candidate offered for local DeepSeek Finder acceptance.
+
+The downloaded GitHub artifact ZIPs each contain one nested distribution ZIP. Numbers below are for **nested distribution files**, not GitHub transport wrappers:
+
+| Candidate distribution | Exact bytes | SHA-256 |
+|---|---:|---|
+| `CPyMO-for-NDS-1.2.0-Starter-macOS-arm64-RC.zip` | 53,173,599 | `84af5c2c78f45527c355d8febe104e9a3e101527c63773a48f27ba4f14f224c1` |
+| `CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip` | 57,696,706 | `04d1676f07f61cd74c3cf5be3996d692002ae186a00b4a66b045120dd73c9881` |
+| `CPyMO-for-NDS-1.2.0-Sources-RC.zip` | 21,789,169 | `c62afd9eca8e89049f7d11d927429cde15600f63c1b282b9d30172d517816d34` |
+| `cpymo-nds.nds` (ROM transport) | 924,672 | `7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31` |
+
+Additional independent archive audit:
+- All nested ZIPs passed integrity tests; Windows and ARM64 Mac both contain matching installed and bundled ROM **regular files** with the approved SHA-256.
+- In the macOS `.app`, `Contents/Frameworks/cpymo-nds.nds` is a **26-byte symbolic link** to `../Resources/cpymo-nds.nds`, not an extra ROM. Hashing that link's literal target path falsely reports a mismatch. Likewise `Contents/Resources/ffmpeg` links to `../Frameworks/ffmpeg`.
+- Both desktop RCs contain the **same original** FFmpeg 7.1.5 source archive: 11,050,340 bytes, SHA-256 `de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f`.
+- macOS `VERSION.json` says `macos_architecture: arm64`, `rosetta_required: false`, and separately records FFmpeg input and post-bundle hashes. The owner-local Finder/Gatekeeper experience is *not* yet attested.
+- The matching CPyMO source archive includes `ui_i18n.py`, `tests/test_ui_i18n.py`, and the proposed NDS-specific README. Intel Mac native binaries are excluded by the ARM64-only release policy.
+
+**The RC is not a published release.** The source snapshot predates later QA/documentation-only commits; final public asset hashes require a frozen corresponding-source commit and cross-package audit. Upstream PR #60 must only be revised *after* the actual Release.
