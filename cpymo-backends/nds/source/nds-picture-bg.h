@@ -45,4 +45,20 @@ static inline const uint16_t* nds_picture_get(void){
   if(found[i]!=wanted[i])return NULL;
  return nds_picture_embedded.pixels;
 }
+/* UI decisions use the same artwork as ordinary dialogue, with a mild
+ * 1/4 RGB555 dimming for contrasting white menu text and touch targets.
+ * The existing CPyMO confirmation/menu elements are drawn on top. */
+static inline uint16_t nds_picture_dim_color(uint16_t native){
+ unsigned r=(native&31u)*3u/4u;
+ unsigned g=((native>>5)&31u)*3u/4u;
+ unsigned b=((native>>10)&31u)*3u/4u;
+ return (uint16_t)(0x8000u|r|(g<<5)|(b<<10));
+}
+static inline bool nds_picture_draw(uint16_t* target,bool interactive){
+ const uint16_t* source=nds_picture_get();
+ if(!source||!target)return false;
+ for(unsigned i=0;i<NDS_PICTURE_PIXELS;i++)
+  target[i]=interactive?nds_picture_dim_color(source[i]):source[i];
+ return true;
+}
 #endif
