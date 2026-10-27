@@ -51,6 +51,7 @@ volatile unsigned scene_state[8]={0x53435238};
 void nds_scene_release(void){scene_valid=false;if(scene_pixels){free(scene_pixels);scene_pixels=NULL;scene_state[4]++;}}
 
 static bool screens_swapped;
+#include "save-dir-nds.h"
 #include "preferences-nds.h"
 /* magic, swapped, toast active/shown/expired/age ms, icon loaded, metadata lines, touch samples */
 volatile unsigned presentation_state[9]={0x4e505232};
@@ -532,7 +533,7 @@ cpymo_input cpymo_input_snapshot(){
  in.mouse_y=touch_sample.y;
  return in;
 }
-static FILE* savefile(const char* dir,const char* name,const char* mode){char path[512];snprintf(path,sizeof path,"%s/save/%s",dir,name);return fopen(path,mode);}
+static FILE* savefile(const char* dir,const char* name,const char* mode){return nds_save_fopen(dir,name,mode);}
 FILE* cpymo_backend_read_save(const char* dir,const char* name){return savefile(dir,name,"rb");}
 FILE* cpymo_backend_write_save(const char* dir,const char* name){return savefile(dir,name,"wb");}
 /* Movie wrapper is implemented after the power and framebuffer helpers. */
@@ -911,6 +912,10 @@ int main(int argc,char** argv){
    nds_dual_bottom_pass=false;
    nds_dual_state[6]++;
   }
+  /* Commit a pending physical LCD role swap only AFTER both target VRAM
+     surfaces have been published. This avoids exposing the previous
+     auxiliary panel as a one-frame lower-screen ghost in mode 1 -> 2. */
+  nds_display_commit_pending_swap();
   if(engine.bg.transform_draw){engine_state[38]++;float p=cpymo_tween_value(&engine.bg.transform_progression);if(p>0&&p<1)engine_state[39]|=1u<<(unsigned)(p*31);}
   unsigned draw_us=(tickGetCount()-draw_start)*1000000/TICK_FREQ;if(draw_us>engine_state[30])engine_state[30]=draw_us;if(draw_us>50000){unsigned seq=draw_trace[1]++,j=4+(seq%64)*8;draw_trace[j]=seq;draw_trace[j+1]=draw_us;draw_trace[j+2]=perf_state[5]-image_before;draw_trace[j+3]=text_us-text_before;draw_trace[j+4]=fill_us-fill_before;draw_trace[j+5]=engine_state[14];draw_trace[j+6]=engine_state[2];draw_trace[j+7]=mask_state[3];}}
  nds_audio_update();
