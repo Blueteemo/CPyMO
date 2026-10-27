@@ -37,6 +37,13 @@ int main(void){
    CHECK(source_a[162*256+20]==nds_dual_canvas_row(162));
    CHECK(source_a[170*256+2]==nds_dual_canvas_row(170));
    CHECK(source_a[191*256+200]==dark);
+   const uint16_t base=nds_dual_canvas_row(70);
+   const uint16_t edge=nds_dual_canvas_color(
+       (base&31u)+1u,((base>>5)&31u)+2u,((base>>10)&31u)+2u);
+   CHECK(source_a[70*256+7]==(interactive?base:edge));
+   CHECK(source_a[70*256+248]==(interactive?base:edge));
+   CHECK(source_a[181*256+18]==(interactive?nds_dual_canvas_row(181):
+          nds_dual_canvas_color(6,9,13)));
   }
  }
  return 0;
