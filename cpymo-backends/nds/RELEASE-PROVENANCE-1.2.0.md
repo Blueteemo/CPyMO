@@ -1,5 +1,14 @@
 # CPyMO for NDS 1.2.0 — RC provenance and public-distribution gate
 
+## 最新门槛说明（2026-10-27，本节优先于下文早期历史快照）
+
+- 最后一次已核验的五任务成功候选：Actions [40536655608 attempt 2](https://github.com/Blueteemo/CPyMO/actions/runs/40536655608/attempts/2)，源码 `71942aafb9a45029f7f595137fae80783f4c40d0`，Windows+Mac arm64+ROM+对应源码统一 CI。macOS 首次调度在无运行器/步骤记录时取消，单作业重试后成功。
+- 源自 PyMO 原仓库 MIT 许可图标的透明高清 04 衍生稿已固定入库，原件 SHA-256 `3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62`，随后补充原图 MIT 许可和衍生来源署名。发行打包流程明确复制 `ICON-ATTRIBUTION.txt` 和 `PYMO-ORIGINAL-MIT-LICENSE.txt`。
+- Mac M2 Pro 用户本机核心和 UI 复验共通过，最新 7/7 GUI 复验见 run `40513187447`；此后小文案修补+新桌面图标已通过 CI，仍未独立完成 Finder/Dock 中**最终图标版**的真人外观确认。
+- 正在建立新的 `paired-asset-audit` CI 跨资产把关，审计 ROM、Windows PE 图标资源、Mac ICNS/Info.plist、FFmpeg 同源及 LGPL 配置、图标署名，以及四份 SHA256SUMS；**未运行通过的新版本不能因旧 RC 成功而自动视为最终发行冻结件**。
+- Mac 用户说明明确披露 ad-hoc 签名／未 Apple Developer ID 公证，提供 [Apple 官方安全操作说明](https://support.apple.com/zh-cn/102445)；不指引全局关闭 Gatekeeper 或 SIP。公开之前仍需最终完整 SHA、准确文档/来源检查。
+- 本页后续描述早期 x86_64/非 LGPL RC 的段落只作为历史事故记录，现已由 arm64 + LGPL 源码自编译方案替代。不得使用旧 RC 的哈希填报最终发行附件。
+
 This is the release-engineering record, **not** the public GitHub Release. Do not publish the current Windows/macOS RC ZIPs solely because CI passes.
 
 ## Provenance verified (2026-10-27)
