@@ -1,0 +1,32 @@
+CPyMO for NDS — Desktop converter icon attribution (1.2.0)
+==================================================================
+
+Source motif:
+  PyMO original app icon (girl, yellow mascot and game controller)
+  https://github.com/pymo/pymo/blob/master/images/pymo-icon.png
+  https://github.com/pymo/pymo/blob/master/images/pymo-icon.psd
+
+Original project:
+  PyMO (https://github.com/pymo/pymo)
+  Copyright (c) 2013 pymo
+  MIT License — see the accompanying PYMO-ORIGINAL-MIT-LICENSE.txt.
+
+CPyMO desktop artwork:
+  Selected high-resolution pixel-style derivative, approved by the
+  CPyMO for NDS contributor on 2026-10-25.
+  Archival master: 04_高清像素图标_透明外框.png
+  1254 × 1254 RGBA; SHA-256:
+  3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62
+  Generated app icon formats: Windows .ico, macOS .icns and PNG,
+  produced exclusively by scaling/container conversion.
+  The source file is included in the corresponding CPyMO source archive:
+  cpymo-tool/nds-converter/assets/converter-icon-source.png
+
+This is a visually modified, AI-assisted derivation of the PyMO icon,
+not an independently originating character design. The original rights
+and copyright notices are respected and not assigned to the AI tool.
+The upstream MIT license and attribution are retained. No affiliation
+with or endorsement by PyMO's original authors is implied.
+
+This artwork is distinct from the Nintendo DS 32×32 banner artwork,
+which is not replaced by the desktop icon.
