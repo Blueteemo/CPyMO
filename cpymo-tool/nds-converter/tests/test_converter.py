@@ -53,7 +53,8 @@ class ConverterTests(unittest.TestCase):
             (src/'voice').mkdir();shutil.copy2(src/'bgm/tone.wav',src/'voice/line.wav')
             before=hashes(src)
             report=helper_core.run_job({'action':'convert','source':str(src),'output':str(base/'output'),
-                'result':str(base/'job/result.json'),'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
+                'result':str(base/'job/result.json'),'video_mode':'skip',
+                'ffmpeg':os.environ.get('NDS_TEST_FFMPEG') or shutil.which('ffmpeg')})
             self.assertTrue(report['ok'],report)
             self.assertTrue(report['cache_only']);self.assertEqual(report['lossless']['audio_mode'],'voice')
             dst=Path(report['game_directory'])
