@@ -3,7 +3,7 @@
 依据最终发行 ROM/Starter/Sources 的 SHA256、许可证与 CI 结果核对下文。
 本文件是内部发行准备材料，不表示 1.2.0 已发布。 -->
 
-CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏引擎。一个 `.nds` 程序可以从列表选择多个游戏，支持转换 **S60v3 / S60v5 / 安卓 PyMO 游戏数据**。
+CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏引擎。一个 `.nds` 程序可以从列表选择多个游戏，支持转换 **S60v3 / S60v5 / Android PyMO 游戏数据**。
 
 **1.2.0 新增 DSi 原生模式支持、增强双屏、游戏视频转换与播放，并大幅完善游戏资料库及触控交互。** 本版已在 **Wood R4 的 DS/NTR 模式**和 **DSpico 的 DSi/TWL 模式**进行用户实机验收；不同游戏和烧录卡仍可能存在个别兼容性差异。
 
@@ -16,7 +16,7 @@ CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏
 | 查看、修改或构建程序 | **`CPyMO-for-NDS-1.2.0-Sources.zip`**（发布时填入链接）。提供完整对应源码、所需子模块、第三方许可及构建材料。 |
 | 核对下载文件是否完整 | **`CPyMO-for-NDS-1.2.0-SHA256SUMS.txt`**（发布时填入链接）。 |
 
-**安装套件不附具体游戏。** 转换助手在 Windows 电脑上使用；完整安装套件应包括运行所需组件，无须用户另装 Python 或 FFmpeg。S60v3 / S60v5 / 安卓指输入游戏的数据平台；macOS/Linux 可使用转换器源码，未提供相应免安装套件。
+**安装套件不附具体游戏。** 转换助手在 Windows 电脑上使用；完整安装套件应包括运行所需组件，无须用户另装 Python 或 FFmpeg。S60v3 / S60v5 / Android指输入游戏的数据平台；macOS/Linux 可使用转换器源码，未提供相应免安装套件。
 
 ## 第一次使用
 
