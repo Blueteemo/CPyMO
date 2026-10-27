@@ -76,6 +76,22 @@ UI_EN = {
         "The conversion worker exited unexpectedly. Please keep the diagnostic logs.",
     "界面语言：": "Language:",
     "检测到不支持的素材；请查看诊断日志。": "Unsupported assets were detected; see diagnostic logs.",
+    "缺少视频和音频转换组件 FFmpeg，请完整解压转换助手。":
+        "FFmpeg is missing. Extract the complete converter package.",
+    "视频转换模式无效。": "Invalid video conversion mode.",
+    "无损压缩模式无效。": "Invalid lossless compression mode.",
+    "嵌套游戏包太多，请单独选择要转换的游戏包。":
+        "Too many nested game packages; select one game package.",
+}
+
+DIAGNOSTIC_PREFIXES_EN = {
+    "已识别：": "Detected: ",
+    "正在转换图片、音频和字体，游戏较大时需要等待……":
+        "Converting images, audio and fonts; larger games may take longer…",
+    "未知脚本指令：": "Unknown script commands: ",
+    "缺失资源引用：": "Missing asset references: ",
+    "需运行检查的指令：": "Commands requiring runtime checks: ",
+    "字库缺字以□显示，原脚本未改：": "Missing glyphs displayed as □; original script unchanged: ",
 }
 
 def tr(value: str, language: str = "简体中文") -> str:
@@ -83,6 +99,9 @@ def tr(value: str, language: str = "简体中文") -> str:
         return value
     if value in UI_EN:
         return UI_EN[value]
+    for prefix, translated in DIAGNOSTIC_PREFIXES_EN.items():
+        if value.startswith(prefix):
+            return translated + value[len(prefix):]
     # A version number embedded in a static UI caption is not a translation
     # key; replacing it temporarily makes the label stable across releases.
     import re
@@ -92,3 +111,11 @@ def tr(value: str, language: str = "简体中文") -> str:
         if match:
             return UI_EN[normalized].format(version=match.group())
     return value
+
+
+def tr_log(raw: str, language: str = "简体中文") -> str:
+    if language != "English":
+        return raw
+    # Only translate recognized player-facing prefix lines, never edit
+    # the on-disk diagnostic log or unrecognized technical error details.
+    return "\n".join(tr(line, language) for line in raw.split("\n"))
