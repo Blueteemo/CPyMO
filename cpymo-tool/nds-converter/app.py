@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse, contextlib, datetime, json, os, subprocess, sys, tempfile
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, font as tkfont
 from helper_core import run_job
 
 from release_info import VERSION
@@ -23,6 +23,9 @@ class App:
         self.source=tk.StringVar();self.output=tk.StringVar(value=str(Path.home()/'Desktop'))
         self.status=tk.StringVar(value=self.tr(self._status_zh))
         self.candidates=[];self.serial=0;self.last_result=None;self.last_output=None
+        self._log_disk_text=''
+        self._log_extra_text=''
+        self._last_log_display=''
         window.title('CPyMO NDS 转换助手');window.geometry(f"840x{min(890,max(700,window.winfo_screenheight()-110))}");window.minsize(760,670)
         ui_font='PingFang SC' if sys.platform=='darwin' else 'Microsoft YaHei UI'
         window.option_add('*Font',(ui_font,10))
@@ -71,8 +74,8 @@ class App:
         row=ttk.Frame(self.advanced_frame);row.pack(fill='x',pady=(5,0))
         ttk.Label(row,text='文件体积与读取：').pack(side='left')
         self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,
-                        state='readonly',width=47)
-        self.compression_box.pack(side='left')
+                        state='readonly',width=64)
+        self.compression_box.pack(side='left',fill='x',expand=True,padx=(9,0))
         ttk.Label(self.advanced_frame,text='默认设置兼顾体积和读取速度，普通使用无需调整。',
                   foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
         row=ttk.Frame(frame);row.pack(fill='x',pady=(13,8))
@@ -81,7 +84,13 @@ class App:
         self.open_button=ttk.Button(row,text='打开结果文件夹',command=self.open_output,state='disabled');self.open_button.pack(side='right')
         self.progress=ttk.Progressbar(frame,mode='indeterminate');self.progress.pack(fill='x')
         ttk.Label(frame,textvariable=self.status,wraplength=790).pack(anchor='w',pady=(8,4))
-        self.log=tk.Text(frame,height=4,wrap='word',background='#f1f4f8',foreground='#233247',insertbackground='#233247',selectbackground='#27659c',selectforeground='#ffffff',relief='flat',font=(ui_font,9));self.log.pack(fill='both',expand=True,pady=(4,8))
+        # Never inherit a white macOS dark-mode foreground over a pale log panel.
+        # Give Tk's CJK fallback extra line height on Retina screens and avoid
+        # repainting the entire Text control every polling interval.
+        log_font=tkfont.Font(window,family='Menlo' if sys.platform=='darwin' else ui_font,size=10)
+        self.log=tk.Text(frame,height=4,wrap='word',background='#f1f4f8',foreground='#233247',insertbackground='#233247',selectbackground='#27659c',selectforeground='#ffffff',relief='solid',borderwidth=1,font=log_font,spacing1=3,spacing2=4,spacing3=5,padx=10,pady=8)
+        self.log.pack(fill='both',expand=True,pady=(4,8))
+        self.log.configure(state='disabled')
         ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579').pack(anchor='w')
         window.protocol('WM_DELETE_WINDOW',self.close)
         self._capture_localizable_widgets(self.window)
@@ -136,6 +145,7 @@ class App:
         self.video.set(self.video_modes[video_idx])
         self._apply_language()
         self._update_advanced_caption()
+        self._render_log(force=True)
         if self.last_output and self.last_result and not self.last_result.get('ok'):
             self.open_button.configure(text=self.tr('查看错误日志'))
         if self.candidates:
@@ -187,6 +197,9 @@ class App:
         else:self.progress.stop()
 
     def start(self,job,callback):
+        self._log_disk_text=''
+        self._log_extra_text=''
+        self._render_log(force=True)
         self.serial+=1;stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f');folder=self.state_root/(stamp+'-'+str(self.serial));folder.mkdir(parents=True)
         self.job_file=folder/'job.json';self.result_file=folder/'result.json';self.log_file=folder/'log.txt'
         job.update(result=str(self.result_file.resolve()),log=str(self.log_file.resolve()));self.job_file.write_text(json.dumps(job,ensure_ascii=False,indent=2),encoding='utf8')
@@ -194,10 +207,30 @@ class App:
         self.process=subprocess.Popen(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=0x08000000 if os.name=='nt' else 0)
         self.callback=callback;self.busy(True);self.window.after(200,self.poll)
 
+    def _render_log(self,force=False):
+        displayed=(tr_log(self._log_disk_text,self.language.get())+
+                   self._log_extra_text)[-12000:]
+        if not force and displayed==self._last_log_display:
+            return
+        self.log.configure(state='normal')
+        # Append only when the new content really extends the old content;
+        # wholesale deletion every 300 ms caused macOS Tk repaint artifacts.
+        if not force and displayed.startswith(self._last_log_display):
+            self.log.insert('end',displayed[len(self._last_log_display):])
+        else:
+            self.log.delete('1.0','end')
+            self.log.insert('end',displayed)
+        self._last_log_display=displayed
+        self.log.see('end')
+        self.log.configure(state='disabled')
+
     def poll(self):
         if not self.process:return
         if self.log_file.exists():
-            text=self.log_file.read_text(encoding='utf8',errors='replace');self.log.delete('1.0','end');self.log.insert('end',tr_log(text,self.language.get())[-5000:]);self.log.see('end')
+            text=self.log_file.read_text(encoding='utf8',errors='replace')
+            if text!=self._log_disk_text:
+                self._log_disk_text=text
+                self._render_log()
         if self.process.poll() is None:self.window.after(300,self.poll);return
         self.process=None;self.busy(False)
         report=json.loads(self.result_file.read_text(encoding='utf8')) if self.result_file.exists() else {'ok':False,'error':'转换进程意外退出，请保留诊断日志。'}
@@ -229,12 +262,15 @@ class App:
         if not report['ok']:self.failed(report);return
         self.last_output=Path(report['output']);self.open_button.configure(state='normal',text=self.tr('打开结果文件夹'))
         self.set_status('转换完成！有一些提示，建议先查看下方记录。' if report.get('warnings') else '转换完成！请打开结果文件夹，按说明复制到 TF 卡。')
-        self.log.insert('end','\n'+('\n'.join(self.tr(w) for w in report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
+        notes=['\n'+('\n'.join(self.tr(w) for w in report['warnings'])
+                       if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n']
         if report.get('cache_only'):
-            self.log.insert('end',self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n');self.log.see('end')
+            notes.append(self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n')
         comp=report.get('lossless',{})
         if comp.get('audio_mode','off')!='off':
-            self.log.insert('end',self.tr('无损缓存另节省 {size:.2f} MiB。请使用随附的 {version} 引擎。').format(size=(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576,version=VERSION)+'\n');self.log.see('end')
+            notes.append(self.tr('无损缓存另节省 {size:.2f} MiB。请使用随附的 {version} 引擎。').format(size=(comp['audio_saved_bytes']+comp['image_saved_bytes'])/1048576,version=VERSION)+'\n')
+        self._log_extra_text=''.join(notes)
+        self._render_log()
         if self.self_test:self.finish_test(report)
 
     def failed(self,report):
