@@ -12,7 +12,7 @@
 Verification:
 - Both Windows and macOS installer archives contain two readable NDS ROM copies, each exactly 924,672 bytes with **identical** SHA-256 matching the above universal ROM.
 - The universal ROM contains one approved embedded 02-B background: RGB555 pixel SHA-256 `92d91514ac12ccab6037a86a71e0c4cf1047917d15de59b91bcc8e4bb4d7d1b2`. No placeholder art may ship.
-- The Windows and macOS archives both carry `FFmpeg-Corresponding-Source/ffmpeg-7.1.5.tar.xz`, captured build configuration, license output, binary and source checksums. FFmpeg is built with `--disable-gpl --disable-nonfree`. Windows frozen conversion tested an original synthetic MP4 into NVL1; the macOS frozen worker tested default NVL1, box fallback and source immutability.
+- The Windows and macOS archives both carry **the identical official** `FFmpeg-Corresponding-Source/ffmpeg-7.1.5.tar.xz` (11,050,340 bytes; SHA-256 `de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f`), captured build configuration, license output, binary and source checksums. FFmpeg is built with `--disable-gpl --disable-nonfree`. Windows frozen conversion tested an original synthetic MP4 into NVL1; the macOS frozen worker tested default NVL1, box fallback and source immutability.
 - The macOS app is **not signed with Apple Developer ID or notarized**. `macos-15-intel` CI success is *not* a Finder GUI or Apple Silicon test. A separate user-local DeepSeek test is pending.
 - macOS FFmpeg may be ad-hoc codesigned by PyInstaller, so the executable in `.app/Contents/Frameworks` need not hash identically to the source-built input. Version 1.2's macOS packager now records both hashes separately for subsequent RC builds.
 
