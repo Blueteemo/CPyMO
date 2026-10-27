@@ -132,8 +132,13 @@ def tr(value: str, language: str = "简体中文") -> str:
 
 
 def tr_log(raw: str, language: str = "简体中文") -> str:
-    if language != "English":
-        return raw
-    # Only translate recognized player-facing prefix lines, never edit
-    # the on-disk diagnostic log or unrecognized technical error details.
-    return "\n".join(tr(line, language) for line in raw.split("\n"))
+    # Display-only translation. Preserve the original diagnostic text on disk.
+    if language == "English":
+        return "\n".join(tr(line, language) for line in raw.split("\n"))
+    if language == "简体中文":
+        return "\n".join(
+            "正在准备输出：" + line[len("Staging:"):] if line.startswith("Staging:")
+            else line
+            for line in raw.split("\n")
+        )
+    return raw
