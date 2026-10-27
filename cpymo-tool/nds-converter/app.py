@@ -47,20 +47,29 @@ class App:
         self.output_button=ttk.Button(row,text='选保存位置',command=self.pick_output);self.output_button.pack(side='left',padx=(8,0))
         ttk.Label(frame,text='自动创建新文件夹，不覆盖原包或已有存档；视频默认转换为 NVL1。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(0,10))
         ttk.Label(frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579',wraplength=780).pack(anchor='w')
+        # Media de-duplication is a safe default, not a player decision.
+        # Keep the variable for existing CLI and GUI self-test fixtures.
         self.cache_only=tk.BooleanVar(value=True)
-        ttk.Checkbutton(frame,text='精简输出：不重复保存已转换的图片／音频（原游戏、脚本与署名不变）',variable=self.cache_only).pack(anchor='w')
-        self.compression=tk.StringVar(value='无损压缩语音与适合的图片（推荐）')
-        self.compression_modes=['不压缩缓存（读取优先）','无损压缩语音与适合的图片（推荐）','无损压缩全部音频与适合的图片（实验）']
-        row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='缓存压缩：').pack(side='left')
-        self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,state='readonly',width=47);self.compression_box.pack(side='left')
-        ttk.Label(frame,text='安装包已包含 CPyMO '+VERSION+'；缓存压缩不会进一步降低转换后素材质量。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
         self.video_modes=['不转换视频（兼容旧流程）','转换视频 NVL1（推荐：兼容优先）','转换视频 NVA1（压缩音频）']
         self.video=tk.StringVar(value=self.video_modes[1])
         row=ttk.Frame(frame);row.pack(fill='x',pady=(7,0));ttk.Label(row,text='游戏视频：').pack(side='left')
         self.video_box=ttk.Combobox(row,textvariable=self.video,values=self.video_modes,
                      state='readonly',width=47)
         self.video_box.pack(side='left')
-        ttk.Label(frame,text='视频默认转换为 256×192 / 12 FPS；可选 NVA1 或跳过，安装包已含对应引擎。',
+        ttk.Label(frame,text='默认保留并转换游戏视频；如不需要视频，也可以选择跳过。',
+                  foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
+        self.compression=tk.StringVar(value='无损压缩语音与适合的图片（推荐）')
+        self.compression_modes=['不压缩缓存（读取优先）','无损压缩语音与适合的图片（推荐）','无损压缩全部音频与适合的图片（实验）']
+        self.advanced_visible=False
+        self.advanced_button=ttk.Button(frame,text='更多设置（可选）',command=self.toggle_advanced)
+        self.advanced_button.pack(anchor='w',pady=(8,0))
+        self.advanced_frame=ttk.Frame(frame)
+        row=ttk.Frame(self.advanced_frame);row.pack(fill='x',pady=(5,0))
+        ttk.Label(row,text='文件体积与读取：').pack(side='left')
+        self.compression_box=ttk.Combobox(row,textvariable=self.compression,values=self.compression_modes,
+                        state='readonly',width=47)
+        self.compression_box.pack(side='left')
+        ttk.Label(self.advanced_frame,text='默认设置兼顾体积和读取速度，普通使用无需调整。',
                   foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
         row=ttk.Frame(frame);row.pack(fill='x',pady=(13,8))
         self.convert_button=ttk.Button(row,text='3  开始转换',command=self.begin,state='disabled');self.convert_button.pack(side='left')
@@ -122,6 +131,7 @@ class App:
         self.compression.set(self.compression_modes[audio_idx])
         self.video.set(self.video_modes[video_idx])
         self._apply_language()
+        self._update_advanced_caption()
         if self.candidates:
             selected=self.games.curselection()
             self.games.delete(0,'end')
@@ -134,6 +144,18 @@ class App:
             self.preference_file.write_text(json.dumps({'language':self.language.get()},ensure_ascii=False),encoding='utf8')
         except OSError:
             pass  # Keep a usable UI if preferences are read-only.
+
+    def _update_advanced_caption(self):
+        label='收起更多设置' if self.advanced_visible else '更多设置（可选）'
+        self.advanced_button.configure(text=self.tr(label))
+
+    def toggle_advanced(self):
+        self.advanced_visible=not self.advanced_visible
+        if self.advanced_visible:
+            self.advanced_frame.pack(fill='x',after=self.advanced_button)
+        else:
+            self.advanced_frame.pack_forget()
+        self._update_advanced_caption()
 
     def pick_zip(self):
         p=filedialog.askopenfilename(title=self.tr('选择 PyMO 游戏包'),filetypes=[(self.tr('游戏包'),'*.zip *.apk'),(self.tr('全部文件'),'*.*')])
@@ -189,13 +211,13 @@ class App:
         source=Path(self.source.get()).resolve();base=Path(self.output.get()).resolve()
         if source.is_dir() and base.is_relative_to(source):self.failed({'ok':False,'error':self.tr('保存位置不能位于原游戏目录内部。')});return
         name='CPyMO_NDS_转换结果_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f');output=base/name
-        self.set_status('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
+        self.set_status('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled',text=self.tr('打开结果文件夹'))
         audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
         self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())],'ui_language':self.language.get()},self.converted)
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
-        self.last_output=Path(report['output']);self.open_button.configure(state='normal');self.set_status(report['status']+'。点击“打开结果文件夹”查看安装必读。')
+        self.last_output=Path(report['output']);self.open_button.configure(state='normal',text=self.tr('打开结果文件夹'));self.set_status(report['status']+'。点击“打开结果文件夹”查看安装必读。')
         self.log.insert('end','\n'+('\n'.join(self.tr(w) for w in report['warnings']) if report['warnings'] else self.tr('未发现静态兼容性警告。'))+'\n');self.log.see('end')
         if report.get('cache_only'):
             self.log.insert('end',self.tr('已省去重复媒体 {size:.2f} MiB。脚本与署名保留，原包未修改。').format(size=report['redundant_media_bytes']/1048576)+'\n');self.log.see('end')
@@ -205,6 +227,9 @@ class App:
         if self.self_test:self.finish_test(report)
 
     def failed(self,report):
+        if self.result_file.parent.is_dir():
+            self.last_output=self.result_file.parent
+            self.open_button.configure(state='normal',text=self.tr('查看错误日志'))
         self.set_status('未完成：'+report['error'])
         if self.self_test:self.finish_test(report)
         else:messagebox.showerror(self.tr('暂时不能完成转换'),self.tr(report['error'])+'\n\n'+self.tr('原游戏包未改动。诊断目录：')+str(self.result_file.parent))
@@ -224,6 +249,9 @@ class App:
             if os.name=='nt':subprocess.run(['taskkill','/PID',str(self.process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=0x08000000)
             else:self.process.terminate()
         self.process=None;self.busy(False);self.set_status('已取消。原游戏包未改动；未完成目录和日志保留供检查。')
+        if getattr(self,'log_file',None) and self.log_file.parent.is_dir():
+            self.last_output=self.log_file.parent
+            self.open_button.configure(state='normal',text=self.tr('查看错误日志'))
 
     def open_output(self):
         if self.last_output:
