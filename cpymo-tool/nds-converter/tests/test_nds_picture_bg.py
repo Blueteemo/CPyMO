@@ -17,6 +17,7 @@ C=r"""
 #include "nds-picture-bg.h"
 #define CHECK(x) do{if(!(x))abort();}while(0)
 int main(int argc,char** argv){
+ (void)argv;
  if(argc!=2)return 2;
  /* Source file must be placed in a test-mapped /pymo path by a host macro. */
  const uint16_t* px=nds_picture_get();
