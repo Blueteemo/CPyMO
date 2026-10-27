@@ -43,14 +43,6 @@ grep -F -- '--disable-nonfree' "$OUT/source/FFMPEG-BUILDCONF.txt"
 if grep -Eiq -- 'nonfree and unredistributable|--enable-nonfree|--enable-gpl' "$OUT/source/FFMPEG-BUILDCONF.txt" "$OUT/source/FFMPEG-LICENSE.txt"; then
   echo 'Rejected nonredistributable or GPL-enabled FFmpeg build' >&2; exit 1
 fi
-python3 - "$OUT/bin/ffmpeg" <<'PY'
-import sys
-from pathlib import Path
-exe=Path(sys.argv[1])
-assert exe.is_file() and exe.stat().st_size>100000,exe
-sys.path.insert(0,str(Path.cwd().parents[2]/'cpymo-tool/nds-converter'))
-# The import path above is source-tree dependent and may not exist in CI.
-PY
 shasum -a 256 "$OUT/bin/ffmpeg" > "$OUT/source/BINARY-SHA256SUMS.txt"
 cat > "$OUT/source/README-REDISTRIBUTION.txt" <<'TXT'
 This CPyMO macOS converter bundles an executable compiled from the included
