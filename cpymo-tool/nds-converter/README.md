@@ -1,17 +1,17 @@
-# CPyMO NDS 转换助手 1.2.0（候选版）
+# CPyMO for NDS 1.2.0 转换助手
 
 NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；字体与依赖保留各自许可。
 
 ## 给玩家
 
-完整解压 Windows Starter，双击“启动转换器.bat”，或运行“Converter/Converter.exe”。
-无需安装 Python、FFmpeg 或编译器。选择游戏 ZIP/APK 或含 gameconfig.txt 的文件夹，
+Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用通过最终验收的 ARM64 `.app` 安装包（RC 阶段暂不公开）；Intel Mac 可按下文从源码运行。
+免安装套件已内置 Python 运行时和 FFmpeg，普通玩家无须另行安装。打开助手后，可选择简体中文或 English（界面选择会保存）；选择游戏 ZIP/APK 或含 gameconfig.txt 的文件夹，
 支持嵌套 ZIP 与 S60v3 / S60v5 / Android PyMO 数据（指输入数据平台，非电脑系统）。
 同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
 
 把输出的 cpymo-nds.nds 和 pymo 文件夹复制到 TF 根目录。路径应为
 `pymo/games/<游戏目录>/gameconfig.txt`，旁边有 script、nds-cache 和 save。
-保留 R4 内核。已有同名游戏先保留自己的 save，不要用新输出的空 save 覆盖。
+保留原有烧录卡内核或 DSi 启动配置。已有同名游戏先保留自己的 save，不要用新输出的空 save 覆盖。
 转换助手在电脑使用，不需要复制进 TF。本包不附游戏。
 
 默认精简已有缓存的重复原媒体，无损压缩语音与适合的图片；BGM/音效保持 PCM，兼顾读取和存储。
@@ -22,7 +22,7 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 
 视频资源默认转换为 NVL1，玩家也可选择 NVA1（压缩音轨）或主动跳过视频。字库缺字默认替换为 □ 并生成警告，原始包、脚本和定稿汉化不修改，源存档不导入。
 转换通过不等于全剧情或全部烧录卡认证。缺资源、未知指令和缺字策略记录在
-`nds-cache/manifest.json` 及转换结果中。GUI 默认缺字显示 □ 并记录，脚本文字不改。
+`nds-cache/manifest.json` 及转换结果中。GUI 默认缺字显示 □ 并记录，脚本文字不改；英文界面转换完成后还会生成 `INSTALL-READ-ME.txt` 英文安装说明。
 加密/打包脚本和其他游戏引擎不支持。
 
 ## 1.2 游戏视频转换
@@ -33,7 +33,7 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 12 FPS、256×192 RGB555；保留原始画面比例，居中补黑边，不随意拉伸。
 字幕、脚本与存档策略不改；无音轨视频补零音频。
 
-CLI 用法（在正式发布前需搭配同分支 ROM）：
+CLI 用法（发行前请确认与同版 NDS 引擎匹配）：
 
 
 
@@ -57,7 +57,7 @@ python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目�
 ## 从源码运行与构建
 
 Python 3.10+，安装 requirements.txt，另备 FFmpeg；完整仓库内运行 `python app.py`。
-Windows 提供免安装包，macOS/Linux 可运行源码 CLI。macOS 原生 `.app` 已在 Intel Mac CI 完成打包及冻结工作进程的原创视频转换测试；实际 Finder GUI 启动、Apple Silicon、签名／公证与正式发行许可仍待确认，因此暂不作为正式下载项。
+Windows 提供免安装包；macOS 正式版拟**仅发行 Apple Silicon 原生 ARM64 `.app`**，不提供 Intel macOS 预编译包。Apple Silicon 版本使用 ARM64 Python、PyInstaller 和 FFmpeg 构建，需通过原生 CI、Finder 图形操作及本机验收后才能公开。Intel Mac、Linux 仍可按要求从源码运行命令行工具；未签名／未公证的 macOS RC 不能冒充已发布版本。
 
 ```sh
 python -m pip install -r cpymo-tool/nds-converter/requirements.txt
@@ -74,7 +74,7 @@ CLI 默认也将缺字替换为 □ 并记录；若开发者希望针对字体�
 
 ```sh
 python build_native.py --cc /path/to/x86_64-w64-mingw32-gcc.exe
-python build_portable.py --ffmpeg /path/to/ffmpeg.exe --output /path/to/new-portable
+python build_portable.py --rom /path/to/verified/cpymo-nds.nds --ffmpeg /path/to/ffmpeg.exe --output /path/to/new-portable
 ```
 
 加速库可选，源码模式缺失时使用 Python 实现；公开 Windows 包包含该库。
