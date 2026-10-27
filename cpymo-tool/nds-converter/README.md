@@ -5,7 +5,7 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 ## 给玩家
 
 Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用通过最终验收的 ARM64 `.app` 安装包（RC 阶段暂不公开）；Intel Mac 可按下文从源码运行。
-免安装套件已内置 Python 运行时和 FFmpeg，普通玩家无须另行安装。打开助手后，可选择简体中文或 English（界面选择会保存）；选择游戏 ZIP/APK 或含 gameconfig.txt 的文件夹，
+免安装套件已内置 Python 运行时和 FFmpeg，普通玩家无须另行安装。打开助手后，可选择简体中文或 English（界面选择会保存）；选择游戏 ZIP 或含 gameconfig.txt 的文件夹，
 支持嵌套 ZIP 与 S60v3 / S60v5 / Android PyMO 数据（指输入数据平台，非电脑系统）。
 同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
 

@@ -41,7 +41,7 @@ CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
 
 ## 安装
 
-1. 在 Windows 或 Apple Silicon macOS 转换助手中选择自己的 PyMO 游戏 ZIP/APK 或游戏文件夹，使用推荐默认选项转换。
+1. 在 Windows 或 Apple Silicon macOS 转换助手中选择自己的 PyMO 游戏 ZIP 或游戏文件夹，使用推荐默认选项转换。
 2. 将转换结果的 `cpymo-nds.nds` 和 `pymo/` 文件夹复制到 TF 卡根目录。
 3. 保留已有烧录卡内核、游戏和存档。覆盖同名游戏目录前，**先备份 `save/`**。
 4. 在掌机启动 `cpymo-nds.nds`，从游戏列表选择游戏。

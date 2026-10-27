@@ -18,7 +18,8 @@ CPyMO desktop artwork:
   1254 × 1254 RGBA; SHA-256:
   3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62
   Generated app icon formats: Windows .ico, macOS .icns and PNG,
-  produced exclusively by scaling/container conversion.
+  produced by scaling/container conversion with 2.4% horizontal optical
+  balancing on desktop derivatives only. The master and NDS banner are unchanged.
   The source file is included in the corresponding CPyMO source archive:
   cpymo-tool/nds-converter/assets/converter-icon-source.png
 

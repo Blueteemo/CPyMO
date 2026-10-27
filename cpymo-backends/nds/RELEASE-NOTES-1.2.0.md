@@ -22,7 +22,7 @@ CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏
 ## 第一次使用
 
 1. **Windows：** 完整解压 Windows 套件，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。**Apple Silicon Mac：** 如正式发行时提供 ARM64 套件，完整解压并从 Finder 打开 `CPyMO-NDS-Converter.app`。**该版本未使用 Apple Developer ID 签名，也未经 Apple 公证。**若 macOS 拦截首次运行，请先确认从本项目官方发行页下载并核对 SHA-256；只有在确认信任后，按 [Apple 官方说明](https://support.apple.com/zh-cn/102445)前往「系统设置 → 隐私与安全性 → 仍要打开」。不要在终端执行全局关闭 Gatekeeper、删除安全属性或关闭 SIP 的命令。
-2. 在电脑转换助手中选择自己的 PyMO 游戏 ZIP/APK 或包含 `gameconfig.txt` 的游戏文件夹。同包有多个平台时，一般优先选择 S60v3；选择新的输出位置，开始转换。助手可切换简体中文／English；游戏视频默认转换为 NVL1，也可选压缩音轨的 NVA1 或主动跳过视频。
+2. 在电脑转换助手中选择自己的 PyMO 游戏 ZIP 或包含 `gameconfig.txt` 的游戏文件夹。同包有多个平台时，一般优先选择 S60v3；选择新的输出位置，开始转换。助手可切换简体中文／English；游戏视频默认转换为 NVL1，也可选压缩音轨的 NVA1 或主动跳过视频。
 3. 转换完成后阅读警告与输出目录的“安装必读”（英文界面还会生成 `INSTALL-READ-ME.txt`），将**转换结果**中的 `cpymo-nds.nds` 和 `pymo` 文件夹复制到 TF 根目录。
 4. 安全弹出 TF，装回烧录卡，在 DS/DSi 上启动 `cpymo-nds.nds`，从游戏库选择游戏。
 
