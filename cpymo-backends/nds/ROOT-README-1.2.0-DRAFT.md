@@ -24,7 +24,7 @@ CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
 | 用途 | 发行文件 |
 |---|---|
 | 已转换过游戏，只更新引擎 | `cpymo-nds.nds` |
-| 首次使用、转换游戏、添加视频 | Windows Starter；macOS 版如通过发行校验再列入 |
+| 首次使用、转换游戏、添加视频 | Windows Starter；Apple Silicon Mac 使用通过最终验收的 ARM64 版，不提供 Intel macOS 预编译附件 |
 | 查看全部变更与校验 | 1.2.0 Release Notes、Sources、SHA256SUMS |
 
 转换助手在电脑上运行，游戏程序在 DS / DSi 上运行。**本仓库不附任何商业游戏。**
@@ -41,7 +41,7 @@ CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
 
 ## 安装
 
-1. 在 Windows 转换助手中选择自己的 PyMO 游戏 ZIP/APK 或游戏文件夹，使用推荐默认选项转换。
+1. 在 Windows 或 Apple Silicon macOS 转换助手中选择自己的 PyMO 游戏 ZIP/APK 或游戏文件夹，使用推荐默认选项转换。
 2. 将转换结果的 `cpymo-nds.nds` 和 `pymo/` 文件夹复制到 TF 卡根目录。
 3. 保留已有烧录卡内核、游戏和存档。覆盖同名游戏目录前，**先备份 `save/`**。
 4. 在掌机启动 `cpymo-nds.nds`，从游戏列表选择游戏。
@@ -81,7 +81,7 @@ TF 卡根目录/
 ## 兼容性、转换器和开发文档
 
 - [NDS 后端、安装与兼容边界](cpymo-backends/nds/README.md)
-- [转换助手：GUI、命令行、视频编码](cpymo-tool/nds-converter/README.md)
+- [转换助手：简体中文 / English GUI、命令行、视频编码](cpymo-tool/nds-converter/README.md)
 - [正式发行说明与已知限制](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.2.0)
 - [旧版下载](https://github.com/Blueteemo/CPyMO/releases)
 
