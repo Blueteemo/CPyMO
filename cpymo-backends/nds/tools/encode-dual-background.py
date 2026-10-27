@@ -17,7 +17,7 @@ def encode(src: Path, dest: Path) -> dict:
         if image.size != (256,192):
             raise ValueError("Expected native 256x192 RGB PNG")
         rgb=image.convert("RGB")
-        raw=bytearray(b"CPYBG12\\0")
+        raw=bytearray(b"CPYBG12\0")
         for r,g,b in rgb.getdata():
             native=(0x8000 | ((r*31+127)//255) |
                     (((g*31+127)//255)<<5) | (((b*31+127)//255)<<10))
