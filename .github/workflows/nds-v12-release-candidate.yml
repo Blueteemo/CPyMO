@@ -275,3 +275,88 @@ jobs:
           path: release-paired-audit/
           retention-days: 21
           if-no-files-found: error
+
+  publish-verified-release:
+    name: Publish nds-v1.2.0 after independent asset audit
+    needs: [paired-asset-audit]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/nds-v1.2-pico-acceptance-20261027'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: CPyMO-1.2-*
+          path: .paired-download
+          merge-multiple: false
+      - name: Verify audit and prepare final named assets
+        run: |
+          python3 - <<'PY'
+          import os,re,json,shutil,hashlib,zipfile
+          from pathlib import Path
+          root=Path('.paired-download')
+          audit=json.loads((root/'CPyMO-1.2-PAIRED-STAGING-AUDIT-SHA256SUMS/RC-PAIRED-AUDIT.json').read_text())
+          assert audit['source_commit']==os.environ['GITHUB_SHA']
+          assert audit['rom_sha256']=='7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31'
+          paths={
+            'rom':root/'CPyMO-1.2-UNIVERSAL-VERIFIED-ROM-RC/cpymo-nds.nds',
+            'windows':root/'CPyMO-1.2-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE/CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip',
+            'macos':root/'CPyMO-1.2-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW/CPyMO-for-NDS-1.2.0-Starter-macOS-arm64-RC.zip',
+            'sources':root/'CPyMO-1.2-SOURCES-RC-LICENSE-REVIEW/CPyMO-for-NDS-1.2.0-Sources-RC.zip',
+          }
+          names={
+            'rom':'cpymo-nds.nds',
+            'windows':'CPyMO-for-NDS-1.2.0-Starter-Windows.zip',
+            'macos':'CPyMO-for-NDS-1.2.0-Starter-macOS-arm64.zip',
+            'sources':'CPyMO-for-NDS-1.2.0-Sources.zip',
+          }
+          dest=Path('release-public');dest.mkdir()
+          sizes={};sums=[]
+          for kind,source in paths.items():
+            data=source.read_bytes()
+            sha=hashlib.sha256(data).hexdigest()
+            assert sha==audit['distributions'][kind]['sha256'] and len(data)==audit['distributions'][kind]['bytes']
+            if kind!='rom':
+              with zipfile.ZipFile(source) as z: assert z.testzip() is None
+            (dest/names[kind]).write_bytes(data)
+            sizes[kind]=len(data)
+            sums.append(sha+'  '+names[kind]+'\n')
+          names['checksums']='CPyMO-for-NDS-1.2.0-SHA256SUMS.txt'
+          (dest/names['checksums']).write_text(''.join(sums),encoding='ascii')
+          sizes['checksums']=(dest/names['checksums']).stat().st_size
+          notes=Path('cpymo-backends/nds/RELEASE-NOTES-1.2.0.md').read_text(encoding='utf-8')
+          if notes.startswith('<!--'): notes=notes.split('-->',1)[1].lstrip()
+          for kind,name in names.items():
+            title='**'+chr(96)+name+chr(96)+'**'
+            magnitude='%.1f KiB'%(sizes[kind]/1024) if kind=='rom' else '%.2f MiB'%(sizes[kind]/1048576)
+            url='https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/releases/download/nds-v1.2.0/'+name
+            label='**['+name+']('+url+')**（'+magnitude+'）'
+            notes,n=re.subn(re.escape(title)+r'（[^）]+）',lambda _:label,notes,count=1)
+            assert n==1,kind
+          notes=notes.replace('Apple Silicon Mac ARM64 套件需通过本机验收后才会作为正式下载提供。','Apple Silicon Mac ARM64 为原生应用，不需要 Rosetta，未进行 Apple Developer ID 签名或公证。')
+          notes=notes.replace('如正式发行时提供 ARM64 套件，','')
+          notes=notes.replace('发行时在此处补充**最终正式 ROM 字节数与 SHA-256**、同提交构建的 CI 链接，以及 Windows 免安装套件的实际转换器测试结果；不可用早期开发版日志替代最终发行件的校验。','最终 ROM 为 924672 字节，SHA-256 为 7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31。Windows 和 macOS ARM64 安装包、同版 ROM 和源码经过同一提交的跨资产审计。')
+          notes+='\n\n完整构建和跨资产审计：https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+os.environ['GITHUB_RUN_ID']+'\n'
+          notes+='\n发行文件 SHA-256：\n\n'+''.join('    '+line for line in sums)
+          assert '发布时填写' not in notes and '发布时填入' not in notes
+          Path('release-body.md').write_text(notes,encoding='utf-8')
+          print('Paired immutable RC inputs renamed for release, SHA256SUMS regenerated.')
+          PY
+      - name: Publish release without overwriting existing tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view nds-v1.2.0 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'The release tag already exists; will not overwrite.'; exit 1
+          fi
+          gh release create nds-v1.2.0 \
+            release-public/cpymo-nds.nds \
+            release-public/CPyMO-for-NDS-1.2.0-Starter-Windows.zip \
+            release-public/CPyMO-for-NDS-1.2.0-Starter-macOS-arm64.zip \
+            release-public/CPyMO-for-NDS-1.2.0-Sources.zip \
+            release-public/CPyMO-for-NDS-1.2.0-SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "CPyMO for NDS 1.2.0" --notes-file release-body.md
+          gh release view nds-v1.2.0 -R "$GITHUB_REPOSITORY" --json url,tagName,assets
