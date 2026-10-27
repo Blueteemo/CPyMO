@@ -12,11 +12,12 @@ CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏
 | 你的情况 | 下载内容 |
 |---|---|
 | 已有转换好的游戏，只更新引擎 | **`cpymo-nds.nds`**（发布时填写准确大小和链接）。替换 TF 卡上的旧版程序，保留游戏与存档；增强双屏星夜背景已内置，无须复制额外素材。 |
-| 第一次使用，或需要转换新游戏 | **`CPyMO-for-NDS-1.2.0-Starter-Windows.zip`**（发布时填写准确大小和链接）。包含同一正式版引擎、免安装转换助手、空游戏根目录及使用说明。 |
+| 第一次使用，或需要转换新游戏（Windows） | **`CPyMO-for-NDS-1.2.0-Starter-Windows.zip`**（发布时填写准确大小和链接）。包含同一正式版引擎、免安装转换助手、空游戏根目录及使用说明。 |
+| Apple Silicon Mac 转换游戏 | **`CPyMO-for-NDS-1.2.0-Starter-macOS-arm64.zip`**（需通过 ARM64 本机最终验收后才列为正式附件）。不提供 Intel Mac 预编译版。 |
 | 查看、修改或构建程序 | **`CPyMO-for-NDS-1.2.0-Sources.zip`**（发布时填入链接）。提供 CPyMO 与转换器的对应源码及子模块；随 FFmpeg 二进制交付时，另须提供与该二进制准确对应的 FFmpeg 源码、构建信息及许可证。 |
 | 核对下载文件是否完整 | **`CPyMO-for-NDS-1.2.0-SHA256SUMS.txt`**（发布时填入链接）。 |
 
-**安装套件不附具体游戏。** 转换助手在 Windows 电脑上使用；完整安装套件应包括运行所需组件，无须用户另装 Python 或 FFmpeg。S60v3 / S60v5 / Android 指输入游戏的数据平台。macOS 转换器正处于独立发行候选测试阶段，在完成本机验收及许可证检查前，不作为正式下载项；macOS/Linux 也可运行转换器源码。
+**安装套件不附具体游戏。** Windows 与符合条件的 Apple Silicon Mac 安装包都内置转换所需的运行组件，无须普通玩家另装 Python 或 FFmpeg。S60v3 / S60v5 / Android 指输入游戏的数据平台，而非转换助手运行的电脑系统。macOS ARM64 附件仅在本机验收通过后公开；Intel Mac、Linux 可按要求使用源码工具。转换助手默认简体中文，可切换 English。
 
 ## 第一次使用
 
