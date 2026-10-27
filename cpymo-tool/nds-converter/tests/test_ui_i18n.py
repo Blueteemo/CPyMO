@@ -5,7 +5,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from ui_i18n import tr, LANGUAGES
+from ui_i18n import tr, tr_log, LANGUAGES
 
 
 class ConverterLanguageTests(unittest.TestCase):
@@ -32,6 +32,14 @@ class ConverterLanguageTests(unittest.TestCase):
         self.assertIn("'ui_language':self.language.get()",app)
         self.assertIn('INSTALL-READ-ME.txt',guide)
         self.assertNotIn('保留R4内核',guide)
+
+    def test_known_diagnostic_prefixes_are_translated_only_for_view(self):
+        raw='字库缺字以□显示，原脚本未改：U+1F984\\nError detail unknown: x'
+        translated=tr_log(raw,'English')
+        self.assertIn('Missing glyphs displayed as □',translated)
+        self.assertIn('U+1F984',translated)
+        self.assertIn('Error detail unknown: x',translated)
+        self.assertEqual(tr_log(raw,'简体中文'),raw)
 
     def test_unknown_diagnostics_are_preserved(self):
         raw='Unmapped PyMO error for source investigation: /tmp/foo'
