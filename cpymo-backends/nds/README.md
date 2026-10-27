@@ -7,7 +7,7 @@ NDS 平台移植：千岚之夏；CPyMO：Seng Jik 及贡献者；PyMO：chen_xi
 ## 安装与更新
 
 发行包提供独立 `cpymo-nds.nds` 和配套 Windows 免安装转换助手，不附游戏。
-先在电脑上用 `cpymo-tool/nds-converter` 转换自己的 S60v3 / S60v5 / 安卓 PyMO 数据，
+先在电脑上用 `cpymo-tool/nds-converter` 转换自己的 S60v3 / S60v5 / Android PyMO 数据，
 再将转换结果中的 `cpymo-nds.nds` 和 `pymo/games/<游戏目录>` 复制到 TF 根目录。
 保留 R4 内核，已有游戏更新前保留自己的 `save/`，不要用转换结果的空存档目录覆盖。
 已转换的 1.0 游戏仍可使用；想缩小旧数据请从原包转入新目录，单独保留并迁移存档。
