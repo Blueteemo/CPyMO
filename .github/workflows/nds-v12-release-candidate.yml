@@ -77,21 +77,28 @@ jobs:
           path: .release-rom
       - name: Install pinned converter dependencies
         run: python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
-      - name: Resolve VIDEO-CAPABLE FFmpeg for Windows
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+            curl
+            tar
+            xz
+      - name: Compile self-contained LGPL-only FFmpeg from matched Windows source
+        shell: msys2 {0}
+        run: |
+          bash cpymo-tool/nds-converter/tools/build_ffmpeg_windows_lgpl.sh windows-ffmpeg-lgpl
+      - name: Verify Windows build and select paired FFmpeg
         shell: pwsh
         run: |
-          $ff = (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue).Source
-          if (-not $ff) {
-            choco install ffmpeg -y --no-progress
-            $ff = (Get-ChildItem 'C:\ProgramData\chocolatey\lib\ffmpeg\tools' -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
-          }
-          if (-not $ff) { throw 'Video-capable FFmpeg not found' }
-          New-Item -ItemType Directory -Force -Path "windows-ffmpeg-provenance" | Out-Null
-          & $ff -version 2>&1 | Set-Content -Encoding UTF8 "windows-ffmpeg-provenance/FFMPEG-VERSION.txt"
-          & $ff -buildconf 2>&1 | Set-Content -Encoding UTF8 "windows-ffmpeg-provenance/FFMPEG-BUILDCONF.txt"
-          $cfg = Get-Content -Raw "windows-ffmpeg-provenance/FFMPEG-BUILDCONF.txt"
-          if ($cfg.Contains("--enable-nonfree")) { throw 'Windows FFmpeg has --enable-nonfree; it is not suitable for redistribution' }
-          (Get-FileHash $ff -Algorithm SHA256).Hash | Set-Content -Encoding ascii "windows-ffmpeg-provenance/FFMPEG-SHA256.txt"
+          $ff = (Resolve-Path "windows-ffmpeg-lgpl/bin/ffmpeg.exe").Path
+          & $ff -version
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone LGPL FFmpeg cannot run on Windows runner' }
+          $config = Get-Content -Raw "windows-ffmpeg-lgpl/source/FFMPEG-BUILDCONF.txt"
+          if ($config.Contains("--enable-nonfree") -or $config.Contains("--enable-gpl")) { throw 'Rejected nonredistributable/GPL flags' }
           "NDS_FFMPEG=$ff" >> $env:GITHUB_ENV
       - name: Verify final ROM before and after packaging
         shell: pwsh
@@ -111,8 +118,8 @@ jobs:
           Copy-Item windows-rc/cpymo-nds.nds "$folder/cpymo-nds.nds"
           Copy-Item cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
           Copy-Item windows-rc/VERSION.json "$folder/VERSION.json"
-          New-Item -ItemType Directory -Force -Path "$folder/FFmpeg-Provenance" | Out-Null
-          Copy-Item windows-ffmpeg-provenance/* "$folder/FFmpeg-Provenance/"
+          New-Item -ItemType Directory -Force -Path "$folder/FFmpeg-Corresponding-Source" | Out-Null
+          Copy-Item windows-ffmpeg-lgpl/source/* "$folder/FFmpeg-Corresponding-Source/"
           Set-Content -Path "$folder/启动转换器.bat" -Value '@echo off' -Encoding ascii
           Add-Content -Path "$folder/启动转换器.bat" -Value 'start "" "%~dp0Converter\Converter.exe"' -Encoding ascii
           @'
