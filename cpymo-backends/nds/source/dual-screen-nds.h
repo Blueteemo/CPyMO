@@ -122,10 +122,8 @@ static void nds_dual_poll_mode(void){
 }
 static void nds_display_commit_pending_swap(void){
  if(!nds_display_swap_pending)return;
- /* The main scene and lower interactive canvas are in their target VRAM.
-  * Wait for the DMA channel used by dmaCopy, then switch at VBlank; never
-  * expose the old auxiliary bitmap as an intermediate lower-screen frame. */
- dmaWait(3);
+ /* Both target VRAM surfaces have been filled by synchronous libnds
+  * dmaCopy. Switch at VBlank so no old auxiliary pixels are exposed. */
  swiWaitForVBlank();
  lcdMainOnTop();
  screens_swapped=false;
