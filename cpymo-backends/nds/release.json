@@ -1,11 +1,11 @@
 {
   "version": "1.2.0",
   "cache_format": 6,
-  "video_policy": "1.2 integration: FFmpeg source MP4/AVI/MKV/MOV to playable NVL1 PCM or NVA1 NAR2 via optional GUI/CLI; legacy video-skip remains selectable; game/device compatibility not yet certified",
+  "video_policy": "1.2 default GUI/CLI: FFmpeg source MP4/AVI/MKV/MOV to playable NVL1 PCM; NVA1 NAR2 optional; explicit skip available. Game/device/video compatibility is not universal.",
   "baseline": "0.5.6.3-test",
   "core_commit": "5a746bc72a4a8c127e0aee7deb20bf415c385ae2",
   "audio_policy": "lossless NAR2 voice with NAR1/PCM compatibility; default BGM and SE remain PCM",
-  "base_release": "1.0.0 input-fixed",
+  "base_release": "1.1.0",
   "cache_format_compatibility": [
     1,
     2,
