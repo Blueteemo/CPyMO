@@ -239,3 +239,37 @@ jobs:
           path: CPyMO-for-NDS-1.2.0-Sources-RC.zip
           retention-days: 21
           if-no-files-found: error
+
+
+  paired-asset-audit:
+    needs: [final-rom, converter-regression, windows-rc, macos-rc, source-rc]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Download all four distributions from the SAME workflow run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: CPyMO-1.2-*
+          path: .paired-download
+          merge-multiple: false
+      - name: Audit real archives, ROM pairing, FFmpeg source, attribution and embedded icons
+        run: |
+          python cpymo-backends/nds/tools/audit-desktop-release.py \
+            --rom ".paired-download/CPyMO-1.2-UNIVERSAL-VERIFIED-ROM-RC/cpymo-nds.nds" \
+            --windows ".paired-download/CPyMO-1.2-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE/CPyMO-for-NDS-1.2.0-Starter-Windows-RC.zip" \
+            --macos ".paired-download/CPyMO-1.2-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW/CPyMO-for-NDS-1.2.0-Starter-macOS-arm64-RC.zip" \
+            --sources ".paired-download/CPyMO-1.2-SOURCES-RC-LICENSE-REVIEW/CPyMO-for-NDS-1.2.0-Sources-RC.zip" \
+            --output release-paired-audit
+          test -s release-paired-audit/CPyMO-for-NDS-1.2.0-RC-SHA256SUMS.txt
+          test -s release-paired-audit/RC-PAIRED-AUDIT.json
+      - name: Upload cross-platform release candidate audit and SHA256SUMS
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2-PAIRED-STAGING-AUDIT-SHA256SUMS
+          path: release-paired-audit/
+          retention-days: 21
+          if-no-files-found: error
