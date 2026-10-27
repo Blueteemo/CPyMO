@@ -104,7 +104,7 @@ def main() -> None:
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    print(json.dumps(result, indent=2, ensure_ascii=True))
 
 
 if __name__ == "__main__":
