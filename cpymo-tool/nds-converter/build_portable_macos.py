@@ -47,6 +47,13 @@ def main():
         parser.error("Engine version metadata mismatch.")
     output.mkdir(parents=True)
     build = output / "_build"
+    resources = build / "resources"
+    resources.mkdir(parents=True)
+    paired_rom = resources / "cpymo-nds.nds"
+    paired_ffmpeg = resources / "ffmpeg"
+    shutil.copy2(rom, paired_rom)
+    shutil.copy2(ffmpeg, paired_ffmpeg)
+    paired_ffmpeg.chmod(paired_ffmpeg.stat().st_mode | 0o111)
     command = [sys.executable, "-m", "PyInstaller",
                "--noconfirm", "--clean", "--onedir", "--windowed",
                "--name", "CPyMO-NDS-Converter",
@@ -56,8 +63,8 @@ def main():
                "--specpath", str(build),
                "--add-data", f"{HERE / 'fonts'}:fonts",
                "--add-data", f"{BACKEND / 'release.json'}:.",
-               "--add-data", f"{rom}:.",
-               "--add-binary", f"{ffmpeg}:.",
+               "--add-data", f"{paired_rom}:.",
+               "--add-binary", f"{paired_ffmpeg}:.",
                "--exclude-module", "numpy", "--exclude-module", "scipy",
                "--exclude-module", "matplotlib", "--exclude-module", "pytest",
                str(HERE / "app.py")]
@@ -68,7 +75,7 @@ def main():
     app = build / "dist/CPyMO-NDS-Converter.app"
     if not app.is_dir():
         raise RuntimeError("Missing .app from PyInstaller")
-    for resource in ("cpymo-nds.nds", ffmpeg.name, "release.json"):
+    for resource in ("cpymo-nds.nds", "ffmpeg", "release.json"):
         present = any((app / location / resource).is_file() for location in
                       ("Contents/Resources", "Contents/Frameworks", "Contents/MacOS"))
         if not present:
