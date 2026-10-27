@@ -36,7 +36,7 @@ CONFIG_ARGS=(
 )
 printf '%s\n' "FFmpeg $VERSION" "$URL" "${CONFIG_ARGS[@]}" > "$OUT/source/BUILD-CONFIG.txt"
 ./configure "${CONFIG_ARGS[@]}" > "$OUT/source/configure.log" 2>&1
-make -j4 ffmpeg > "$OUT/source/make.log" 2>&1
+make -j4 ffmpeg.exe > "$OUT/source/make.log" 2>&1
 cp ffmpeg.exe "$OUT/bin/ffmpeg.exe"
 "$OUT/bin/ffmpeg.exe" -version > "$OUT/source/FFMPEG-VERSION.txt" 2>&1
 "$OUT/bin/ffmpeg.exe" -buildconf > "$OUT/source/FFMPEG-BUILDCONF.txt" 2>&1
