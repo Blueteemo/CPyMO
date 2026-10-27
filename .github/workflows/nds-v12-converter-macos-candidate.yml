@@ -32,7 +32,9 @@ jobs:
           with open(os.environ['GITHUB_PATH'],'a') as f:f.write(str(out.parent)+'\n')
           PY
       - name: Full converter regression, including defaults and glyph fallback
-        run: python -m unittest discover -s cpymo-tool/nds-converter/tests -v
+        run: |
+          python cpymo-backends/nds/tools/generate-ui-font.py
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -v
 
   candidate-rom:
     runs-on: ubuntu-latest
