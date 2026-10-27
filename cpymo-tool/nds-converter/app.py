@@ -283,12 +283,22 @@ class App:
 
     def finish_test(self,report):
         def capture():
-            self.window.lift();self.window.update()
-            from PIL import ImageGrab
-            # Capture this test window directly, even when another app covers it.
-            # Desktop cropping can accidentally include an unrelated foreground app.
-            ImageGrab.grab(window=self.window.winfo_id()).save(self.self_test['screenshot'])
-            Path(self.self_test['result']).write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8');self.window.after(250,self.close)
+            result=dict(report)
+            try:
+                self.window.lift();self.window.update()
+                from PIL import ImageGrab
+                # Screenshot capture is ancillary on macOS: permissions and
+                # unsupported window capture APIs must not discard the actual
+                # conversion result or leave the frozen test GUI running.
+                ImageGrab.grab(window=self.window.winfo_id()).save(self.self_test['screenshot'])
+                result['ui_screenshot']='captured'
+            except Exception as exc:
+                result['ui_screenshot']='unavailable'
+                result['ui_screenshot_error']=str(exc)
+            finally:
+                Path(self.self_test['result']).write_text(
+                    json.dumps(result,ensure_ascii=False,indent=2),encoding='utf8')
+                self.window.after(250,self.close)
         self.window.after(250,capture)
 
     def cancel(self):
