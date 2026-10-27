@@ -84,6 +84,8 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc
             make
+            diffutils
+            pkgconf
             curl
             tar
             xz
