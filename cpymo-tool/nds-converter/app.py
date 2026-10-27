@@ -73,7 +73,7 @@ class App:
         ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579').pack(anchor='w')
         window.protocol('WM_DELETE_WINDOW',self.close)
         self._capture_localizable_widgets(self.window)
-        self._apply_language()
+        self.change_language()
         if self_test:
             if 'cache_only' in self_test:self.cache_only.set(self_test['cache_only'])
             if 'audio_lossless' in self_test:self.compression.set(self.compression_modes[{'off':0,'voice':1,'all':2}[self_test['audio_lossless']]])
@@ -95,6 +95,7 @@ class App:
             self._capture_localizable_widgets(widget)
 
     def _apply_language(self):
+        self.window.title(self.tr('CPyMO NDS 转换助手'))
         for widget,source in self._ui_sources.items():
             widget.configure(text=self.tr(source))
         self.status.set(self.tr(self._status_zh))
@@ -185,7 +186,7 @@ class App:
         self.set_status('正在转换，请稍候。语音较多的游戏需要更长时间……');self.open_button.configure(state='disabled')
         audio_mode=['off','voice','all'][self.compression_modes.index(self.compression.get())]
         if audio_mode!='off':self.cache_only.set(True)
-        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())]},self.converted)
+        self.start({'action':'convert','source':str(source),'candidate':int(selected[0]),'output':str(output),'missing_policy':'box','cache_only':self.cache_only.get(),'audio_lossless':audio_mode,'video_mode':['skip','nvl1','nva1'][self.video_modes.index(self.video.get())],'ui_language':self.language.get()},self.converted)
 
     def converted(self,report):
         if not report['ok']:self.failed(report);return
