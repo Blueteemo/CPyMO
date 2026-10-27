@@ -21,8 +21,8 @@ UI_EN = {
         "Creates a new output folder. Source games and existing saves are never overwritten. NVL1 video is on by default.",
     "缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。":
         "Missing font glyphs appear as □ with a warning. Conversion continues and scripts stay unchanged.",
-    "精简重复媒体：省去已有 NDS 缓存的原媒体，保留脚本与署名":
-        "Remove redundant source media after caching (keep scripts and credits)",
+    "精简输出：不重复保存已转换的图片／音频（原游戏、脚本与署名不变）":
+        "Smaller output: omit converted source images/audio (original game, scripts and credits unchanged)",
     "不压缩缓存（读取优先）": "Uncompressed cache (faster reads)",
     "无损压缩语音与适合的图片（推荐）":
         "Lossless voice and image cache compression (recommended)",
