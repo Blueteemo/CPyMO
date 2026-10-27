@@ -128,6 +128,8 @@ jobs:
           Copy-Item -Recurse 'windows-rc/app/Converter/*' "$folder/Converter/"
           Copy-Item windows-rc/cpymo-nds.nds "$folder/cpymo-nds.nds"
           Copy-Item cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
+          Copy-Item cpymo-tool/nds-converter/assets/ICON-ATTRIBUTION.txt "$folder/图标来源与署名.txt"
+          Copy-Item cpymo-tool/nds-converter/assets/PYMO-ORIGINAL-MIT-LICENSE.txt "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
           Copy-Item windows-rc/VERSION.json "$folder/VERSION.json"
           New-Item -ItemType Directory -Force -Path "$folder/FFmpeg-Corresponding-Source" | Out-Null
           Copy-Item windows-ffmpeg-lgpl/source/* "$folder/FFmpeg-Corresponding-Source/"
@@ -194,6 +196,9 @@ jobs:
           ditto macos-rc/CPyMO-NDS-Converter.app "$folder/CPyMO-NDS-Converter.app"
           cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt "$folder/"
           cp cpymo-tool/nds-converter/README.md "$folder/转换器说明.md"
+          cp cpymo-tool/nds-converter/assets/ICON-ATTRIBUTION.txt "$folder/图标来源与署名.txt"
+          cp cpymo-tool/nds-converter/assets/PYMO-ORIGINAL-MIT-LICENSE.txt "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
+          test -s "$folder/图标来源与署名.txt" && test -s "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
           cp -R macos-ffmpeg-lgpl/source/. "$folder/FFmpeg-Corresponding-Source/"
           cd out
           ditto -c -k --sequesterRsrc --keepParent "CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC" "../CPyMO-for-NDS-1.2.0-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
