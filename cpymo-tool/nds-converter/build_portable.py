@@ -15,6 +15,7 @@ BACKEND = ROOT.parents[1] / 'cpymo-backends/nds'
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ffmpeg', type=Path, required=True)
+    parser.add_argument('--rom', type=Path, help='Explicit paired, validated NTR/TWL release ROM')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--rebuild', action='store_true', help='Reuse an owned portable-build directory')
     args = parser.parse_args()
@@ -28,10 +29,20 @@ def main():
             parser.error(f'Missing build dependency {module}: {error}')
     ffmpeg = args.ffmpeg.resolve()
     output = args.output.resolve()
-    rom = BACKEND / 'engine.nds'
+    rom = args.rom.resolve() if args.rom else BACKEND / 'engine.nds'
     owned = (output/'build/Converter.spec').is_file() and (output/'helper-build.log').is_file()
     if (output.exists() and not (args.rebuild and owned)) or not ffmpeg.is_file() or not rom.is_file():
-        parser.error('Use a new output directory and existing FFmpeg/engine.nds files.')
+        parser.error('Use a new output directory and existing FFmpeg/ROM files.')
+    # A release candidate must never bundle the staging image placeholder.
+    # Developer builds that omit --rom remain possible, but cannot be
+    # mistaken for the explicitly validated single-ROM release path.
+    if args.rom:
+        import importlib.util
+        verifier = BACKEND / 'tools/verify-release-artifact.py'
+        spec = importlib.util.spec_from_file_location('cpymo_release_gate', verifier)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.validate_rom_bytes(rom.read_bytes())
     # Old 1.1 Starter's custom ffmpeg.exe intentionally had --disable-swscale
     # and --disable-everything. It plays audio but can never convert MP4.
     # Refuse to ship a deceptive 1.2 bundle even when PyInstaller succeeds.
