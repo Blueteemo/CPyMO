@@ -349,7 +349,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view nds-v1.2.0 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'The release tag already exists; will not overwrite.'; exit 1
+            echo 'Release already exists: maintenance verification only; do not overwrite public assets.'; exit 0
           fi
           gh release create nds-v1.2.0 \
             release-public/cpymo-nds.nds \
