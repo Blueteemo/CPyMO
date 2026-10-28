@@ -1,4 +1,43 @@
-# CPyMO for NDS 1.2.0 — Paired candidate artifact manifest
+# CPyMO for NDS 1.2.0 — 正式发行附件与历史候选清单
+
+## 当前正式版附件（2026-10-28 桌面界面维护）
+
+本节为当前 GitHub Release 的**正式下载校验记录**，与下文历史 RC 不同。发行页面：[nds-v1.2.0](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.2.0)。
+
+| 发行附件 | 字节数 | 当前 SHA-256 |
+|---|---:|---|
+| `cpymo-nds.nds` | 924,672 | `7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31` |
+| `CPyMO-for-NDS-1.2.0-Starter-Windows.zip` | 57,836,907 | `60033ee444ea3833bd45ec4f2e3572264fdfd91bff6cee54f2f99c5e299f1a52` |
+| `CPyMO-for-NDS-1.2.0-Starter-macOS-arm64.zip` | 55,282,366 | `e55cceb41467afe3732e6febac5d6b65ee7c2f3a65515a84e28c8f48567ac52d` |
+| `CPyMO-for-NDS-1.2.0-Sources.zip` | 23,354,961 | `7875c82b3fe48514a309b5e32ead0405701297b3ab342c54264318ef85c7f589` |
+| `CPyMO-for-NDS-1.2.0-SHA256SUMS.txt` | 394 | `299ec95148586f629ee4a80da59e073e340eac6f60791c95d5be3a7ec77eaf71` |
+
+本次变更：转换器空闲时隐藏不确定进度条、游戏版本列表按数量调整高度并按需显示滚动条、视频选项宽度随窗口调整。版本号继续为 **1.2.0**，不改变引擎或游戏转换算法。
+
+- **当前桌面安装包与对应源码的来源提交：** `3a78ec8f8dcc29edaac58751dbdc2bde67255f0a`。
+- **完整构建／跨资产审计：** [Actions 40621518621](https://github.com/Blueteemo/CPyMO/actions/runs/40621518621)，所有构建、回归和配对审计作业成功。
+- **正式附件替换及再次校验：** [Actions 40622711801](https://github.com/Blueteemo/CPyMO/actions/runs/40622711801)，对初始附件进行备份，按审核通过的审计记录替换四份附件并对照 GitHub 返回的哈希。
+- **原始发行标签：** `nds-v1.2.0` 仍指向首发提交 `0d1bc7a702e552e49735838a7a7eacae8ca40aeb`；这是首发历史快照，不等同于本次桌面 GUI 的来源提交。
+- **NDS ROM 原件：** `cpymo-nds.nds` 原发布附件 ID `682389749`、大小和哈希均未改变。无须重复掌机实机验收。
+- 只有 **Windows、macOS ARM64、Sources.zip、SHA256SUMS.txt** 四个附件被替换。旧版 ZIP 不再作为当前正式附件下载，初发哈希保留如下。
+
+## 首发正式版附件快照（2026-10-27，历史校验）
+
+| 首发附件 | 首发 SHA-256 |
+|---|---|
+| `cpymo-nds.nds` | `7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31` |
+| `CPyMO-for-NDS-1.2.0-Starter-Windows.zip` | `8e85611033cf89fa12cb89c3727a397b98db083fb12cb29a5f818eef6a35d581` |
+| `CPyMO-for-NDS-1.2.0-Starter-macOS-arm64.zip` | `975500238bb0050e0da92bdbc6d41f37e30098f0861bc8d9c015fde8298df7db` |
+| `CPyMO-for-NDS-1.2.0-Sources.zip` | `67fb74c8a0a8b2b6b87aa60709fb65dfbdc0644f7744b39c58e28c9d5ef55760` |
+| `CPyMO-for-NDS-1.2.0-SHA256SUMS.txt` | `5939ef5217bf3ea918edd9033013ccd0968aeea80cd03adaadc091a202ef5d7c` |
+
+以上数字是首次公开发布时的历史身份记录，不是当前安装包应使用的校验值。
+
+---
+
+## 历史 RC 验收记录（保留原始记录）
+
+以下所有“未发布”“等待验收”等表述均属于当时的候选阶段，不能覆盖上面的当前正式发行状态。
 
 **Status: RC review only, not published.** Built by [GitHub Actions run 40494654625](https://github.com/Blueteemo/CPyMO/actions/runs/40494654625) from source commit `213d756a5467d77b7da3a52b142337f2946e7bec`. All five jobs succeeded. Files below were downloaded from that run, unwrapped from GitHub Actions' artifact ZIP and independently checked for archive integrity and paired ROM hashes.
 

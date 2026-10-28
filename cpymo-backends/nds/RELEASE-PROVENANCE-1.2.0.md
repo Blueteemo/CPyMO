@@ -1,4 +1,18 @@
-# CPyMO for NDS 1.2.0 — RC provenance and public-distribution gate
+# CPyMO for NDS 1.2.0 — 发布溯源与维护记录
+
+## 当前正式发行维护结论（2026-10-28，本节优先）
+
+CPyMO for NDS 1.2.0 于 2026-10-27 首发；本次在**不移动标签、不修改 ROM**的条件下维护了桌面转换器界面。
+
+- 代码变更提交：`a85bf29569dc9b0d3d62050147854c63b1b37a8c`，包括进度条仅任务运行时显示、游戏列表/视频选项排版优化和三项 GUI 生命周期测试。
+- 成套构建来源：`3a78ec8f8dcc29edaac58751dbdc2bde67255f0a`；完整 [构建、Windows/macOS ARM64 打包及跨资产审计](https://github.com/Blueteemo/CPyMO/actions/runs/40621518621) 均成功。
+- 维护发行附件：[更新与复核流程](https://github.com/Blueteemo/CPyMO/actions/runs/40622711801) 成功；四个附件的 SHA-256 均与独立审计一致。ROM 发布附件未替换，哈希仍为 `7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31`。
+- 当前正式附件 SHA-256、字节数及首发快照的逐项对照见 [RELEASE-ARTIFACT-MANIFEST-1.2.0.md](RELEASE-ARTIFACT-MANIFEST-1.2.0.md)。
+- 原始 `nds-v1.2.0` 标签保持在 `0d1bc7a702e552e49735838a7a7eacae8ca40aeb`。当前桌面 ZIP 的对应源码由上述维护提交提供；此后仓库中的历史记录补充提交不改变它的发行身份。
+
+## 2026-10-27 及更早的 RC 阶段记录
+
+以下候选状态、验收阻碍与整改计划均保留作为历史文档，不应视为 2026-10-28 当前正式发行仍存在的未完成门槛。
 
 ## 最新门槛说明（2026-10-27，本节优先于下文早期历史快照）
 
