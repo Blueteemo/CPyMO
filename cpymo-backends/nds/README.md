@@ -1,17 +1,18 @@
-# CPyMO for Nintendo DS 1.2.0（实机验收候选）
+# CPyMO for Nintendo DS 1.2.0
 
-面向普通 DS / DS Lite、4 MiB RAM 和 FAT/DLDI Slot-1 烧录卡。不依赖 DSi 软破。
+面向 Nintendo DS / DS Lite（DS/NTR）和 Nintendo DSi（DSi/TWL），两种模式使用同一份 `.nds` 程序。普通 DS 保持 4 MiB RAM 与 FAT/DLDI 运行路径；DSi/TWL 功能取决于实际启动方式。
 NDS 平台移植：千岚之夏；CPyMO：Seng Jik 及贡献者；PyMO：chen_xin_ming 及贡献者。
+本项目的 `1.2.0` 为 **NDS 移植版的独立发行版本**，不是 CPyMO 上游全平台的版本号；基于上游代码开发，不要求上游同步升版。
 引擎与后端为 AGPL-3.0-or-later，独立转换器为 MIT，第三方许可见 CREDITS.md、licenses/ 和转换器 fonts/。
 
 ## 安装与更新
 
-发行包提供独立 `cpymo-nds.nds` 和配套 Windows 免安装转换助手，不附游戏。
+[1.2.0 正式发行包](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.2.0)提供独立 `cpymo-nds.nds`、Windows 免安装转换助手和 Apple Silicon macOS ARM64 原生转换助手，不附游戏。
 先在电脑上用 `cpymo-tool/nds-converter` 转换自己的 S60v3 / S60v5 / Android PyMO 数据，
 再将转换结果中的 `cpymo-nds.nds` 和 `pymo/games/<游戏目录>` 复制到 TF 根目录。
 保留 R4 内核，已有游戏更新前保留自己的 `save/`，不要用转换结果的空存档目录覆盖。
 已转换的 1.0 游戏仍可使用；想缩小旧数据请从原包转入新目录，单独保留并迁移存档。
-新压缩缓存需要 1.1 引擎，不能配旧版程序。
+1.2.0 仍可读取既有 1.1 缓存；新增的可播放视频缓存需要与 1.2 引擎和转换助手配套使用。
 
 | 按键 | 作用 |
 |---|---|
@@ -19,7 +20,7 @@ NDS 平台移植：千岚之夏；CPyMO：Seng Jik 及贡献者；PyMO：chen_xi
 | X | 游戏菜单；游戏列表中打开语言选择 |
 | B | 返回、取消；剧情中按住隐藏文字；脚本选择界面遵循游戏取消设置 |
 | Y | 开关辅助屏及其背光 |
-| L | 交换物理上下屏 |
+| L | 在上屏游戏、下屏游戏、增强双屏三种模式间循环切换 |
 | R | 按游戏快进策略跳读 |
 | START / SELECT | 快速保存到标准存档1 / 快速读取存档1 |
 | 合盖 / 开盖 | 暂停静音 / 恢复 |
@@ -63,7 +64,8 @@ ARM9/ARM7 均使用 Calico specs；不要改用默认 ARM7，自定义服务负�
 
 ## 验证范围
 
-1.1.0 最终程序 807936 字节，与用户 Wood R4 短测程序逐字节一致，用户确认“已测，正常”。
-stock melonDS 1.1 普通 DS / 4 MiB 的19项界面、语言、持久化、错误页及时钟检查及5项标题字形像素对比通过。
-这不代表四游戏全剧情、所有烧录卡或固件认证。合盖恢复有用户实机反馈；历史带调度修正的模拟器检查不能替代原版模拟器认证。
-完整游戏、用户存档、SDK 和模拟器镜像不属于本源码贡献。
+1.2.0 已在 Wood R4（DS/NTR）和 DSpico（DSi/TWL）上完成用户实机验收，覆盖三种显示模式、游戏库与触控交互、视频播放和主要界面修复；两种运行模式使用同一 ROM。最终发行对应的 [CI 构建与验证](https://github.com/Blueteemo/CPyMO/actions/runs/40551906575)已成功，正式 ROM 为 924672 字节，SHA-256 为 `7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31`。
+
+历史 1.1.0 阶段曾通过 Wood R4 短测及 stock melonDS 的界面、语言、持久化和字体检查；这属于旧版验证，不能代替 1.2.0 的发行验收。
+
+实机和 CI 验收不代表所有游戏剧情、烧录卡及启动方式都已经逐一认证。完整游戏、用户存档、SDK 和模拟器镜像不属于本源码贡献。

@@ -4,7 +4,7 @@ NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；
 
 ## 给玩家
 
-Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用通过最终验收的 ARM64 `.app` 安装包（RC 阶段暂不公开）；Intel Mac 可按下文从源码运行。
+Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家可使用已正式发布的原生 ARM64 `.app` 套件；Intel Mac 和 Linux 用户可按下文从源码运行。
 免安装套件已内置 Python 运行时和 FFmpeg，普通玩家无须另行安装。打开助手后，可选择简体中文或 English（界面选择会保存）；选择游戏 ZIP 或含 gameconfig.txt 的文件夹，
 支持嵌套 ZIP 与 S60v3 / S60v5 / Android PyMO 数据（指输入数据平台，非电脑系统）。
 同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
@@ -33,7 +33,7 @@ Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运
 12 FPS、256×192 RGB555；保留原始画面比例，居中补黑边，不随意拉伸。
 字幕、脚本与存档策略不改；无音轨视频补零音频。
 
-CLI 用法（发行前请确认与同版 NDS 引擎匹配）：
+CLI 用法（请与对应的 NDS 引擎版本配套使用）：
 
 
 
@@ -57,7 +57,7 @@ python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目�
 ## 从源码运行与构建
 
 Python 3.10+，安装 requirements.txt，另备 FFmpeg；完整仓库内运行 `python app.py`。
-Windows 提供免安装包；macOS 正式版拟**仅发行 Apple Silicon 原生 ARM64 `.app`**，不提供 Intel macOS 预编译包。Apple Silicon 版本使用 ARM64 Python、PyInstaller 和 FFmpeg 构建，需通过原生 CI、Finder 图形操作及本机验收后才能公开。Intel Mac、Linux 仍可按要求从源码运行命令行工具；未签名／未公证的 macOS RC 不能冒充已发布版本。
+Windows 提供免安装包；macOS 正式版已提供 **Apple Silicon 原生 ARM64 `.app`**，不提供 Intel macOS 预编译包。Apple Silicon 版本使用 ARM64 Python、PyInstaller 和 FFmpeg 构建，已完成原生 CI 与 Finder 图形操作、本机验收。Intel Mac、Linux 仍可按要求从源码运行命令行工具。macOS 正式版未使用 Apple Developer ID 签名，也未经 Apple 公证，请先核验正式发行附件及 SHA-256，再按系统安全提示操作。
 
 ```sh
 python -m pip install -r cpymo-tool/nds-converter/requirements.txt
@@ -78,12 +78,12 @@ python build_portable.py --rom /path/to/verified/cpymo-nds.nds --ffmpeg /path/to
 ```
 
 加速库可选，源码模式缺失时使用 Python 实现；公开 Windows 包包含该库。
-打包脚本嵌入并检查同一 ROM 与版本元数据。发布时还需附玩家必读、第三方许可和完整对应源码。
+打包脚本嵌入并检查同一 ROM 与版本元数据。正式发行附件已提供玩家必读、第三方许可和对应源码。
 FFmpeg 独立进程运行，不链接进 MIT 转换器；tools/ 提供音频专用构建脚本。
 发行页 Sources.zip 包含相应 FFmpeg 官方源码、构建配置及工具链许可。
 
 
-macOS 开发候选构建（须在 Mac 上运行，且显式传入与目标发行版本匹配的 ROM）：
+macOS 从源码构建（须在 Mac 上运行，且显式传入与目标发行版本匹配的 ROM）：
 
 ```sh
 python cpymo-tool/nds-converter/build_portable_macos.py \
@@ -91,10 +91,7 @@ python cpymo-tool/nds-converter/build_portable_macos.py \
   --output /path/to/new-macos-package
 ```
 
-已通过 [原生 macOS CI](https://github.com/Blueteemo/CPyMO/actions/runs/40484402394)：
-使用打包后的 `.app` 工作进程转换原创 MP4 为 NVL1 并校验配套 ROM 的 SHA。
-该 CI 的 ROM 是**内部构建测试输入**，不是用户最终验收并内置星夜素材的发行 ROM，
-不能直接拿该构建的研究包替代正式版；仍需完整许可证、最终 ROM 配套及发行门槛。
+发布前曾通过 [原生 macOS CI](https://github.com/Blueteemo/CPyMO/actions/runs/40484402394) 的应用工作进程转换测试；该运行使用内部测试 ROM，不能视为正式发行文件。1.2.0 正式版另有 [最终跨资产构建与审计记录](https://github.com/Blueteemo/CPyMO/actions/runs/40551906575)，并已完成 Apple Silicon ARM64 本机验收。正式下载请以 [nds-v1.2.0 发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.2.0) 为准。
 
 回归：`python -m unittest discover -s cpymo-tool/nds-converter/tests -v`，可用 NDS_TEST_FFMPEG 指定程序。
 app.py 的 `--self-test JSON` 通过真实 GUI 与工作进程完成转换，未指定压缩字段时使用实际界面默认值。

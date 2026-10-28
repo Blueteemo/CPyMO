@@ -1,7 +1,8 @@
-<!-- 1.2.0 GitHub Release 草稿。与 1.0.0 / 1.1.0 的章节结构对齐。
-发布前门槛：将下载表中的文件名替换为实际资产的可访问链接与实测大小；
-依据最终发行 ROM/Starter/Sources 的 SHA256、许可证与 CI 结果核对下文。
-本文件是内部发行准备材料，不表示 1.2.0 已发布。 -->
+<!-- 1.2.0 历史发行模板：该文件用于 GitHub Actions 根据实测文件与校验值生成正式发行说明。保留发布流程依赖的占位符，不应将其解释为目前尚未发布。正式发行链接：https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.2.0 -->
+
+# CPyMO for NDS 1.2.0 · 历史发行模板
+
+> 1.2.0 已于 2026 年 10 月 27 日正式发布。本文档保留发布前的模板占位符，供构建流程与历史审计使用；实际下载链接、文件校验和最终状态均以 [正式发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.2.0) 为准。
 
 CPyMO for NDS 是面向 **Nintendo DS / DS Lite / Nintendo DSi** 的 PyMO 游戏引擎。一个 `.nds` 程序可以从列表选择多个游戏，支持转换 **S60v3 / S60v5 / Android PyMO 游戏数据**。
 
