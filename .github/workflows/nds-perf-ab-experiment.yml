@@ -67,12 +67,19 @@ jobs:
       - name: Install existing converter requirements
         run: |
           python -m pip install -r cpymo-tool/nds-converter/requirements.txt
-          ffmpeg -version | head -n 1
+          python -m pip install 'imageio-ffmpeg==0.6.0'
+          python - <<'PY'
+          import imageio_ffmpeg,os
+          executable=imageio_ffmpeg.get_ffmpeg_exe()
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as env:
+              env.write("NDS_PERF_FFMPEG="+executable+"\\n")
+          print("Pinned wheel FFmpeg:",executable)
+          PY
       - name: Generate synthetic playable game and convert to NDS caches
         shell: bash
         run: |
           python cpymo-tool/nds-converter/tests/make_dual_card_game.py "$RUNNER_TEMP/nds-perf-original"
-          python cpymo-tool/nds-converter/convert.py convert "$RUNNER_TEMP/nds-perf-original" "$RUNNER_TEMP/nds-perf-converted" --cache-only --audio-lossless voice --compress-images --video-mode skip
+          python cpymo-tool/nds-converter/convert.py convert "$RUNNER_TEMP/nds-perf-original" "$RUNNER_TEMP/nds-perf-converted" --cache-only --audio-lossless voice --compress-images --video-mode skip --ffmpeg "$NDS_PERF_FFMPEG"
           python cpymo-tool/nds-converter/convert.py verify "$RUNNER_TEMP/nds-perf-converted"
       - name: Create four independent instrumented fixture copies
         run: |
