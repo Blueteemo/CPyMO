@@ -684,12 +684,40 @@ extern volatile unsigned audio_state[12],audio_bench[12];
 extern volatile unsigned stream_diag[8];
 extern void nds_stream_diag_reset(void);
 volatile unsigned load_bench[40]={0x4c424e43};
+/* Diagnostic-only export. Never writes during timed image loads, and is
+ * reachable only with the existing nds-loadbench.flag in the game's save/. */
+static void nds_bench_write_array(FILE* f,const char* name,const volatile unsigned* data,unsigned count){
+ fprintf(f,"%s=",name);
+ for(unsigned i=0;i<count;i++)fprintf(f,"%s%u",i?",":"",data[i]);
+ fputc('\n',f);
+}
+static void nds_bench_export(void){
+ FILE* out=savefile(engine.assetloader.gamedir,"nds-loadbench-results.txt","wb");
+ if(!out)return;
+ fprintf(out,"CPYMO_NDS_LOADBENCH_V1\nactual_twl=%u\nrecent_limit=%u\nimage_buffer_policy=%u\n",
+         isDSiMode()?1u:0u,recent_limit,image_buffer_policy);
+ nds_bench_write_array(out,"load_bench",load_bench,40);
+ nds_bench_write_array(out,"load_state",load_state,32);
+ nds_bench_write_array(out,"compressed_state",compressed_state,8);
+ nds_bench_write_array(out,"engine_state",engine_state,46);
+ nds_bench_write_array(out,"perf_state",perf_state,9);
+ nds_bench_write_array(out,"background_cache_state",background_cache_state,5);
+ nds_bench_write_array(out,"stream_diag",stream_diag,8);
+ nds_bench_write_array(out,"audio_bench",audio_bench,12);
+ fclose(out);
+}
 static void run_load_bench(void){
  char names[4][64],kinds[4][16];
  FILE* spec=savefile(engine.assetloader.gamedir,"nds-bench-assets.txt","rb");
- if(!spec){load_bench[2]=1;load_bench[1]=1;return;}
- for(unsigned n=0;n<4;n++)if(fscanf(spec,"%15s %63s",kinds[n],names[n])!=2){fclose(spec);load_bench[2]=2;load_bench[1]=1;return;}
- fclose(spec);recent_limit=0;
+ if(!spec){load_bench[2]=1;load_bench[1]=1;nds_bench_export();return;}
+ for(unsigned n=0;n<4;n++)if(fscanf(spec,"%15s %63s",kinds[n],names[n])!=2){fclose(spec);load_bench[2]=2;load_bench[1]=1;nds_bench_export();return;}
+ fclose(spec);
+ /* Preserve the original all-cold benchmark unless explicitly opted in.
+  * The optional cache experiment uses the platform's existing RAM budget.
+  * nds-cache-stress.flag, if present, still forces all-cold behavior. */
+ FILE* keep_cache=savefile(engine.assetloader.gamedir,"nds-bench-keep-cache.flag","rb");
+ if(!keep_cache)recent_limit=0;
+ else fclose(keep_cache);
  cpymo_audio_set_channel_volume(0,&engine.audio,.20f);cpymo_audio_set_channel_volume(1,&engine.audio,.20f);cpymo_audio_set_channel_volume(2,&engine.audio,.20f);
  load_bench[2]=cpymo_audio_bgm_play(&engine,cpymo_str_pure("BGM07"),true);
  load_bench[2]|=cpymo_audio_se_play(&engine,cpymo_str_pure("SE013"),true);
@@ -700,7 +728,7 @@ static void run_load_bench(void){
  for(unsigned repeat=0;repeat<8;repeat++)for(unsigned n=0;n<4;n++){
   u64 start=tickGetCount();cpymo_backend_image image=NULL;int w,h;
   error_t err=cached_image(&image,&w,&h,cpymo_str_pure(names[n]),&engine.assetloader,kinds[n]);
-  if(err){load_bench[2]=err;load_bench[1]=1;return;}
+  if(err){load_bench[2]=err;load_bench[1]=1;nds_bench_export();return;}
   if(n==0)for(unsigned p=0;p<256*192;p++)framebuffer[p]=0x8010;
   cpymo_backend_image_draw(n==2?64:0,0,w,h,image,0,0,w,h,n==0?1.f:.5f,strcmp(kinds[n],"bg")?cpymo_backend_image_draw_type_chara:cpymo_backend_image_draw_type_bg);
   cpymo_backend_image_free(image);nds_audio_update();
@@ -712,6 +740,7 @@ static void run_load_bench(void){
  load_bench[16]=engine_state[28];load_bench[17]=perf_state[5];load_bench[18]=perf_state[6];
  for(unsigned i=1;i<8;i++)load_bench[20+i]=stream_diag[i];
  for(unsigned i=1;i<12;i++)audio_bench[i]=audio_state[i];load_bench[1]=1;
+ nds_bench_export();
 }
 
 
