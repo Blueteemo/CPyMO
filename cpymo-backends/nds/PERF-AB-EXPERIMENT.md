@@ -71,7 +71,7 @@ Run each condition repeatedly, alternate run order, and keep the TF/microSD card
 
 ## Validation status
 
-Source checks and comparison against the published tag are possible remotely. As of the initial experiment, this branch has **not** been built with devkitPro and has **not** produced device or emulator A/B measurements. The official `nds-v1.2.0` tag and `main` remain untouched.
+Source checks were completed against the released tag, and the opt-in ROMs were successfully compiled with the pinned devkitPro SDK. A later synthetic-game CI completed successfully. There are **no measured emulator or hardware A/B performance results**, and no claim of improved speed or audio continuity. The official `nds-v1.2.0` tag and `main` remain untouched.
 
 ## Automatic comparison (host, not device)
 
@@ -85,3 +85,27 @@ python3 cpymo-backends/nds/tools/compare-loadbench.py /path/to/cold.txt /path/to
 The script rejects incomplete measurements, inconsistent NTR/TWL runtime, mismatched frame hashes and confounded buffer+cache A/B changes. It prints per-asset first-load, average and worst warm-pass timings, LRU hit/miss/eviction counts, audio update gap and memory counters. The self-test only verifies parsing and rejection rules with fabricated inputs: it is **not** a CPyMO performance measurement.
 
 Experiment CI workflow `.github/workflows/nds-perf-ab-experiment.yml` is scoped to this research branch and performs the pinned devkitPro native build plus synthetic converter fixture checks. A passing build is **not** emulator or physical hardware validation.
+
+## Final static review and disposition — 2026-10-29
+
+This section closes the requested **theoretical/static review**, not the separate experimental A/B benchmark. No hardware acceptance or optimization release is required by this investigation.
+
+| Area | Evidence in released `nds-v1.2.0` | Disposition |
+| --- | --- | --- |
+| Image loading | `source/main.c` `cached_image()` (approximately lines 199–245) selects preconverted NPI1/NPA4/NPS1/NPS2 rather than unconditionally decoding PNG/JPEG. `nds-image-buffer.txt` already selects the stdio buffering mode. | No duplicate predecode pipeline or default I/O policy change. |
+| Sprite/background LRU | `main.c` approximately lines 147–186 uses image refcounts, a bounded 384 KiB/6-slot NTR cache, and a conditional 2 MiB/12-slot TWL cache. Background reuse requires TWL and sufficient memory. | Existing protection is conceptually sound; do not enlarge budgets without evidence. |
+| Scene reuse | `main.c` `nds_engine_draw()` (approximately lines 718–745) reuses the immutable base layer only when draw commands/view match, rendering dialogue/overlays separately; optional `nds-scene-verify.flag` supports pixel comparison. `cpymo_backend_image_free()` invalidates the scene cache even when image refs remain; this is conservative but may sacrifice reuse. | No proven semantic failure. Preserve current invalidation rather than risk stale image pointers or hidden visual regressions. |
+| Audio during I/O | `main.c` uncompressed NPI reads, `npl4-reader.h`, and `nps-reader.h` service audio in bounded chunks; `audio-nds.c` logs prolonged update gaps to RAM. | No identified unserviced image decoding loop deserving an unmeasured patch; gap telemetry is not audible-underrun proof. |
+| Resource lookup | `cpymo/cpymo_package.c` has linear package index search, but native NDS cached images use independently hashed filesystem paths. | Do not graft a VNDS ZIP index onto different resource paths without profiling an actual package-heavy workload. |
+| Script skip | `cpymo/cpymo_engine.c` executes interpreter steps under wait/skip and already-read safeguards. | VNDS QuickRead semantics cannot be transplanted by simply omitting draw calls; leave the behavior unchanged. |
+| License | VNDS GPLv2-only code was considered solely as architectural inspiration; no code was copied. | Keep independent implementations. |
+
+**What actually passed:**
+
+- Native NTR and DSi-layout ROM builds: GitHub Actions run [40835958009](https://github.com/Blueteemo/CPyMO/actions/runs/40835958009), **native-build job success**; the *overall first workflow was red* only because its separate synthetic fixture initially lacked FFmpeg.
+- Converter synthetic game generation and verification, 16 image variants / 12 audio files / 46 cache files; four independent A/B fixture directories; parser rejection-rule self-test: [40836196881](https://github.com/Blueteemo/CPyMO/actions/runs/40836196881), **synthetic-fixture job and overall workflow success**. The native-build job was intentionally skipped as unchanged on that later run.
+- Source control: published `nds-v1.2.0` tag remained `0d1bc7a702e552e49735838a7a7eacae8ca40aeb`. Neither the stable tag nor `main` was modified.
+
+**Limits:** The tests establish that the diagnostic branch compiles and the generated fixture verifies; they do not prove one file-buffering/cache setting is faster, that any performance regression is absent on hardware, or that audio is perceptually seamless. No A/B runs were executed. Under the agreed "theoretical analysis is sufficient; no device test" scope, this is a research result, not a proposed change to release defaults.
+
+**Decision:** Close this cross-engine optimization investigation with **no production optimization patch and no v1.2.1 performance release**. Leave the isolated diagnostic branch unmerged; only revisit if a concrete reproduction, demonstrable correctness bug, or new engineering requirement appears. No Deep Research is necessary.
