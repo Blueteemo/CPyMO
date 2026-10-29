@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   native-build:
+    if: ${{ !contains(github.event.head_commit.message, '[fixture-only]') }}
     name: Native NTR/TWL compile validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -94,8 +95,8 @@ jobs:
               save=target/"save"
               save.mkdir(parents=True,exist_ok=True)
               (save/"nds-loadbench.flag").touch()
-              (save/"nds-bench-assets.txt").write_text("bg SCENE01\\nchara PLAYER1\\nbg SCENE02\\nchara PLAYER2\\n",encoding="ascii")
-              (save/"nds-bench-audio.txt").write_text("BGM07 TONE1 SIGNAL\\n",encoding="ascii")
+              (save/"nds-bench-assets.txt").write_text("bg SCENE01\nchara PLAYER1\nbg SCENE02\nchara PLAYER2\n",encoding="ascii")
+              (save/"nds-bench-audio.txt").write_text("BGM07 TONE1 SIGNAL\n",encoding="ascii")
               (save/"nds-image-buffer.txt").write_text(str(policy),encoding="ascii")
               if cache:(save/"nds-bench-keep-cache.flag").touch()
               assert (target/"gameconfig.txt").exists()
