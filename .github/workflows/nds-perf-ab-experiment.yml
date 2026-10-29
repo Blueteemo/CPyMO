@@ -1,0 +1,104 @@
+name: CPyMO NDS 1.2 loadbench experiment (NOT RELEASE)
+
+on:
+  push:
+    branches:
+      - 'experiment/nds-v1.2.0-loadbench-ab-20261029'
+    paths:
+      - 'cpymo-backends/nds/source/main.c'
+      - 'cpymo-backends/nds/tools/compare-loadbench.py'
+      - 'cpymo-backends/nds/PERF-AB-EXPERIMENT.md'
+      - '.github/workflows/nds-perf-ab-experiment.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-build:
+    name: Native NTR/TWL compile validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container: devkitpro/devkitarm:20260610
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Initialize pinned code dependencies
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init stb endianness.h
+      - name: Verify pinned SDK contents
+        run: |
+          dkp-pacman -Q devkitARM libnds libfat-nds maxmod-nds calico ndstool
+          test -n "$DEVKITPRO"
+          python3 cpymo-backends/nds/tools/compare-loadbench.py --self-test
+      - name: Build NTR experimental ROM
+        run: python3 cpymo-backends/nds/build.py
+      - name: Build separate DSi-layout experimental ROM
+        run: python3 cpymo-backends/nds/build.py --dsi-experiment
+      - name: Verify ROM headers and record file hashes
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          for name in ("engine.nds", "cpymo-dsi-experiment.nds"):
+              p=Path("cpymo-backends/nds")/name
+              image=p.read_bytes()
+              assert len(image)>0x200
+              assert image[:12].startswith(b"CPyMO") or len(image[:12].strip(b'\\x00'))>0
+              print(name,"bytes",len(image),"sha256",hashlib.sha256(image).hexdigest(),"unit_code",image[0x12])
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: NDS-LOADBENCH-EXPERIMENT-NOT-RELEASE
+          path: |
+            cpymo-backends/nds/engine.nds
+            cpymo-backends/nds/cpymo-dsi-experiment.nds
+            cpymo-backends/nds/PERF-AB-EXPERIMENT.md
+          retention-days: 7
+
+  synthetic-fixture:
+    name: Synthetic image/audio conversion and analysis self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install existing converter requirements
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements.txt
+          ffmpeg -version | head -n 1
+      - name: Generate synthetic playable game and convert to NDS caches
+        shell: bash
+        run: |
+          python cpymo-tool/nds-converter/tests/make_dual_card_game.py "$RUNNER_TEMP/nds-perf-original"
+          python cpymo-tool/nds-converter/convert.py convert "$RUNNER_TEMP/nds-perf-original" "$RUNNER_TEMP/nds-perf-converted" --cache-only --audio-lossless voice --compress-images --video-mode skip
+          python cpymo-tool/nds-converter/convert.py verify "$RUNNER_TEMP/nds-perf-converted"
+      - name: Create four independent instrumented fixture copies
+        run: |
+          python - <<'PY'
+          import os,shutil
+          from pathlib import Path
+          base=Path(os.environ["RUNNER_TEMP"])
+          converted=base/"nds-perf-converted"
+          for name,policy,cache in (("cold-buffer8192",2,False),("warm-cache-buffer8192",2,True),("cold-unbuffered",1,False),("cold-buffer4096",3,False)):
+              target=Path("nds-perf-fixtures")/name
+              shutil.copytree(converted,target)
+              save=target/"save"
+              save.mkdir(parents=True,exist_ok=True)
+              (save/"nds-loadbench.flag").touch()
+              (save/"nds-bench-assets.txt").write_text("bg SCENE01\\nchara PLAYER1\\nbg SCENE02\\nchara PLAYER2\\n",encoding="ascii")
+              (save/"nds-bench-audio.txt").write_text("BGM07 TONE1 SIGNAL\\n",encoding="ascii")
+              (save/"nds-image-buffer.txt").write_text(str(policy),encoding="ascii")
+              if cache:(save/"nds-bench-keep-cache.flag").touch()
+              assert (target/"gameconfig.txt").exists()
+              assert len((save/"nds-bench-assets.txt").read_text().splitlines())==4
+              print(name,"configured",policy,"cache",cache)
+          PY
+      - name: Analyze synthetic log samples (NOT measured performance)
+        run: python cpymo-backends/nds/tools/compare-loadbench.py --self-test
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: NDS-LOADBENCH-SYNTHETIC-GAMES-NOT-RELEASE
+          path: nds-perf-fixtures/
+          retention-days: 7
