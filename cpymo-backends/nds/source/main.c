@@ -696,6 +696,7 @@ static void nds_bench_export(void){
  if(!out)return;
  fprintf(out,"CPYMO_NDS_LOADBENCH_V1\nactual_twl=%u\nrecent_limit=%u\nimage_buffer_policy=%u\n",
          isDSiMode()?1u:0u,recent_limit,image_buffer_policy);
+ fprintf(out,"bg_cache_enabled=%u\n",nds_bg_cache_enabled?1u:0u);
  nds_bench_write_array(out,"load_bench",load_bench,40);
  nds_bench_write_array(out,"load_state",load_state,32);
  nds_bench_write_array(out,"compressed_state",compressed_state,8);
@@ -742,8 +743,13 @@ static void run_load_bench(void){
   cpymo_backend_image_free(image);nds_audio_update();
   unsigned us=(tickGetCount()-start)*1000000/TICK_FREQ;
   load_bench[4+n]+=us;if(us>load_bench[8+n])load_bench[8+n]=us;
+  if(repeat==0)load_bench[32+n]=us;
+  else if(us>load_bench[36+n])load_bench[36+n]=us;
   unsigned hash=2166136261u;for(unsigned p=0;p<256*192;p++){hash^=framebuffer[p];hash*=16777619u;}
-  load_bench[12+n]=hash;load_bench[3]++;
+  load_bench[12+n]=hash;
+  load_bench[28+n]=(load_bench[28+n]?load_bench[28+n]:2166136261u)^hash;
+  load_bench[28+n]*=16777619u;
+  load_bench[3]++;
  }
  load_bench[16]=engine_state[28];load_bench[17]=perf_state[5];load_bench[18]=perf_state[6];
  for(unsigned i=1;i<8;i++)load_bench[20+i]=stream_diag[i];
