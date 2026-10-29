@@ -56,9 +56,10 @@ The actual runtime is distinguished by the exported `actual_twl` value; do not c
 
 ## Interpreting results
 
-Only accept a run where `load_bench[1] == 1`, `load_bench[2] == 0`, `load_bench[3] == 32`, with the same fixture, hardware/runtime mode, ROM build, and identical `load_bench[12:16]` output-frame hashes.
+Only accept a run where `load_bench[1] == 1`, `load_bench[2] == 0`, `load_bench[3] == 32`, with the same fixture, hardware/runtime mode and ROM build. Compare both final-frame hashes `load_bench[12:16]` **and all-eight-pass accumulated frame hashes** `load_bench[28:32]`; these do not replace real visual checks.
 
 - `load_bench[4:8]`: cumulative image **load plus draw** microseconds per asset (eight repetitions each).
+- `load_bench[32:36]`: each asset's first load+draw microseconds. `load_bench[36:40]`: maximum among repetitions 2–8, measuring worst warm pass (not p95).
 - `load_bench[8:12]`: per-asset maximum microseconds.
 - `load_state[9], [10], [11]`: image-cache hits, misses and evictions.
 - `compressed_state[3], [5]`: cumulative decompression and checksum microseconds.
@@ -71,3 +72,16 @@ Run each condition repeatedly, alternate run order, and keep the TF/microSD card
 ## Validation status
 
 Source checks and comparison against the published tag are possible remotely. As of the initial experiment, this branch has **not** been built with devkitPro and has **not** produced device or emulator A/B measurements. The official `nds-v1.2.0` tag and `main` remain untouched.
+
+## Automatic comparison (host, not device)
+
+Copy the exported `nds-loadbench-results.txt` from each *independent* trial to the host, using unique filenames:
+
+```sh
+python3 cpymo-backends/nds/tools/compare-loadbench.py --self-test
+python3 cpymo-backends/nds/tools/compare-loadbench.py /path/to/cold.txt /path/to/cached.txt
+```
+
+The script rejects incomplete measurements, inconsistent NTR/TWL runtime, mismatched frame hashes and confounded buffer+cache A/B changes. It prints per-asset first-load, average and worst warm-pass timings, LRU hit/miss/eviction counts, audio update gap and memory counters. The self-test only verifies parsing and rejection rules with fabricated inputs: it is **not** a CPyMO performance measurement.
+
+Experiment CI workflow `.github/workflows/nds-perf-ab-experiment.yml` is scoped to this research branch and performs the pinned devkitPro native build plus synthetic converter fixture checks. A passing build is **not** emulator or physical hardware validation.
