@@ -718,10 +718,18 @@ static void run_load_bench(void){
  FILE* keep_cache=savefile(engine.assetloader.gamedir,"nds-bench-keep-cache.flag","rb");
  if(!keep_cache)recent_limit=0;
  else fclose(keep_cache);
+ /* Optional test fixture names. Defaults retain the established benchmark. */
+ char bgm_name[64]="BGM07",se_name[64]="SE013",voice_name[64]="8RD93O2Y";
+ FILE* audio_spec=savefile(engine.assetloader.gamedir,"nds-bench-audio.txt","rb");
+ if(audio_spec){
+  int got=fscanf(audio_spec,"%63s %63s %63s",bgm_name,se_name,voice_name);
+  fclose(audio_spec);
+  if(got!=3){load_bench[2]=3;load_bench[1]=1;nds_bench_export();return;}
+ }
  cpymo_audio_set_channel_volume(0,&engine.audio,.20f);cpymo_audio_set_channel_volume(1,&engine.audio,.20f);cpymo_audio_set_channel_volume(2,&engine.audio,.20f);
- load_bench[2]=cpymo_audio_bgm_play(&engine,cpymo_str_pure("BGM07"),true);
- load_bench[2]|=cpymo_audio_se_play(&engine,cpymo_str_pure("SE013"),true);
- load_bench[2]|=cpymo_audio_vo_play(&engine,cpymo_str_pure("8RD93O2Y"));
+ load_bench[2]=cpymo_audio_bgm_play(&engine,cpymo_str_pure(bgm_name),true);
+ load_bench[2]|=cpymo_audio_se_play(&engine,cpymo_str_pure(se_name),true);
+ load_bench[2]|=cpymo_audio_vo_play(&engine,cpymo_str_pure(voice_name));
  nds_audio_update();nds_stream_diag_reset();for(unsigned i=1;i<8;i++)audio_state[i]=0;
  FILE* stress=savefile(engine.assetloader.gamedir,"nds-cache-stress.flag","rb");if(stress){fclose(stress);recent_limit=0;}recent_clear();for(unsigned i=1;i<32;i++)load_state[i]=0;for(unsigned i=1;i<8;i++)compressed_state[i]=0;
  engine_state[28]=0;perf_state[4]=perf_state[5]=perf_state[6]=0;
