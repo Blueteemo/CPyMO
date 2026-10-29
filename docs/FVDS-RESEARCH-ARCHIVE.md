@@ -36,3 +36,18 @@ The final R14.1 local frozen evidence, staged source changes, and Git bundle are
 - Any future reuse requires a fresh technical and licensing assessment; archived results are not production integration instructions.
 
 This document records the conclusion of the research. It does not announce an FVDS release or claim verified playback on DS/DSi hardware.
+
+## Final private handoff verification (2026-10-30)
+
+The complete R14.1 freeze package was received and independently checked before private archival:
+
+- Source ZIP SHA-256: `60c292c51a8c32b068d2102206dae7565087edf4562ce42ee29e1304e18ff2d8`.
+- ZIP content: 83 files; all 81 files listed in its primary `SHA256SUMS.txt` matched. Both checksum-list files are deliberately excluded from the primary list.
+- Git bundle: complete-history verification, independent clone, and object connectivity verification succeeded.
+- The preserved staged R14.1 diff applies cleanly to its recorded base commit `ba8fd9cd3775a68723e1a200e37c9281c1ab01de`.
+- The archived public-patch screening procedure reported 23 allowed paths and no private table payload in that diff. This check does **not** certify all archived material as redistributable.
+- The 115-test result above is the **local handoff's reported outcome**, not a new CI run for this branch.
+
+A private archive ZIP was rewrapped solely to correct ZIP filename encoding flags; individual extracted file bytes were verified unchanged. Its SHA-256 is `d56f4ed211bfd12584485fd27babc13ae042d0ebce38bf824269e43eeb9710aa`.
+
+**Do not commit or attach either complete ZIP to this public repository.** Both contain the isolated `private-tables/` test assets and full research history. The complete archive is retained in the user's private FVDS project Library; this public branch records the conclusion only. Any future publication of experiment source requires a separate provenance review.
