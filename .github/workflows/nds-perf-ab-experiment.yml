@@ -72,7 +72,7 @@ jobs:
           import imageio_ffmpeg,os
           executable=imageio_ffmpeg.get_ffmpeg_exe()
           with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as env:
-              env.write("NDS_PERF_FFMPEG="+executable+"\\n")
+              env.write("NDS_PERF_FFMPEG="+executable+"\n")
           print("Pinned wheel FFmpeg:",executable)
           PY
       - name: Generate synthetic playable game and convert to NDS caches
