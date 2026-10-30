@@ -1,0 +1,1484 @@
+diff --git a/cpymo-backends/nds/source/fvds-iframe-nds.c b/cpymo-backends/nds/source/fvds-iframe-nds.c
+index a86408b..1ec862a 100644
+--- a/cpymo-backends/nds/source/fvds-iframe-nds.c
++++ b/cpymo-backends/nds/source/fvds-iframe-nds.c
+@@ -1,5 +1,6 @@
+ #include "fvds-iframe-nds.h"
+ #include "fvds-vlc-asm-tables.h"
++#include "fvds-profile-nds.h"
+ #include <string.h>
+ #if defined(__NDS__)
+ #include <nds.h>
+@@ -190,14 +191,17 @@ int nds_fvds_iframe_decode(nds_fvds_bits *bits,
+    for(unsigned plane_index=0;plane_index<3u;plane_index++){
+     uint8_t *plane=planes[plane_index];
+     unsigned t0=0;
++    uint32_t pt0=fvds_profile_now();
+     if(g_i_stats)t0=FVDS_I_TICKS();
+     int status=decode_coefficients(bits,dct);
++    fvds_profile_add(FVDS_P_I_VLC,pt0,fvds_profile_now());
+     if(g_i_stats)g_i_stats->entropy_ticks+=FVDS_I_TICKS()-t0;
+     if(status<0)return status;
+     if(plane_index==0u){
+      dct[0]=(int16_t)(dct[0]+previous_g_dc);
+      previous_g_dc=dct[0];
+     }
++    uint32_t pblk=fvds_profile_now();
+     for(unsigned quad=0;quad<16u;quad++){
+      unsigned y3=fvds_quads[quad][0], x3=fvds_quads[quad][1];
+      unsigned y2=fvds_quads[quad][2], x2=fvds_quads[quad][3];
+@@ -225,6 +229,7 @@ int nds_fvds_iframe_decode(nds_fvds_bits *bits,
+       store_quad(plane,stride,px,py,out);
+      }
+     }
++    fvds_profile_add(FVDS_P_I_COEFF,pblk,fvds_profile_now());
+    }
+   }
+  }
+diff --git a/cpymo-backends/nds/source/fvds-pframe-nds.c b/cpymo-backends/nds/source/fvds-pframe-nds.c
+index f99ad70..954aa2d 100644
+--- a/cpymo-backends/nds/source/fvds-pframe-nds.c
++++ b/cpymo-backends/nds/source/fvds-pframe-nds.c
+@@ -1,4 +1,5 @@
+ #include "fvds-pframe-nds.h"
++#include "fvds-profile-nds.h"
+ #include "fvds-iframe-nds.h"
+ #include "fvds-vlc-asm-tables.h"
+ #include <string.h>
+@@ -123,6 +124,18 @@ static int p_decode_coefficients(nds_fvds_bits *bits,int *dct,int *nonzero){
+  return 0;
+ }
+ 
++/* One 8 byte block row through two words: the byte wise libcall costs more than
++ * the copy itself at this size. */
++static inline __attribute__((always_inline))
++void p_copy8(uint8_t *dst,const uint8_t *src){
++ memcpy(dst,src,4);memcpy(dst+4,src+4,4);
++}
++static inline __attribute__((always_inline))
++void p_copy_block(uint8_t *dst,unsigned dst_stride,
++                  const uint8_t *src,unsigned src_stride){
++ for(unsigned r=0;r<8u;r++)p_copy8(dst+r*dst_stride,src+r*src_stride);
++}
++
+ static inline __attribute__((always_inline)) uint8_t p_clamp5(int value){
+  if(value<0)return 0;
+  if(value>31)return 31;
+@@ -296,6 +309,7 @@ int nds_fvds_pframe_decode(nds_fvds_bits *bits,
+                            int16_t *vectors){
+  uint32_t bit;
+  unsigned phase_start=0;
++ uint32_t pv0=fvds_profile_now();
+  if(g_stats){phase_start=FVDS_TICKS();g_stats->vector_ticks=0;g_stats->residual_ticks=0;}
+  if(!bits||!ref_g||!ref_r||!ref_b||!out_g||!out_r||!out_b||!vectors)
+   return NDS_FVDS_IFRAME_ERR_ARGUMENT;
+@@ -355,6 +369,7 @@ int nds_fvds_pframe_decode(nds_fvds_bits *bits,
+  }
+ 
+  if(g_stats){unsigned now=FVDS_TICKS();g_stats->vector_ticks=now-phase_start;phase_start=now;}
++ fvds_profile_add(FVDS_P_VECTORS,pv0,fvds_profile_now());
+  nds_fvds_bits_align16(bits);
+ 
+  uint8_t *out_planes[3]={out_g,out_r,out_b};
+@@ -376,15 +391,15 @@ int nds_fvds_pframe_decode(nds_fvds_bits *bits,
+     for(unsigned plane=0;plane<3u;plane++){
+      int ignored=0;
+      int status=p_decode_coefficients(bits,dct,&ignored);
++     uint32_t pi=fvds_profile_now();
+      if(status<0)return status;
+      p_intra_plane(dct,tiles[plane],tile_g,plane);
++     fvds_profile_add(FVDS_P_INTRA,pi,fvds_profile_now());
+     }
+-    for(unsigned plane=0;plane<3u;plane++){
+-     uint8_t *out=out_planes[plane];
+-     const uint8_t *tile=tiles[plane];
+-     for(unsigned ly=0;ly<8u;ly++)
+-      for(unsigned lx=0;lx<8u;lx++)out[(y+ly)*stride+x+lx]=tile[ly*8u+lx];
+-    }
++    uint32_t pc=fvds_profile_now();
++    for(unsigned plane=0;plane<3u;plane++)
++     p_copy_block(out_planes[plane]+y*stride+x,stride,tiles[plane],8u);
++    fvds_profile_add(FVDS_P_P_COPY,pc,fvds_profile_now());
+    }else{
+     int hx=(int)(x<<1)+row[mx*2];
+     int hy=(int)(y<<1)+row[mx*2+1];
+@@ -411,7 +426,9 @@ int nds_fvds_pframe_decode(nds_fvds_bits *bits,
+       base=ref; base_stride=stride;
+       base_x=(unsigned)bx; base_y=(unsigned)by;
+      }else if(!still){
++      uint32_t pp=fvds_profile_now();
+       p_predict(ref,stride,width,height,hx,hy,pred);
++      fvds_profile_add(FVDS_P_INTERP,pp,fvds_profile_now());
+      }else{
+       base=ref; base_stride=stride; base_x=x; base_y=y;
+      }
+@@ -420,23 +437,29 @@ int nds_fvds_pframe_decode(nds_fvds_bits *bits,
+       if(g_stats)g_stats->zero_residual++;
+       /* Zero residual reproduces the prediction exactly: the samples are
+        * already 5 bit aligned, so no transform has to run. */
+-      for(unsigned ly=0;ly<8u;ly++)
+-       memcpy(out+(y+ly)*stride+x,base+(base_y+ly)*base_stride+base_x,8);
++      uint32_t pz=fvds_profile_now();
++      p_copy_block(out+y*stride+x,stride,base+base_y*base_stride+base_x,base_stride);
++      fvds_profile_add(FVDS_P_P_COPY,pz,fvds_profile_now());
+       continue;
+      }
+      {
+       int nonzero=0;
++     uint32_t pv=fvds_profile_now();
+      int status=p_decode_coefficients(bits,dct,&nonzero);
++     fvds_profile_add(FVDS_P_P_VLC,pv,fvds_profile_now());
+       if(status<0)return status;
+       if(nonzero){if(g_stats)g_stats->residual_quads++;}
+       if(g_stats){for(unsigned q=0;q<64u;q++)if(dct[q])g_stats->nonzero_coefs++;}
+       if(!nonzero){
+-       for(unsigned ly=0;ly<8u;ly++)
+-        memcpy(out+(y+ly)*stride+x,base+(base_y+ly)*base_stride+base_x,8);
++       p_copy_block(out+y*stride+x,stride,base+base_y*base_stride+base_x,base_stride);
+        continue;
+       }
+      }
+-     p_apply_residual(base+(base_y*base_stride+base_x),base_stride,dct,out+(y*stride+x),stride);
++     {
++      uint32_t pr=fvds_profile_now();
++      p_apply_residual(base+(base_y*base_stride+base_x),base_stride,dct,out+(y*stride+x),stride);
++      fvds_profile_add(FVDS_P_RESIDUAL,pr,fvds_profile_now());
++     }
+     }
+    }
+   }
+diff --git a/cpymo-backends/nds/source/fvds-profile-nds.c b/cpymo-backends/nds/source/fvds-profile-nds.c
+new file mode 100644
+index 0000000..068584d
+--- /dev/null
++++ b/cpymo-backends/nds/source/fvds-profile-nds.c
+@@ -0,0 +1,12 @@
++#include "fvds-profile-nds.h"
++#include <string.h>
++
++uint32_t (*fvds_profile_ticks)(void);
++uint32_t fvds_profile_acc[FVDS_P_SLOTS];
++uint32_t fvds_profile_hits[FVDS_P_SLOTS];
++
++void fvds_profile_reset(void)
++{
++    memset(fvds_profile_acc, 0, sizeof fvds_profile_acc);
++    memset(fvds_profile_hits, 0, sizeof fvds_profile_hits);
++}
+diff --git a/cpymo-backends/nds/source/fvds-profile-nds.h b/cpymo-backends/nds/source/fvds-profile-nds.h
+new file mode 100644
+index 0000000..422b4a3
+--- /dev/null
++++ b/cpymo-backends/nds/source/fvds-profile-nds.h
+@@ -0,0 +1,34 @@
++/* Opt-in phase profiler for the FVDS decoders and the playback path.
++ *
++ * The tick source is injected: a ROM sets fvds_profile_ticks to a cycle
++ * counter, the host tests leave it null and pay one load per phase.  Slots are
++ * fixed so every report has the same shape.
++ */
++#ifndef CPYMO_NDS_FVDS_PROFILE_H
++#define CPYMO_NDS_FVDS_PROFILE_H
++#include <stdint.h>
++
++enum {
++ FVDS_P_I_VLC = 0, FVDS_P_I_COEFF, FVDS_P_I_STORE,
++ FVDS_P_VECTORS, FVDS_P_P_VLC, FVDS_P_INTERP, FVDS_P_RESIDUAL,
++ FVDS_P_P_COPY, FVDS_P_INTRA,
++ FVDS_P_REF_COPY, FVDS_P_RGB, FVDS_P_UPLOAD, FVDS_P_SLOTS
++};
++
++extern uint32_t (*fvds_profile_ticks)(void);
++extern uint32_t fvds_profile_acc[FVDS_P_SLOTS];
++extern uint32_t fvds_profile_hits[FVDS_P_SLOTS];
++
++static inline uint32_t fvds_profile_now(void)
++{
++    return fvds_profile_ticks ? fvds_profile_ticks() : 0u;
++}
++static inline void fvds_profile_add(unsigned slot, uint32_t from, uint32_t to)
++{
++    if (fvds_profile_ticks) {
++        fvds_profile_acc[slot] += to - from;
++        fvds_profile_hits[slot]++;
++    }
++}
++void fvds_profile_reset(void);
++#endif
+diff --git a/cpymo-backends/nds/tools/fvds-gpu/Makefile b/cpymo-backends/nds/tools/fvds-gpu/Makefile
+new file mode 100644
+index 0000000..722f881
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-gpu/Makefile
+@@ -0,0 +1,126 @@
++#---------------------------------------------------------------------------------
++.SUFFIXES:
++#---------------------------------------------------------------------------------
++
++ifeq ($(strip $(DEVKITARM)),)
++$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
++endif
++
++include $(DEVKITARM)/ds_rules
++
++#---------------------------------------------------------------------------------
++# TARGET is the name of the output
++# BUILD is the directory where object files & intermediate files will be placed
++# SOURCES is a list of directories containing source code
++# INCLUDES is a list of directories containing extra header files
++#---------------------------------------------------------------------------------
++TARGET		:=	$(shell basename $(CURDIR))
++BUILD		:=	build
++SOURCES		:=	gfx source data
++INCLUDES	:=	include build source
++
++#---------------------------------------------------------------------------------
++# options for code generation
++#---------------------------------------------------------------------------------
++ARCH	:=	-march=armv5te -mtune=arm946e-s -marm
++
++CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections $(EXTRA) \
++			$(ARCH)
++
++CFLAGS	+=	$(INCLUDE) -DARM9
++CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
++
++ASFLAGS	:=	-g $(ARCH)
++LDFLAGS	=	-specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
++
++#---------------------------------------------------------------------------------
++# any extra libraries we wish to link with the project
++#---------------------------------------------------------------------------------
++LIBS	:= -lnds9 -lfat
++
++
++#---------------------------------------------------------------------------------
++# list of directories containing libraries, this must be the top level containing
++# include and lib
++#---------------------------------------------------------------------------------
++LIBDIRS	:=	$(LIBNDS)
++
++#---------------------------------------------------------------------------------
++# no real need to edit anything past this point unless you need to add additional
++# rules for different file extensions
++#---------------------------------------------------------------------------------
++ifneq ($(BUILD),$(notdir $(CURDIR)))
++#---------------------------------------------------------------------------------
++
++export OUTPUT	:=	$(CURDIR)/$(TARGET)
++
++export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
++export DEPSDIR	:=	$(CURDIR)/$(BUILD)
++
++CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
++CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
++SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
++BINFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.bin)))
++
++#---------------------------------------------------------------------------------
++# use CXX for linking C++ projects, CC for standard C
++#---------------------------------------------------------------------------------
++ifeq ($(strip $(CPPFILES)),)
++#---------------------------------------------------------------------------------
++	export LD	:=	$(CC)
++#---------------------------------------------------------------------------------
++else
++#---------------------------------------------------------------------------------
++	export LD	:=	$(CXX)
++#---------------------------------------------------------------------------------
++endif
++#---------------------------------------------------------------------------------
++
++export OFILES	:=	$(BINFILES:.bin=.o) \
++					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
++
++export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
++					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
++					-I$(CURDIR)/$(BUILD)
++
++export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
++
++.PHONY: $(BUILD) clean
++
++#---------------------------------------------------------------------------------
++$(BUILD):
++	@[ -d $@ ] || mkdir -p $@
++	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
++
++#---------------------------------------------------------------------------------
++clean:
++	@echo clean ...
++	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds $(TARGET).ds.gba
++
++
++#---------------------------------------------------------------------------------
++else
++
++DEPENDS	:=	$(OFILES:.o=.d)
++
++#---------------------------------------------------------------------------------
++# main targets
++#---------------------------------------------------------------------------------
++$(OUTPUT).nds	: 	$(OUTPUT).elf
++$(OUTPUT).elf	:	$(OFILES)
++
++#---------------------------------------------------------------------------------
++%.o	:	%.bin
++#---------------------------------------------------------------------------------
++	@echo $(notdir $<)
++	$(bin2o)
++
++
++-include $(DEPENDS)
++
++#---------------------------------------------------------------------------------------
++endif
++#---------------------------------------------------------------------------------------
++CFLAGS += -O3
++CFLAGS += -flto
++LDFLAGS += -flto
+diff --git a/cpymo-backends/nds/tools/fvds-gpu/main.c b/cpymo-backends/nds/tools/fvds-gpu/main.c
+new file mode 100644
+index 0000000..4bfc84a
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-gpu/main.c
+@@ -0,0 +1,167 @@
++/* DS 3D micro-benchmark: can the engine do a motion-compensation copy batch?
++ *
++ * 768 blocks of 8x8 are drawn as textured quads from a 256x256 source texture
++ * at integer offsets, the framebuffer is read back and compared with the same
++ * copy done by the CPU.  Submission, engine completion and texture upload are
++ * timed separately, so a fast submission that stalls the engine cannot look
++ * like a win.
++ */
++#include <nds.h>
++#include <stdio.h>
++#include <string.h>
++#include <stdint.h>
++#include <fat.h>
++#include <sys/iosupport.h>
++#include <stdarg.h>
++
++#define W 256
++#define H 192
++#define BLOCKS ((W / 8) * (H / 8))
++#define RUNS 5
++#define WARM 1
++
++static uint8_t src[256 * 256];          /* opaque source plane */
++static uint16_t expect[W * H];          /* CPU copy reference */
++static uint16_t *fb;                    /* 3D output, VRAM C */
++static uint16_t *tex;                   /* texture, VRAM A */
++static FILE *logf;
++
++static void emit(const char *fmt, ...)
++{
++    va_list ap;
++    va_start(ap, fmt); vprintf(fmt, ap); va_end(ap);
++    if (logf) { va_start(ap, fmt); vfprintf(logf, fmt, ap); va_end(ap); fflush(logf); }
++}
++static unsigned to_us(unsigned ticks) { return ticks / (BUS_CLOCK / 1000000u); }
++static uint32_t ticks(void) { return cpuGetTiming(); }
++
++static unsigned crc32_update(unsigned crc, const uint8_t *p, size_t n)
++{
++    while (n--) { crc ^= *p++; for (int k = 0; k < 8; k++) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u))); }
++    return crc;
++}
++
++static void fill_source(void)
++{
++    for (int y = 0; y < 256; y++)
++        for (int x = 0; x < 256; x++)
++            src[y * 256 + x] = (uint8_t)((x * 5 + y * 3) & 31);
++}
++
++static void cpu_reference(void)
++{
++    for (int my = 0; my < H / 8; my++)
++        for (int mx = 0; mx < W / 8; mx++) {
++            const uint8_t *s = src + (my * 8 + 2) * 256 + (mx * 8 + 3);
++            uint16_t *d = expect + (my * 8) * W + mx * 8;
++            for (int r = 0; r < 8; r++)
++                for (int c = 0; c < 8; c++)
++                    d[r * W + c] = (uint16_t)(s[r * 256 + c] << 10 | s[r * 256 + c] << 5 | s[r * 256 + c]);
++        }
++}
++
++static void upload_texture(void)
++{
++    for (int y = 0; y < 256; y++)
++        for (int x = 0; x < 256; x++) {
++            unsigned v = src[y * 256 + x];
++            tex[y * 256 + x] = (uint16_t)(v << 10 | v << 5 | v);
++        }
++    dmaCopy(tex, tex, 0);                 /* no-op, keeps the shape explicit */
++    while (dmaBusy(3)) ;
++}
++
++static void submit_quads(void)
++{
++    glBegin(GL_QUADS);
++    for (int my = 0; my < H / 8; my++)
++        for (int mx = 0; mx < W / 8; mx++) {
++            int sx = mx * 8 + 3, sy = my * 8 + 2;
++            int dx = mx * 8, dy = my * 8;
++            glTexCoord2t16(sx * 16, sy * 16);
++            glVertex3v16(dx << 12, dy << 12, 0);
++            glTexCoord2t16((sx + 8) * 16, sy * 16);
++            glVertex3v16((dx + 8) << 12, dy << 12, 0);
++            glTexCoord2t16((sx + 8) * 16, (sy + 8) * 16);
++            glVertex3v16((dx + 8) << 12, (dy + 8) << 12, 0);
++            glTexCoord2t16(sx * 16, (sy + 8) * 16);
++            glVertex3v16(dx << 12, (dy + 8) << 12, 0);
++        }
++    glEnd();
++}
++
++int main(void)
++{
++    static unsigned sub[RUNS + WARM], done[RUNS + WARM], up[RUNS + WARM], crc[RUNS + WARM];
++    unsigned q = 0;
++    consoleDemoInit();
++
++    char path[48] = "sd:/G.TXT";
++    if (fatInitDefault()) {
++        const char *dev = 0;
++        for (int i = 3; i < 32; i++)
++            if (devoptab_list[i] && devoptab_list[i]->name) { dev = devoptab_list[i]->name; break; }
++        snprintf(path, sizeof path, "%s:/G.TXT", dev ? dev : "sd");
++        logf = fopen(path, "wb");
++    }
++    cpuStartTiming(1);
++    fill_source();
++    cpu_reference();
++
++    vramSetBankA(VRAM_A_TEXTURE);
++    vramSetBankC(VRAM_C_LCD);
++    tex = (uint16_t *)VRAM_A;
++    fb = (uint16_t *)VRAM_C;
++    videoSetMode(MODE_0_3D);
++    glInit();
++    glEnable(GL_TEXTURE_2D);
++    glEnable(GL_ANTIALIAS);
++    glClearColor(0, 0, 0, 31);
++    glClearDepth(0x7FFF);
++    glViewport(0, 0, 255, 191);
++    glMatrixMode(GL_PROJECTION);
++    glLoadIdentity();
++    glOrthof32(0, 256, 192, 0, -1 << 12, 1 << 12);
++    glMatrixMode(GL_MODELVIEW);
++    glLoadIdentity();
++    glTranslate3f32(0, 0, 0);
++
++    glGenTextures(1, &q);
++    glBindTexture(0, q);
++    glTexImage2D(0, 0, GL_RGBA, TEXTURE_SIZE_256, TEXTURE_SIZE_256, 0, TEXGEN_TEXCOORD, 0, (uint32_t *)tex);
++    glTexParameter(0, (unsigned)(TEXTURE_SIZE_256 | TEXTURE_SIZE_256 << 4 | GL_RGBA << 26));
++
++    emit("R14 gpu blocks=%u tex=%ux%u run=%u\n", (unsigned)BLOCKS, 256u, 256u, (unsigned)RUNS);
++
++    for (int run = 0; run < WARM + RUNS; run++) {
++        uint32_t t0 = ticks();
++        upload_texture();
++        up[run] = ticks() - t0;
++
++        t0 = ticks();
++        glFlush(GL_TRANS_MANUALSORT);
++        submit_quads();
++        glFlush(GL_TRANS_MANUALSORT);
++        sub[run] = ticks() - t0;
++
++        t0 = ticks();
++        while (GFX_BUSY) ;
++        done[run] = ticks() - t0;
++
++        unsigned c = crc32_update(0xFFFFFFFFu, (const uint8_t *)fb, W * H * 2) ^ 0xFFFFFFFFu;
++        crc[run] = c;
++    }
++    {
++        unsigned c = crc32_update(0xFFFFFFFFu, (const uint8_t *)expect, W * H * 2) ^ 0xFFFFFFFFu;
++        unsigned diff = 0;
++        for (int i = 0; i < W * H; i++) if (fb[i] != expect[i]) diff++;
++        for (int i = WARM; i < WARM + RUNS; i++)
++            emit("PG run=%d up=%u sub=%u done=%u crc=%u\n", i, to_us(up[i]),
++                 to_us(sub[i]), to_us(done[i]), crc[i]);
++        emit("PG expect crc=%u diff=%u\n", c, diff);
++    }
++    emit("R14 gpu done\n");
++    if (logf) { fclose(logf); logf = 0; }
++    for (;;) swiWaitForVBlank();
++    return 0;
++}
+diff --git a/cpymo-backends/nds/tools/fvds-play/Makefile b/cpymo-backends/nds/tools/fvds-play/Makefile
+new file mode 100644
+index 0000000..2c48ed7
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-play/Makefile
+@@ -0,0 +1,126 @@
++#---------------------------------------------------------------------------------
++.SUFFIXES:
++#---------------------------------------------------------------------------------
++
++ifeq ($(strip $(DEVKITARM)),)
++$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
++endif
++
++include $(DEVKITARM)/ds_rules
++
++#---------------------------------------------------------------------------------
++# TARGET is the name of the output
++# BUILD is the directory where object files & intermediate files will be placed
++# SOURCES is a list of directories containing source code
++# INCLUDES is a list of directories containing extra header files
++#---------------------------------------------------------------------------------
++TARGET		:=	$(shell basename $(CURDIR))
++BUILD		:=	build
++SOURCES		:=	source
++INCLUDES	:=	source
++
++#---------------------------------------------------------------------------------
++# options for code generation
++#---------------------------------------------------------------------------------
++ARCH	:=	-march=armv5te -mtune=arm946e-s -marm -std=gnu11
++
++CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections $(EXTRA) \
++			$(ARCH)
++
++CFLAGS	+=	$(INCLUDE) -DARM9
++CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
++
++ASFLAGS	:=	-g $(ARCH)
++LDFLAGS	=	-specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
++
++#---------------------------------------------------------------------------------
++# any extra libraries we wish to link with the project
++#---------------------------------------------------------------------------------
++LIBS	:= -lnds9 -lfat
++
++
++#---------------------------------------------------------------------------------
++# list of directories containing libraries, this must be the top level containing
++# include and lib
++#---------------------------------------------------------------------------------
++LIBDIRS	:=	$(LIBNDS)
++
++#---------------------------------------------------------------------------------
++# no real need to edit anything past this point unless you need to add additional
++# rules for different file extensions
++#---------------------------------------------------------------------------------
++ifneq ($(BUILD),$(notdir $(CURDIR)))
++#---------------------------------------------------------------------------------
++
++export OUTPUT	:=	$(CURDIR)/$(TARGET)
++
++export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
++export DEPSDIR	:=	$(CURDIR)/$(BUILD)
++
++CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
++CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
++SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
++BINFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.bin)))
++
++#---------------------------------------------------------------------------------
++# use CXX for linking C++ projects, CC for standard C
++#---------------------------------------------------------------------------------
++ifeq ($(strip $(CPPFILES)),)
++#---------------------------------------------------------------------------------
++	export LD	:=	$(CC)
++#---------------------------------------------------------------------------------
++else
++#---------------------------------------------------------------------------------
++	export LD	:=	$(CXX)
++#---------------------------------------------------------------------------------
++endif
++#---------------------------------------------------------------------------------
++
++export OFILES	:=	$(BINFILES:.bin=.o) \
++					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
++
++export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
++					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
++					-I$(CURDIR)/$(BUILD)
++
++export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
++
++.PHONY: $(BUILD) clean
++
++#---------------------------------------------------------------------------------
++$(BUILD):
++	@[ -d $@ ] || mkdir -p $@
++	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
++
++#---------------------------------------------------------------------------------
++clean:
++	@echo clean ...
++	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds $(TARGET).ds.gba
++
++
++#---------------------------------------------------------------------------------
++else
++
++DEPENDS	:=	$(OFILES:.o=.d)
++
++#---------------------------------------------------------------------------------
++# main targets
++#---------------------------------------------------------------------------------
++$(OUTPUT).nds	: 	$(OUTPUT).elf
++$(OUTPUT).elf	:	$(OFILES)
++
++#---------------------------------------------------------------------------------
++%.o	:	%.bin
++#---------------------------------------------------------------------------------
++	@echo $(notdir $<)
++	$(bin2o)
++
++
++-include $(DEPENDS)
++
++#---------------------------------------------------------------------------------------
++endif
++#---------------------------------------------------------------------------------------
++CFLAGS += -O3
++CFLAGS += -flto
++LDFLAGS += -flto
+diff --git a/cpymo-backends/nds/tools/fvds-play/build-play.sh b/cpymo-backends/nds/tools/fvds-play/build-play.sh
+new file mode 100755
+index 0000000..a965ac9
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-play/build-play.sh
+@@ -0,0 +1,17 @@
++#!/bin/bash
++# build-play.sh TREE OUT
++set -eu
++TREE=$1; OUT=$2
++SRC="$TREE/cpymo-backends/nds/source"
++rm -rf "$OUT"; mkdir -p "$OUT/source"
++cp main.c "$OUT/source/"
++for f in fvds-bits-nds.c fvds-iframe-nds.c fvds-pframe-nds.c fvds-stream-nds.c fvds-profile-nds.c fvds-adpcm-nds.c fvds-iframe-tables.c fvds-tables-nds.c fvds-quads-nds.c; do
++  [ -f "$SRC/$f" ] && cp "$SRC/$f" "$OUT/source/"
++done
++for h in "$SRC"/fvds-*.h; do cp "$h" "$OUT/source/"; done
++PRIVATE=${CPYMO_FVDS_PRIVATE:?set CPYMO_FVDS_PRIVATE}
++cp "$PRIVATE/tables/fvds-vlc-asm-tables.c" "$PRIVATE/tables/fvds-vlc-asm-tables.h" "$OUT/source/"
++cp Makefile "$OUT/"
++make -C "$OUT" -j4 >"$OUT/build.log" 2>&1 || { tail -20 "$OUT/build.log"; exit 1; }
++"${DEVKITPRO}/tools/bin/dlditool" "${FVDS_DLDI:?}" "$OUT/play.nds"
++ls -l "$OUT/play.nds"
+diff --git a/cpymo-backends/nds/tools/fvds-play/main.c b/cpymo-backends/nds/tools/fvds-play/main.c
+new file mode 100644
+index 0000000..0d3f94d
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-play/main.c
+@@ -0,0 +1,231 @@
++/* R14 continuous playback prototype.
++ *
++ * Reads a real FVDS container from the DLDI card, decodes I and P pictures in
++ * order, converts to RGB555, uploads to the display and logs one record per
++ * frame.  B stops, EOF and corrupt packets are reported, and a frame that
++ * misses its deadline is counted as a drop instead of being hidden.
++ *
++ * The container is synthetic: the three payloads of the private sample are
++ * replayed in a 12 frame group of pictures, so the pictures drift away from a
++ * real encode after the first group.  That is a property of this fixture, not
++ * of the decoder, and is stated in the report.
++ */
++#include <nds.h>
++#include <stdio.h>
++#include <string.h>
++#include <stdint.h>
++#include <stdarg.h>
++#include <fat.h>
++#include <sys/iosupport.h>
++
++#include "fvds-bits-nds.h"
++#include "fvds-iframe-nds.h"
++#include "fvds-pframe-nds.h"
++#include "fvds-stream-nds.h"
++#include "fvds-adpcm-nds.h"
++
++#define W 256
++#define H 192
++#define PIX (W * H)
++#define MAXF 150u
++#define LOG_EVERY 10u
++
++static uint8_t a_g[PIX], a_r[PIX], a_b[PIX];
++static uint8_t b_g[PIX], b_r[PIX], b_b[PIX];
++static uint16_t rgbbuf[PIX];
++static int16_t vectors[NDS_FVDS_PFRAME_VECTOR_BYTES];
++static uint8_t packet[65536 + 1024];
++static uint8_t audiobuf[8 * 1024];
++static int16_t pcm[NDS_FVDS_ADPCM_INTERLEAVED_SAMPLES * 40];
++static nds_fvds_bits bits;
++static nds_fvds_stream stream;
++static FILE *logf;
++
++static void emit(const char *fmt, ...)
++{
++    va_list ap;
++    va_start(ap, fmt); vprintf(fmt, ap); va_end(ap);
++    if (logf) { va_start(ap, fmt); vfprintf(logf, fmt, ap); va_end(ap); fflush(logf); }
++}
++static uint32_t ticks(void) { return cpuGetTiming(); }
++static unsigned to_us(uint32_t t) { return t / (BUS_CLOCK / 1000000u); }
++static unsigned crc32(unsigned crc, const uint8_t *p, size_t n)
++{
++    while (n--) { crc ^= *p++; for (int k = 0; k < 8; k++) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u))); }
++    return crc;
++}
++/* The packet is already in RAM, so the bit reader must not pull from the
++ * stream again: the explicit read consumed all of it. */
++typedef struct { const uint8_t *data; size_t size, at; } mem_pull;
++static size_t pull(void *ctx, void *dst, size_t maximum)
++{
++    mem_pull *m = (mem_pull *)ctx;
++    size_t left = m->size - m->at;
++    if (left > maximum) left = maximum;
++    memcpy(dst, m->data + m->at, left);
++    m->at += left;
++    return left;
++}
++
++int main(void)
++{
++    unsigned frames = 0, is = 0, ps = 0, drops = 0, errors = 0;
++    unsigned aud_samples = 0, aud_underruns = 0, aud_bad = 0, aud_peak = 0;
++    uint32_t dec_sum = 0, tot_sum = 0, dec_max = 0, tot_max = 0, late_max = 0;
++    unsigned crc = 0xFFFFFFFFu;
++    int have_ref = 0, eof = 0, stopped = 0;
++    uint32_t read_ticks = 0, read_sum = 0, read_max = 0;
++    char path[48] = "fat:/play.fvds";
++
++    consoleDemoInit();
++    if (fatInitDefault()) {
++        const char *dev = 0;
++        for (int i = 3; i < 32; i++)
++            if (devoptab_list[i] && devoptab_list[i]->name) { dev = devoptab_list[i]->name; break; }
++        if (dev && strcmp(dev, "fat")) snprintf(path, sizeof path, "%s:/play.fvds", dev);
++        logf = fopen("fat:/P.TXT", "wb");
++    }
++    vramSetBankA(VRAM_A_LCD);
++    videoSetMode(MODE_5_2D);
++    cpuStartTiming(1);
++    soundEnable();
++    emit("R14 play start fat=%d file=%d log=%d\n", 1, 0, logf != 0);
++
++    nds_fvds_stream *s = &stream;
++    int rc = nds_fvds_open(s, path);
++    emit("R14 play open rc=%d w=%u h=%u fps=%u/%u frames=%u keys=%u\n", rc,
++         s->width, s->height, s->fps_num, s->fps_den, s->frame_count, s->keyframe_count);
++    if (rc) goto done;
++    emit("R14 play log=%d\n", logf != 0);
++    {
++        uint32_t budget_us = s->fps_num ? (1000000u * s->fps_den) / s->fps_num : 0;
++        uint32_t budget = budget_us * (BUS_CLOCK / 1000000u);
++        uint32_t start = ticks();
++        emit("R14 play budget=%u\n", budget_us);
++        for (;;) {
++            nds_fvds_packet pkt;
++            scanKeys();
++            if (keysDown() & KEY_B) { stopped = 1; break; }
++            if (frames >= MAXF) break;
++            { uint32_t t = ticks(); rc = nds_fvds_next(s, &pkt); read_ticks = ticks() - t; }
++            if (rc == 1) { eof = 1; break; }
++            if (rc < 0) {
++                errors++;
++                emit("R14 play perr f=%u rc=%d\n", frames, rc);
++                have_ref = 0;
++                break;
++            }
++            if (pkt.video_bytes > sizeof packet) { errors++; emit("R14 play big f=%u b=%u\n", frames, pkt.video_bytes); break; }
++            { uint32_t t = ticks();
++              if (nds_fvds_read_video(s, packet, pkt.video_bytes) != pkt.video_bytes) {
++                errors++; emit("R14 play short f=%u\n", frames); break;
++              }
++              read_ticks += ticks() - t;
++            }
++            if (frames == 0 || frames % 20 == 0) emit("R14 play pkt f=%u v=%u crc=%u\n", frames, pkt.video_bytes, crc32(0xFFFFFFFFu, packet, pkt.video_bytes) ^ 0xFFFFFFFFu);
++            uint32_t t0 = ticks();
++            /* Audio arrives as ADPCM block pairs; decode the whole packet and
++             * hand one 16 bit stereo buffer to the ARM7 sound channel. */
++            {
++                size_t want = pkt.audio_bytes, got = 0;
++                while (got < want) {
++                    size_t n = nds_fvds_read_audio(s, audiobuf + got, want - got);
++                    if (!n) break;
++                    got += n;
++                }
++                if (got != want) { aud_bad++; emit("R14 play ashort f=%u got=%u want=%u\n", frames, (unsigned)got, (unsigned)want); }
++                unsigned pairs = (unsigned)(got / NDS_FVDS_ADPCM_PAIR_BYTES), decoded = 0;
++                for (unsigned i = 0; i < pairs && decoded + NDS_FVDS_ADPCM_INTERLEAVED_SAMPLES <= sizeof pcm / sizeof pcm[0]; i++) {
++                    if (nds_fvds_adpcm_pair(audiobuf + i * NDS_FVDS_ADPCM_PAIR_BYTES,
++                                            NDS_FVDS_ADPCM_PAIR_BYTES,
++                                            pcm + decoded,
++                                            NDS_FVDS_ADPCM_INTERLEAVED_SAMPLES) != NDS_FVDS_ADPCM_SAMPLES_PER_BLOCK) { aud_bad++; break; }
++                    decoded += NDS_FVDS_ADPCM_INTERLEAVED_SAMPLES;
++                }
++                if (decoded) {
++                    for (unsigned i = 0; i < decoded * 2u; i++) {
++                        int v = pcm[i] < 0 ? -pcm[i] : pcm[i];
++                        if ((unsigned)v > aud_peak) aud_peak = (unsigned)v;
++                    }
++                    soundPlaySample(pcm, SoundFormat_16Bit, decoded * 4u, 47605, 110, 64, false, 0);
++                    aud_samples += decoded;
++                }
++                if (got != want) aud_underruns++;
++            }
++            mem_pull mp = { packet, pkt.video_bytes, 0 };
++            if (!nds_fvds_bits_init(&bits, pull, &mp, pkt.video_bytes)) {
++                errors++; emit("R14 play bits f=%u\n", frames); break;
++            }
++            int status;
++            if (s->current_is_keyframe) {
++                unsigned q = 0;
++                status = nds_fvds_iframe_decode(&bits, b_g, b_r, b_b, W, W, H, &q);
++                is++;
++                emit("R14 play iframe f=%u q=%u st=%d\n", frames, q, status);
++            } else {
++                if (!have_ref) {
++                    /* first P without reference: show nothing, wait for a keyframe */
++                    errors++;
++                    emit("R14 play noref f=%u\n", frames);
++                    if (nds_fvds_finish(s)) break;
++                    frames++;
++                    continue;
++                }
++                status = nds_fvds_pframe_decode(&bits, a_g, a_r, a_b, b_g, b_r, b_b, W, W, H, vectors);
++                ps++;
++            }
++            uint32_t t1 = ticks();
++            if (status < 0) {
++                errors++;
++                emit("R14 play decode f=%u st=%d\n", frames, status);
++                have_ref = 0;
++                if (nds_fvds_finish(s)) break;
++                continue;
++            }
++            if (nds_fvds_iframe_to_rgb555(b_g, b_r, b_b, W, rgbbuf, W, W, H)) {
++                errors++; emit("R14 play rgb f=%u\n", frames); break;
++            }
++            dmaCopy(rgbbuf, BG_BMP_RAM(0), sizeof rgbbuf);
++            uint32_t t2 = ticks();
++            while (dmaBusy(3)) ;
++            swiWaitForVBlank();
++            {
++                uint32_t dec = t1 - t0, tot = t2 - t0;
++                uint32_t due = start + (uint32_t)((uint64_t)frames * budget);
++                uint32_t late = 0;
++                if (ticks() > due) { late = ticks() - due; drops++; }
++                dec_sum += dec; tot_sum += tot;
++                read_sum += read_ticks;
++                if (read_ticks > read_max) read_max = read_ticks;
++                if (dec > dec_max) dec_max = dec;
++                if (tot > tot_max) tot_max = tot;
++                if (late > late_max) late_max = late;
++                crc = crc32(crc, (const uint8_t *)rgbbuf, sizeof rgbbuf);
++                if (frames % LOG_EVERY == 0)
++                    emit("PL f=%u i=%u dec=%u rd=%u tot=%u late=%u crc=%u\n", frames,
++                         s->current_is_keyframe, to_us(dec), to_us(read_ticks),
++                         to_us(tot), to_us(late), crc);
++            }
++            memcpy(a_g, b_g, PIX); memcpy(a_r, b_r, PIX); memcpy(a_b, b_b, PIX);
++            have_ref = 1;
++            read_ticks = 0;
++            frames++;
++            if (nds_fvds_finish(s)) break;
++        }
++    }
++done:
++    {
++        unsigned n = frames ? frames : 1;
++        emit("PY frames=%u i=%u p=%u drops=%u errors=%u eof=%d stop=%d crc=%u\n",
++             frames, is, ps, drops, errors, eof, stopped, crc);
++        emit("PY au samples=%u underruns=%u bad=%u peak=%u\n", aud_samples, aud_underruns, aud_bad, aud_peak);
++        emit("PY dec_avg=%u dec_max=%u rd_avg=%u rd_max=%u tot_avg=%u tot_max=%u late_max=%u\n",
++             to_us(dec_sum / n), to_us(dec_max), to_us(read_sum / n), to_us(read_max),
++             to_us(tot_sum / n), to_us(tot_max), to_us(late_max));
++    }
++    nds_fvds_close(&stream);
++    emit("R14 play done\n");
++    if (logf) { fclose(logf); logf = 0; }
++    for (;;) swiWaitForVBlank();
++    return 0;
++}
+diff --git a/cpymo-backends/nds/tools/fvds-profile/Makefile b/cpymo-backends/nds/tools/fvds-profile/Makefile
+new file mode 100644
+index 0000000..722f881
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-profile/Makefile
+@@ -0,0 +1,126 @@
++#---------------------------------------------------------------------------------
++.SUFFIXES:
++#---------------------------------------------------------------------------------
++
++ifeq ($(strip $(DEVKITARM)),)
++$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
++endif
++
++include $(DEVKITARM)/ds_rules
++
++#---------------------------------------------------------------------------------
++# TARGET is the name of the output
++# BUILD is the directory where object files & intermediate files will be placed
++# SOURCES is a list of directories containing source code
++# INCLUDES is a list of directories containing extra header files
++#---------------------------------------------------------------------------------
++TARGET		:=	$(shell basename $(CURDIR))
++BUILD		:=	build
++SOURCES		:=	gfx source data
++INCLUDES	:=	include build source
++
++#---------------------------------------------------------------------------------
++# options for code generation
++#---------------------------------------------------------------------------------
++ARCH	:=	-march=armv5te -mtune=arm946e-s -marm
++
++CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections $(EXTRA) \
++			$(ARCH)
++
++CFLAGS	+=	$(INCLUDE) -DARM9
++CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
++
++ASFLAGS	:=	-g $(ARCH)
++LDFLAGS	=	-specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
++
++#---------------------------------------------------------------------------------
++# any extra libraries we wish to link with the project
++#---------------------------------------------------------------------------------
++LIBS	:= -lnds9 -lfat
++
++
++#---------------------------------------------------------------------------------
++# list of directories containing libraries, this must be the top level containing
++# include and lib
++#---------------------------------------------------------------------------------
++LIBDIRS	:=	$(LIBNDS)
++
++#---------------------------------------------------------------------------------
++# no real need to edit anything past this point unless you need to add additional
++# rules for different file extensions
++#---------------------------------------------------------------------------------
++ifneq ($(BUILD),$(notdir $(CURDIR)))
++#---------------------------------------------------------------------------------
++
++export OUTPUT	:=	$(CURDIR)/$(TARGET)
++
++export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
++export DEPSDIR	:=	$(CURDIR)/$(BUILD)
++
++CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
++CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
++SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
++BINFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.bin)))
++
++#---------------------------------------------------------------------------------
++# use CXX for linking C++ projects, CC for standard C
++#---------------------------------------------------------------------------------
++ifeq ($(strip $(CPPFILES)),)
++#---------------------------------------------------------------------------------
++	export LD	:=	$(CC)
++#---------------------------------------------------------------------------------
++else
++#---------------------------------------------------------------------------------
++	export LD	:=	$(CXX)
++#---------------------------------------------------------------------------------
++endif
++#---------------------------------------------------------------------------------
++
++export OFILES	:=	$(BINFILES:.bin=.o) \
++					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
++
++export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
++					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
++					-I$(CURDIR)/$(BUILD)
++
++export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
++
++.PHONY: $(BUILD) clean
++
++#---------------------------------------------------------------------------------
++$(BUILD):
++	@[ -d $@ ] || mkdir -p $@
++	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
++
++#---------------------------------------------------------------------------------
++clean:
++	@echo clean ...
++	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds $(TARGET).ds.gba
++
++
++#---------------------------------------------------------------------------------
++else
++
++DEPENDS	:=	$(OFILES:.o=.d)
++
++#---------------------------------------------------------------------------------
++# main targets
++#---------------------------------------------------------------------------------
++$(OUTPUT).nds	: 	$(OUTPUT).elf
++$(OUTPUT).elf	:	$(OFILES)
++
++#---------------------------------------------------------------------------------
++%.o	:	%.bin
++#---------------------------------------------------------------------------------
++	@echo $(notdir $<)
++	$(bin2o)
++
++
++-include $(DEPENDS)
++
++#---------------------------------------------------------------------------------------
++endif
++#---------------------------------------------------------------------------------------
++CFLAGS += -O3
++CFLAGS += -flto
++LDFLAGS += -flto
+diff --git a/cpymo-backends/nds/tools/fvds-profile/build-profile.sh b/cpymo-backends/nds/tools/fvds-profile/build-profile.sh
+new file mode 100755
+index 0000000..f028d60
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-profile/build-profile.sh
+@@ -0,0 +1,21 @@
++#!/bin/bash
++# build-profile.sh TREE CASE OUT [EXTRA_CFLAGS...]
++set -e
++TREE=$(cd "$1" && pwd); CASE=$(cd "$2" && pwd); OUT=$3; shift 3
++HERE=$(cd "$(dirname "$0")" && pwd)
++: "${DEVKITARM:?set DEVKITARM}"
++DEVKITPRO=${DEVKITPRO:-$(dirname "$DEVKITARM")}
++PRIVATE=${CPYMO_FVDS_PRIVATE:?set CPYMO_FVDS_PRIVATE}
++S=$TREE/cpymo-backends/nds/source
++rm -rf "$OUT"; mkdir -p "$OUT/source"
++cp "$HERE/Makefile" "$OUT/"; cp "$HERE/main.c" "$OUT/source/main.c"
++cp "$S/fvds-bits-nds.c" "$S/fvds-bits-nds.h" "$S/fvds-iframe-nds.c" "$S/fvds-iframe-nds.h" "$OUT/source/"
++cp "$S/fvds-pframe-nds.c" "$S/fvds-pframe-nds.h" "$S/fvds-profile-nds.c" "$S/fvds-profile-nds.h" "$OUT/source/"
++cp "$PRIVATE/tables/fvds-vlc-asm-tables.c" "$PRIVATE/tables/fvds-vlc-asm-tables.h" "$OUT/source/"
++EXTRA="-DSAMPLE_NAME=\\\"$(basename "$CASE")\\\""
++DIM=$(python3 "$HERE/gen-data.py" "$CASE" "$OUT/source/data.c")
++EXTRA="$EXTRA $DIM $*"
++cd "$OUT"
++make -s EXTRA="$EXTRA" > build.log 2>&1 || { tail -20 build.log; exit 1; }
++[ -n "${FVDS_DLDI:-}" ] && "$DEVKITPRO/tools/bin/dlditool" "$FVDS_DLDI" "$OUT"/*.nds >/dev/null
++ls -l "$OUT"/*.nds
+diff --git a/cpymo-backends/nds/tools/fvds-profile/gen-data.py b/cpymo-backends/nds/tools/fvds-profile/gen-data.py
+new file mode 100755
+index 0000000..ed76866
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-profile/gen-data.py
+@@ -0,0 +1,14 @@
++#!/usr/bin/env python3
++"""Embed an I/P/P chain and print the -DFRAME_* geometry flags."""
++import pathlib
++import sys
++
++case, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
++width, height = (int(v) for v in (case / "dims").read_text().strip().split("x"))
++parts = ["#include <stdint.h>"]
++for index in range(3):
++    data = (case / f"f.{index}.pic").read_bytes()
++    parts.append(f"const unsigned int f{index}_len={len(data)};")
++    parts.append(f"const unsigned char f{index}[{len(data)}]={{{','.join(str(b) for b in data)}}};")
++out.write_text("\n".join(parts) + "\n")
++print(f"-DFRAME_W={width} -DFRAME_H={height}")
+diff --git a/cpymo-backends/nds/tools/fvds-profile/main.c b/cpymo-backends/nds/tools/fvds-profile/main.c
+new file mode 100644
+index 0000000..a27d99f
+--- /dev/null
++++ b/cpymo-backends/nds/tools/fvds-profile/main.c
+@@ -0,0 +1,185 @@
++/* Phase profiler: one I frame then one P frame per run, every phase timed.
++ *
++ * The decoders carry opt-in hooks (fvds-profile-nds.h); this ROM injects a
++ * cycle counter, so the hook cost is one indirect call per phase.  The external
++ * phases (reference copy, RGB555 conversion, VRAM upload) are timed here in the
++ * same table so the shares are comparable.  MODE 1 times FAT reads instead.
++ */
++#include <nds.h>
++#include <stdio.h>
++#include <string.h>
++#include <stdint.h>
++#include <fat.h>
++#include <sys/iosupport.h>
++#include <stdarg.h>
++#include "fvds-bits-nds.h"
++#include "fvds-iframe-nds.h"
++#include "fvds-pframe-nds.h"
++#include "fvds-profile-nds.h"
++
++extern const unsigned char f0[], f1[], f2[];
++extern const unsigned int f0_len, f1_len, f2_len;
++
++#define W FRAME_W
++#define H FRAME_H
++#define RUNS 6
++#define WARM 1
++#define FRAMES 2
++#ifndef PROFILE_MODE
++#define PROFILE_MODE 0
++#endif
++
++static uint8_t a_g[W * H], a_r[W * H], a_b[W * H];
++static uint8_t b_g[W * H], b_r[W * H], b_b[W * H];
++static uint16_t rgbbuf[2][W * H];
++static int16_t vectors[NDS_FVDS_PFRAME_VECTOR_BYTES / 2];
++static uint16_t *vram __attribute__((aligned(4)));
++
++static FILE *logf;
++
++static void emit(const char *fmt, ...)
++{
++    va_list ap;
++    va_start(ap, fmt); vprintf(fmt, ap); va_end(ap);
++    if (logf) { va_start(ap, fmt); vfprintf(logf, fmt, ap); va_end(ap); fflush(logf); }
++}
++
++static unsigned to_us(unsigned ticks) { return ticks / (BUS_CLOCK / 1000000u); }
++static uint32_t ticks(void) { return cpuGetTiming(); }
++
++static unsigned crc32_update(unsigned crc, const uint8_t *p, size_t n)
++{
++    while (n--) { crc ^= *p++; for (int k = 0; k < 8; k++) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u))); }
++    return crc;
++}
++
++static size_t src_pull(void *ctx, void *dst, size_t max)
++{
++    struct { const unsigned char *p, *end; } *s = ctx;
++    size_t n = (size_t)(s->end - s->p);
++    if (n > max) n = max;
++    memcpy(dst, s->p, n);
++    s->p += n;
++    return n;
++}
++
++static void copy_planes(const uint8_t *g, const uint8_t *r, const uint8_t *b,
++                        uint8_t *og, uint8_t *orr, uint8_t *ob)
++{
++    uint32_t t0 = ticks();
++    memcpy(og, g, W * H); memcpy(orr, r, W * H); memcpy(ob, b, W * H);
++    fvds_profile_add(FVDS_P_REF_COPY, t0, ticks());
++}
++
++static unsigned to_rgb_and_upload(const uint8_t *g, const uint8_t *r,
++                                  const uint8_t *b, uint16_t *buf)
++{
++    uint32_t t0 = ticks();
++    nds_fvds_iframe_to_rgb555(g, r, b, W, buf, W, W, H);
++    fvds_profile_add(FVDS_P_RGB, t0, ticks());
++    t0 = ticks();
++    dmaCopy(buf, vram, W * H * 2);
++    while (dmaBusy(3)) ;
++    fvds_profile_add(FVDS_P_UPLOAD, t0, ticks());
++    unsigned crc = crc32_update(0xFFFFFFFFu, (const uint8_t *)buf, W * H * 2);
++    return crc ^ 0xFFFFFFFFu;
++}
++
++static void timing_mode(void)
++{
++    static uint8_t chunk[512];
++    char path[48] = "sd:/READ.BIN";
++    const char *dev = 0;
++    for (int i = 3; i < 32; i++)
++        if (devoptab_list[i] && devoptab_list[i]->name) { dev = devoptab_list[i]->name; break; }
++    snprintf(path, sizeof path, "%s:/READ.BIN", dev ? dev : "sd");
++    FILE *f = fopen(path, "wb");
++    if (!f) { emit("PH read open=0\n"); return; }
++    for (int i = 0; i < 2048; i++) fwrite(chunk, 1, sizeof chunk, f);
++    fclose(f);
++    f = fopen(path, "rb");
++    if (!f) { emit("PH read open=0\n"); return; }
++    for (int run = 0; run < RUNS + WARM; run++) {
++        static unsigned v[RUNS + WARM];
++        unsigned t0 = ticks(), sum = 0;
++        for (int i = 0; i < 128; i++) sum += fread(chunk, 1, sizeof chunk, f);
++        v[run] = ticks() - t0;
++        if (run >= WARM)
++            emit("PT f=9 total=%u bytes=%u\n", to_us(v[run]), sum);
++        rewind(f);
++    }
++    fclose(f);
++    emit("PH read done=1\n");
++}
++
++int main(void)
++{
++    static unsigned total[RUNS][FRAMES], crc[RUNS][FRAMES];
++    static int st[RUNS][FRAMES];
++    unsigned mode = 0;
++
++    consoleDemoInit();
++    vramSetBankA(VRAM_A_MAIN_BG);
++    videoSetMode(MODE_5_2D);
++    vram = (uint16_t *)BG_BMP_RAM(0);
++    char path[48] = "sd:/P.TXT";
++    if (fatInitDefault()) {
++        const char *dev = 0;
++        for (int i = 3; i < 32; i++)
++            if (devoptab_list[i] && devoptab_list[i]->name) { dev = devoptab_list[i]->name; break; }
++        snprintf(path, sizeof path, "%s:/P.TXT", dev ? dev : "sd");
++        logf = fopen(path, "wb");
++    }
++    mode = PROFILE_MODE;
++    fvds_profile_ticks = ticks;
++    cpuStartTiming(1);
++    emit("R14 profile %s mode=%u fat=%d file=%d arm=1\n", SAMPLE_NAME, mode,
++         logf != 0, logf != 0);
++    if (mode == 1) { timing_mode(); emit("R14 profile done\n"); for (;;) swiWaitForVBlank(); }
++
++    for (int run = 0; run < WARM + RUNS; run++) {
++        for (int idx = 0; idx < FRAMES; idx++) {
++            const unsigned char *pic = idx == 0 ? f0 : f1;
++            unsigned len = idx == 0 ? f0_len : f1_len;
++            struct { const unsigned char *p, *end; } s = { pic, pic + len };
++            nds_fvds_bits b;
++            uint8_t *og = idx == 0 ? b_g : a_g, *orr = idx == 0 ? b_r : a_r, *ob = idx == 0 ? b_b : a_b;
++            const uint8_t *rg = a_g, *rr = a_r, *rb = a_b;
++            unsigned q = 0, dt = 0;
++            nds_fvds_bits_init(&b, src_pull, &s, len);
++            fvds_profile_reset();
++            unsigned t0 = ticks();
++            if (idx == 0) {
++                st[run][idx] = nds_fvds_iframe_decode(&b, og, orr, ob, W, W, H, &q);
++            } else {
++                st[run][idx] = nds_fvds_pframe_decode(&b, rg, rr, rb, og, orr, ob, W, W, H, vectors);
++            }
++            dt = ticks() - t0;
++            if (st[run][idx]) { total[run][idx] = 0; crc[run][idx] = 0; continue; }
++            copy_planes(og, orr, ob, a_g, a_r, a_b);
++            unsigned c = to_rgb_and_upload(a_g, a_r, a_b, rgbbuf[idx]);
++            if (run >= WARM) {
++                total[run - WARM][idx] = dt;
++                crc[run][idx] = c;
++                emit("PT f=%d total=%u crc=%u decode=%u\n", idx, to_us(dt + 0u), c, to_us(dt));
++                for (unsigned s2 = 0; s2 < FVDS_P_SLOTS; s2++)
++                    if (fvds_profile_hits[s2])
++                        emit("PH f=%d s=%u us=%u hits=%u\n", idx, s2,
++                             to_us(fvds_profile_acc[s2]), fvds_profile_hits[s2]);
++            }
++        }
++    }
++    for (int idx = 0; idx < FRAMES; idx++) {
++        unsigned v[RUNS], sum = 0;
++        for (int i = 0; i < RUNS; i++) v[i] = total[i][idx];
++        for (int i = 1; i < RUNS; i++) { unsigned k = v[i]; int j = i - 1; while (j >= 0 && v[j] > k) { v[j + 1] = v[j]; j--; } v[j + 1] = k; }
++        for (int i = 0; i < RUNS; i++) sum += v[i];
++        emit("PS f=%d n=%d min=%u med=%u mean=%u max=%u crc=%u\n", idx, RUNS,
++             to_us(v[0]), to_us(v[RUNS / 2]), to_us(sum / RUNS), to_us(v[RUNS - 1]),
++             crc[RUNS - 1][idx]);
++    }
++    emit("R14 profile done\n");
++    if (logf) { fclose(logf); logf = 0; }
++    for (;;) swiWaitForVBlank();
++    return 0;
++}
+diff --git a/cpymo-backends/nds/tools/public-patch/allow.txt b/cpymo-backends/nds/tools/public-patch/allow.txt
+index 473205f..d49e5ed 100644
+--- a/cpymo-backends/nds/tools/public-patch/allow.txt
++++ b/cpymo-backends/nds/tools/public-patch/allow.txt
+@@ -19,3 +19,8 @@ R13_2-PERFORMANCE-20261029.md
+ R13_2-PLAYER-20261029.md
+ R13_2-OPEN-ISSUES-20261029.md
+ R13_2-BUILD-RECORD-20261029.md
++cpymo-backends/nds/source/fvds-profile-nds.c
++cpymo-backends/nds/source/fvds-profile-nds.h
++cpymo-backends/nds/tools/fvds-profile
++cpymo-backends/nds/tools/fvds-gpu
++cpymo-backends/nds/tools/fvds-play
+diff --git a/cpymo-backends/nds/tools/public-patch/check-public-patch.py b/cpymo-backends/nds/tools/public-patch/check-public-patch.py
+index 85d4761..285d611 100755
+--- a/cpymo-backends/nds/tools/public-patch/check-public-patch.py
++++ b/cpymo-backends/nds/tools/public-patch/check-public-patch.py
+@@ -4,19 +4,38 @@
+ Three independent checks: the touched paths must be allow-listed, no hunk may
+ contain a line that also occurs in the private table carriers, and nothing may
+ be smuggled in as base64, a data: URL or a compressed blob.
++
++The table comparison needs the private tree.  Without it the check used to pass
++silently, because an empty table set matches nothing; now a missing private
++tree is a failure unless --allow-missing-private is passed, in which case the
++result says so on the last line.
+ """
+ import pathlib
+ import re
++import os
+ import subprocess
+ import sys
+ 
+-patch = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="surrogateescape")
++args = [a for a in sys.argv[1:] if not a.startswith("--")]
++allow_missing_private = "--allow-missing-private" in sys.argv[1:]
++if len(args) != 1:
++    print("usage: check-public-patch.py PATCH [--allow-missing-private]")
++    sys.exit(2)
++try:
++    patch = pathlib.Path(args[0]).read_text(encoding="utf-8", errors="surrogateescape")
++except OSError as exc:
++    print(f"PUBLIC PATCH CHECK FAILED\n - cannot read patch: {exc}")
++    sys.exit(1)
+ here = pathlib.Path(__file__).resolve().parent
+ allow = [l.strip() for l in (here / "allow.txt").read_text().split("\n") if l.strip()]
+ quarantine = [l.strip() for l in (here / "quarantine.txt").read_text().split("\n") if l.strip()]
+-private = pathlib.Path(__file__).resolve().parents[3].parent.parent / "fvds-private"
+-if not private.exists():
+-    private = pathlib.Path.home() / "工作区" / "CPyMO_FVDS_Research_Checkpoint_20261028" / "fvds-private"
++_override = os.environ.get("FVDS_PRIVATE_DIR")
++if _override:
++    private = pathlib.Path(_override)
++else:
++    private = pathlib.Path(__file__).resolve().parents[3].parent.parent / "fvds-private"
++    if not private.exists():
++        private = pathlib.Path.home() / "工作区" / "CPyMO_FVDS_Research_Checkpoint_20261028" / "fvds-private"
+ 
+ problems = []
+ 
+@@ -42,10 +61,14 @@ for chunk in chunks:
+     if "data:application" in chunk:
+         problems.append(f"data: URL present: {path}")
+ 
++private_ok = private.is_dir()
++missing_tables = []
+ table_lines = set()
+ for name in ("tables/fvds-vlc-asm-tables.c", "tables/fvds-vlc-asm-tables.h"):
+     f = private / name
+-    if f.exists():
++    if not f.exists():
++        missing_tables.append(name)
++    else:
+         for line in f.read_text(encoding="utf-8", errors="replace").split("\n"):
+             line = line.strip().rstrip(",")
+             if len(line) >= 40 and not line.startswith(("/*", "//", "#include", "#if")):
+@@ -54,6 +77,15 @@ added = [l[1:].strip().rstrip(",") for l in patch.split("\n") if l.startswith("+
+ hits = [l for l in added if l in table_lines]
+ if hits:
+     problems.append(f"{len(hits)} added line(s) duplicate the private table payload, e.g. {hits[0][:60]}")
++if not table_lines:
++    detail = ", ".join(missing_tables) if missing_tables else "private tree"
++    if allow_missing_private:
++        note = f"table payload NOT verified ({detail} missing)"
++    else:
++        problems.append(f"private comparison data missing ({private}), table payload unverified")
++        note = ""
++else:
++    note = ""
+ 
+ for path in paths:
+     if not path.startswith(("cpymo-backends/nds/source/fvds", "cpymo-tool")):
+@@ -66,3 +98,5 @@ if problems:
+         print(" -", p)
+     sys.exit(1)
+ print(f"public patch OK: {len(paths)} file(s), {len(added)} added line(s), no table payload")
++if note:
++    print(note)
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_bits.py b/cpymo-tool/nds-converter/tests/test_fvds_bits.py
+index 25fc882..64bda90 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_bits.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_bits.py
+@@ -90,6 +90,6 @@ class FVDSBitsTests(unittest.TestCase):
+    runner=d/"runner"
+    subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
+                    "-fsanitize=undefined","-I",str(SRC),
+-                   str(SRC/"fvds-bits-nds.c"),str(c),"-o",str(runner)],
++                   str(SRC/"fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"),str(c),"-o",str(runner)],
+                   check=True,capture_output=True,text=True)
+    subprocess.run([str(runner)],check=True,capture_output=True,text=True)
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_error_paths.py b/cpymo-tool/nds-converter/tests/test_fvds_error_paths.py
+index f3f4e6c..38c5496 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_error_paths.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_error_paths.py
+@@ -124,7 +124,7 @@ class ErrorPathTests(unittest.TestCase):
+         cmd = ["cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                "-I", str(SRC), *fvds_private.includes(),
+-               str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-iframe-nds.c"),
++               str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"), str(SRC / "fvds-iframe-nds.c"),
+                fvds_private.table_source(), str(SRC / "fvds-pframe-nds.c"),
+                str(harness), "-o", str(cls.binary)]
+         build = subprocess.run(cmd, capture_output=True, text=True)
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_iframe.py b/cpymo-tool/nds-converter/tests/test_fvds_iframe.py
+index 9406af1..5a2f814 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_iframe.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_iframe.py
+@@ -237,7 +237,7 @@ class FVDSIFrameTests(unittest.TestCase):
+             ["gcc", "-std=c99", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+              "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+              "-I", str(SRC), *fvds_private.includes(), str(source),
+-             str(SRC / "fvds-iframe-nds.c"), str(SRC / "fvds-bits-nds.c"), fvds_private.table_source(),
++             str(SRC / "fvds-iframe-nds.c"), str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"), fvds_private.table_source(),
+              "-o", str(cls.binary)],
+             check=True,
+         )
+@@ -416,7 +416,7 @@ class FVDSIFrameTests(unittest.TestCase):
+             binary = Path(td) / "peek"
+             subprocess.run(["gcc", "-std=c99", "-Wall", "-Wextra", "-Werror",
+                             "-fsanitize=address,undefined", "-I", str(SRC), *fvds_private.includes(),
+-                            str(source), str(SRC / "fvds-bits-nds.c"), fvds_private.table_source(), "-o", str(binary)],
++                            str(source), str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"), fvds_private.table_source(), "-o", str(binary)],
+                            check=True)
+             result = subprocess.run([str(binary)], stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE)
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_pframe.py b/cpymo-tool/nds-converter/tests/test_fvds_pframe.py
+index 043ef37..513c293 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_pframe.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_pframe.py
+@@ -168,7 +168,7 @@ class PFrameDecode(unittest.TestCase):
+             "cc", "-std=c11", "-O1", "-g", "-Werror", "-Wall", "-Wextra",
+             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+             "-I", str(SRC), *fvds_private.includes(),
+-            str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-iframe-nds.c"), fvds_private.table_source(),
++            str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"), str(SRC / "fvds-iframe-nds.c"), fvds_private.table_source(),
+             str(SRC / "fvds-pframe-nds.c"), str(harness),
+             "-o", str(cls.binary),
+         ]
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_picture_audit.py b/cpymo-tool/nds-converter/tests/test_fvds_picture_audit.py
+index 8c0dd47..279919e 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_picture_audit.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_picture_audit.py
+@@ -41,7 +41,7 @@ class FVDSPictureAuditTests(unittest.TestCase):
+                             "-Werror", "-fsanitize=undefined",
+                             "-I", str(SRC),
+                             str(SRC/"fvds-stream-nds.c"),
+-                            str(SRC/"fvds-bits-nds.c"), str(CLI),
++                            str(SRC/"fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"), str(CLI),
+                             "-o", str(executable)],
+                            check=True, capture_output=True, text=True)
+ 
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_picture_source.py b/cpymo-tool/nds-converter/tests/test_fvds_picture_source.py
+index 65f640e..9b77439 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_picture_source.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_picture_source.py
+@@ -83,7 +83,7 @@ class FVDSReaderAdapterTests(unittest.TestCase):
+    subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
+                    "-fsanitize=undefined","-I",str(SRC),
+                    str(SRC/"fvds-stream-nds.c"),
+-                   str(SRC/"fvds-bits-nds.c"),
++                   str(SRC/"fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"),
+                    str(code),"-o",str(exe)],
+                   check=True,capture_output=True,text=True)
+    result=subprocess.run([str(exe),str(fixture)],
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_player.py b/cpymo-tool/nds-converter/tests/test_fvds_player.py
+index 1c07af5..ffacd50 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_player.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_player.py
+@@ -47,7 +47,7 @@ class PlayerTests(unittest.TestCase):
+                    "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                    "-I", str(SRC), *fvds_private.includes(),
+                    str(TOOL / "harness.c"), str(TOOL / "player.c"),
+-                   str(SRC / "fvds-stream-nds.c"), str(SRC / "fvds-bits-nds.c"),
++                   str(SRC / "fvds-stream-nds.c"), str(SRC / "fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"),
+                    str(SRC / "fvds-iframe-nds.c"), str(SRC / "fvds-pframe-nds.c"),
+                    str(SRC / "fvds-adpcm-nds.c"), fvds_private.table_source(),
+                    "-o", str(cls.binary)]
+diff --git a/cpymo-tool/nds-converter/tests/test_fvds_vlc.py b/cpymo-tool/nds-converter/tests/test_fvds_vlc.py
+index 453de61..5baa487 100644
+--- a/cpymo-tool/nds-converter/tests/test_fvds_vlc.py
++++ b/cpymo-tool/nds-converter/tests/test_fvds_vlc.py
+@@ -61,7 +61,7 @@ class FVDSVlcTests(unittest.TestCase):
+             exe=p/"vlc_test"
+             subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
+                             "-fsanitize=undefined,bounds","-I",str(SRC),*fvds_private.includes(),
+-                            str(SRC/"fvds-bits-nds.c"),str(fvds_private.held_dir()/"fvds-vlc-nds.c"),
++                            str(SRC/"fvds-bits-nds.c"), str(SRC / "fvds-profile-nds.c"),str(fvds_private.held_dir()/"fvds-vlc-nds.c"),
+                             str(c),"-o",str(exe)],
+                            check=True,capture_output=True,text=True)
+             subprocess.run([str(exe)],check=True,capture_output=True,text=True)

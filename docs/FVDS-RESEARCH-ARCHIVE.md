@@ -51,3 +51,7 @@ The complete R14.1 freeze package was received and independently checked before 
 A private archive ZIP was rewrapped solely to correct ZIP filename encoding flags; individual extracted file bytes were verified unchanged. Its SHA-256 is `d56f4ed211bfd12584485fd27babc13ae042d0ebce38bf824269e43eeb9710aa`.
 
 **Do not commit or attach either complete ZIP to this public repository.** Both contain the isolated `private-tables/` test assets and full research history. The complete archive is retained in the user's private FVDS project Library; this public branch records the conclusion only. Any future publication of experiment source requires a separate provenance review.
+
+## Published experiment snapshot (2026-10-30)
+
+The provenance review mentioned above was carried out and passed: the R14.1 change was re-screened with the repository's own public-patch checker at its base commit (`public patch OK: 23 file(s), 1151 added line(s), no table payload`), and the probe sources were checked separately for private table headers, base64 payloads and compressed blobs. The result is published as a read-only historical snapshot under [`fvds-r14.1-archive/`](fvds-r14.1-archive/README.md), together with the per-file hashes. It is still not part of the build.
