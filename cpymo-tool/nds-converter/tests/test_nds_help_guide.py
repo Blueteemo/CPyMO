@@ -26,7 +26,7 @@ class NDSHelpGuideTests(unittest.TestCase):
         panel = self.panel
         for msg in ("A / DOWN：继续", "UP：历史对话", "X：菜单 · B：返回",
                     "B：按住隐藏文字", "Y：隐藏／唤回辅助屏",
-                    "R：快进 · L：切换模式",
+                    "R：快进 · L：切换显示模式",
                     "上屏游戏 / 下屏游戏 / 增强双屏",
                     "START：快速保存  SELECT：快速读取"):
             self.assertIn(f'nds_ui("{msg}")', panel, msg)
@@ -45,7 +45,7 @@ class NDSHelpGuideTests(unittest.TestCase):
             panel
         )
         self.assertEqual([int(y) for _, y, _ in positions],
-                         [32, 50, 68, 86, 104, 122, 140, 158])
+                         [32, 50, 68, 86, 104, 122, 140, 158, 50, 68, 86, 104, 122, 158])
         for _, y, max_x in positions:
             if int(y) < 114:
                 self.assertLessEqual(int(max_x), 183)
@@ -59,17 +59,17 @@ class NDSHelpGuideTests(unittest.TestCase):
             '#include "ui-language-extra.h"', 1
         )[0]
         pair_count = len(re.findall(r'\{"(?:[^"\\]|\\.)*","(?:[^"\\]|\\.)*"\}', section))
-        self.assertEqual(pair_count, 72)
-        self.assertIn("extra_ui[2][72]", self.extra)
+        self.assertEqual(pair_count, 89)
+        self.assertIn("extra_ui[2][89]", self.extra)
         for value in ("A / DOWN：继续", "UP：历史对话",
-                      "R：快进 · L：切换模式",
+                      "R：快进 · L：切换显示模式",
                       "上屏游戏 / 下屏游戏 / 增强双屏",
                       "START：快速保存  SELECT：快速读取", "SELECT：快速读取"):
             self.assertIn(f'{{"{value}",', section)
         cht = '{"正在讀取' + self.extra.split('{"正在讀取', 1)[1].split('{"ゲーム一覧', 1)[0]
         jap = '{"ゲーム一覧' + self.extra.split('{"ゲーム一覧', 1)[1].split("static error_t jp_saved", 1)[0]
         for localized in (cht, jap):
-            self.assertEqual(len(re.findall(r'"(?:[^"\\]|\\.)*"', localized)), 72)
+            self.assertEqual(len(re.findall(r'"(?:[^"\\]|\\.)*"', localized)), 89)
 
 
 if __name__ == "__main__":
