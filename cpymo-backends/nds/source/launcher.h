@@ -237,8 +237,8 @@ static void launcher_failure_hint(const char* message,int error,const char* hint
 static void launcher_failure(const char* message,int error){launcher_failure_hint(message,error,"按 B 返回游戏资料库");}
 static void launcher_library_clock(u16* pixels,bool erase){
  /* Header-only minute patch: never re-read game metadata or repaint the list. */
- if(erase)for(int y=4;y<22;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
- nds_clock_paint_impl(pixels,200,4,RGB15(26,28,30),false);
+ if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
+ nds_clock_paint_impl(pixels,200,6,RGB15(26,28,30),false);
 }
 static void launcher_draw(const char* message){
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
