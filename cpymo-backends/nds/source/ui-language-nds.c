@@ -106,7 +106,24 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"START：快速保存  SELECT：快速读取","START: Save / SELECT: Load"},
  {"SELECT：快速读取","SELECT: Quick load"},
  {"退出到游戏库","Exit to library"},
- {"确定退出到游戏库？\n未保存的进度将丢失。","Exit to library?\nUnsaved progress will be lost."}
+ {"确定退出到游戏库？\n未保存的进度将丢失。","Exit to library?\nUnsaved progress will be lost."},
+ {"主题设置","Theme settings"},
+ {"默认","Default"},
+ {"主题已保存","Theme saved"},
+ {"游戏列表已刷新","Game list refreshed"},
+ {"A / START 启动 · 轻触两次启动","A/START: Start · Tap twice"},
+ {"上下选择 · B 关于 · X 语言 · Y 主题","UP/DOWN · B Info · X Lang · Y Theme"},
+ {"UP / DOWN：选择项目","UP / DOWN: Choose"},
+ {"A：确认","A: Confirm"},
+ {"B：返回","B: Back"},
+ {"标题菜单","Title menu"},
+ {"当前显示：上屏游戏","Display: Upper game"},
+ {"当前显示：下屏游戏","Display: Lower game"},
+ {"当前显示：增强双屏","Display: Dual screen"},
+ {"方向键选择 · A 确定 · B 返回","D-pad: Pick · A: Set · B: Back"},
+ {"R：快进 · L：切换显示模式","R: Skip · L: Cycle display"},
+ {"L：切换显示模式","L: Cycle display mode"},
+ {"NDS 移植：千岚之夏（Blueteemo）","NDS port: 千岚之夏 (Blueteemo)"}
 };
 #include "ui-language-extra.h"
 int nds_language_choice_get(void){return preference;}
