@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1-test",
   "cache_format": 6,
   "video_policy": "1.2 default GUI/CLI: FFmpeg source MP4/AVI/MKV/MOV to playable NVL1 PCM; NVA1 NAR2 optional; explicit skip available. Game/device/video compatibility is not universal.",
   "baseline": "0.5.6.3-test",
