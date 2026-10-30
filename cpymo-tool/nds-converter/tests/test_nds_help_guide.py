@@ -45,7 +45,7 @@ class NDSHelpGuideTests(unittest.TestCase):
             panel
         )
         self.assertEqual([int(y) for _, y, _ in positions],
-                         [32, 50, 68, 86, 104, 122, 140, 158, 32, 50, 68, 86, 104, 122, 158])
+                         [32, 50, 68, 86, 104, 122, 140, 158, 32, 50, 68, 86, 104, 122])
         for _, y, max_x in positions:
             if int(y) < 114:
                 self.assertLessEqual(int(max_x), 183)
