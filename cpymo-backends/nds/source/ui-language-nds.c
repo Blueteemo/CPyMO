@@ -112,7 +112,7 @@ static const struct {const char* zh;const char* en;} strings[]={
  {"主题已保存","Theme saved"},
  {"游戏列表已刷新","Game list refreshed"},
  {"A / START 启动 · 轻触两次启动","A/START: Start · Tap twice"},
- {"上下选择 · B 关于 · X 语言 · Y 主题","UP/DOWN · B Info · X Lang · Y Theme"},
+ {"上下选择 · B 关于 · X 语言 · Y 主题","UP/DOWN · B Info · X Lang · Y Color"},
  {"UP / DOWN：选择项目","UP / DOWN: Choose"},
  {"A：确认","A: Confirm"},
  {"B：返回","B: Back"},
