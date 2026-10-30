@@ -11,6 +11,7 @@ on:
       - '.github/ci-requests/nds.txt'
       - 'cpymo-backends/nds/source/**'
       - 'cpymo-backends/nds/VERSION'
+      - 'cpymo-tool/nds-converter/tests/**'
       - '.github/workflows/nds.yml'
   pull_request:
     paths:
