@@ -39,7 +39,7 @@ class NDSHelpGuideTests(unittest.TestCase):
     def test_landmarks_and_conservative_clip_areas_unchanged(self):
         panel = self.panel
         self.assertIn("launcher_game_icon(&launcher_games[launcher_selected],196,40,true)", panel)
-        self.assertIn("nds_clock_paint(framebuffer,196,96,", panel)
+        self.assertIn("nds_clock_paint_impl(framebuffer,196,96,", panel)
         positions = re.findall(
             r'launcher_text\(nds_ui\("([^"]+)"\),12,(\d+),(?:white|accent|muted),(\d+)\)',
             panel
