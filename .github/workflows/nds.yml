@@ -6,8 +6,12 @@ on:
   push:
     branches:
       - 'codex/nds-v1.2-integration'
+      - 'codex/nds-v1.2.1-test-20261030'
     paths:
       - '.github/ci-requests/nds.txt'
+      - 'cpymo-backends/nds/source/**'
+      - 'cpymo-backends/nds/VERSION'
+      - '.github/workflows/nds.yml'
   pull_request:
     paths:
       - 'cpymo/**'
@@ -40,6 +44,8 @@ jobs:
             dkp-pacman -Syu --noconfirm --needed libnds libfat-nds maxmod-nds calico ndstool
           fi
           dkp-pacman -Q devkitARM libnds libfat-nds maxmod-nds calico ndstool
+      - name: Refresh four-language UI glyphs for v1.2.1
+        run: python3 cpymo-backends/nds/tools/generate-ui-font.py
       - name: Build original DS ROM
         run: python3 cpymo-backends/nds/build.py
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
@@ -59,6 +65,20 @@ jobs:
         with:
           name: CPyMO-for-DSi-Experiment
           path: cpymo-backends/nds/cpymo-dsi-experiment.nds
+      - name: Assemble official-background universal v1.2.1 test ROM
+        if: github.ref_name == 'codex/nds-v1.2.1-test-20261030'
+        run: |
+          mkdir -p out-v121
+          python3 cpymo-backends/nds/tools/patch-rom-bg.py --rom cpymo-backends/nds/cpymo-dsi-experiment.nds --art cpymo-backends/nds/assets/nds-dual-bg.rgb555 --output out-v121/CPyMO-for-NDS-v1.2.1-test.nds
+          python3 cpymo-backends/nds/tools/verify-release-artifact.py --rom out-v121/CPyMO-for-NDS-v1.2.1-test.nds
+          sha256sum out-v121/CPyMO-for-NDS-v1.2.1-test.nds > out-v121/SHA256SUMS.txt
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        if: github.ref_name == 'codex/nds-v1.2.1-test-20261030'
+        with:
+          name: CPyMO-NDS-v1.2.1-universal-TEST
+          path: out-v121/
+          retention-days: 30
+          if-no-files-found: error
   converter:
     runs-on: ubuntu-latest
     steps:
@@ -84,6 +104,7 @@ jobs:
           print('CI FFmpeg wheel binary:',link.resolve())
           PY
           fi
+      - run: python cpymo-backends/nds/tools/generate-ui-font.py
       - run: python -m unittest discover -s cpymo-tool/nds-converter/tests -v
 
   portable-windows:
