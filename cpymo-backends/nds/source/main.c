@@ -328,7 +328,7 @@ error_t cpymo_backend_image_load_with_mask(cpymo_backend_image *out,void *px,voi
 void cpymo_backend_image_free(cpymo_backend_image im){if(im){nds_scene_release();Image* image=im;if(--image->refs)return;free(image->opaque);free(image->bounds);free(image->px);free(image->mask);free(image);}}
 /* Independent red/blue lanes are ten bits apart: sums stay <=31*32.
    Exact RGB555 blend, using two multiplies for both lanes instead of four. */
-static u16 blend(u16 old,u16 col,int a){if(a>=32)return col;if(a<=0)return old;unsigned rb=(((old&0x7c1f)*(32-a)+(col&0x7c1f)*a)>>5)&0x7c1f;unsigned g=(((old&0x03e0)*(32-a)+(col&0x03e0)*a)>>5)&0x03e0;return rb|g|BIT(15);}
+static u16 blend(u16 old,u16 col,int a){if(a>=32)return col;if(a<=0)return old;unsigned rb=(((old&0x7c1f)*(32-a)+(col&0x7c1f)*a+0x4010u)>>5)&0x7c1f;unsigned g=(((old&0x03e0)*(32-a)+(col&0x03e0)*a+0x0200u)>>5)&0x03e0;return rb|g|BIT(15);}
 static void image_draw_reference(float dx,float dy,float dw,float dh,cpymo_backend_image image,int sx,int sy,int sw,int sh,float alpha,enum cpymo_backend_image_draw_type type){
  if(scene_collect){
   if(scene_count>=64){scene_overflow=true;return;}
@@ -579,6 +579,7 @@ volatile unsigned sleep_state[12]={0x4e534c31};
 extern void nds_audio_suspend(void);
 extern void nds_audio_resume(void);
 static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3];if(!pmMainLoop())exit(0);if(wakes!=sleep_state[3])nds_aux_refresh();}
+#include "theme-nds.h"
 #include "launcher.h"
 #include "aux-screen-nds.h"
 #include "visual-capture-nds.h"
@@ -773,7 +774,7 @@ int main(int argc,char** argv){
     CPyMO preference is only available after the card is mounted. */
  debug_trace=false;nds_language_boot();filter_console_output();launcher_video_init();
  if(!fatInitDefault()){launcher_failure_hint("无法访问存储卡",CPYMO_ERR_CAN_NOT_OPEN_FILE,"请关机后重新启动");launcher_video_show();while(1){nds_power_poll();swiWaitForVBlank();}}
- nds_language_load();nds_global_preferences_load();
+ nds_language_load();nds_global_preferences_load();nds_theme_load();
  /* First visible game-list transition now honors the resolved CPyMO locale,
     including the Chinese default on English/Japanese DSi firmware. */
  launcher_show_splash();
@@ -859,13 +860,15 @@ int main(int argc,char** argv){
   unsigned title_ended=nds_dual_title_observe(&nds_title_gate,
       engine.say.active,cpymo_ui_enabled(&engine),
       engine.select_img.selections!=NULL);
-  if(title_ended && nds_display_mode==2){
+  if(title_ended){
+    if(nds_display_mode==2){
    /* Previous sub LCD held auxiliary help. The upcoming split pass will
       replace it with the real CPyMO dialogue on the same frame. */
    nds_aux_refresh();
    cpymo_engine_request_redraw(&engine);
    redraw=true;
-  }
+    }else if(!debug_trace)launcher_play_panel(NULL);
+   }
  }
  if(skip_override)engine.config_skip_already_read_only=saved_skip_policy;engine_state[1]=err;engine_state[2]++;
  nds_preferences_sync();
