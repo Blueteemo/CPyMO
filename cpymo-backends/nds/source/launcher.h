@@ -22,7 +22,9 @@ static void launcher_scroll_ensure_visible(void){
  else if(launcher_selected>=launcher_scroll_first+4)launcher_scroll_first=launcher_selected-3;
 }
 static u16* launcher_sub;
-static bool launcher_about,launcher_restored,launcher_language_menu;
+static bool launcher_about,launcher_restored,launcher_language_menu,launcher_theme_menu;
+static unsigned launcher_theme_cursor;
+static u64 launcher_refresh_notice_until;
 /* User-facing text describes the *runtime mode*, not a guessed shell
  * model: DSi and DSi XL/LL share the same TWL mode; a DSi can also run
  * homebrew in NTR/DS mode. 16/4 MiB are hardware RAM capacities, not free
@@ -178,8 +180,8 @@ static bool launcher_scrollbar_move_touch(int y){
 }
 static void launcher_scrollbar_draw(void){
  if(launcher_count<=4)return;
- launcher_rect(251,LAUNCHER_SCROLL_Y,4,LAUNCHER_SCROLL_H,RGB15(6,10,14));
- launcher_rect(252,launcher_scroll_thumb_top(),2,launcher_scroll_thumb_height(),RGB15(14,24,30));
+ launcher_rect(251,LAUNCHER_SCROLL_Y,4,LAUNCHER_SCROLL_H,nds_theme_card());
+ launcher_rect(252,launcher_scroll_thumb_top(),2,launcher_scroll_thumb_height(),nds_theme_accent());
 }
 static void launcher_text_mode(const char* text,int x,int y,u16 color,int max_x,unsigned mode){
  const char* p=text;int start=x;while(*p){unsigned cp=decode(&p);if(cp==13)continue;if(cp==10|| (cp=='\\'&&*p=='n')){if(cp=='\\')p++;x=start;y+=17;continue;}if(y>178)break;
@@ -237,8 +239,8 @@ static void launcher_title(const LauncherGame* game,int x,int y,u16 color,int ma
  if(nds_font_choices_available())launcher_line(game->title,x,y,color,max_x,2);
  else if(!launcher_title_bitmap(game,x,y,color))launcher_line(game->title,x,y,color,max_x,0);
 }
-static void launcher_background(void){for(unsigned i=0;i<256*192;i++)framebuffer[i]=RGB15(3,5,8)|BIT(15);}
-static void launcher_header(const char* title){launcher_rect(0,0,256,28,RGB15(5,10,16));launcher_text(title,10,7,RGB15(31,31,31),248);}
+static void launcher_background(void){for(unsigned i=0;i<256*192;i++)framebuffer[i]=nds_theme_bg()|BIT(15);}
+static void launcher_header(const char* title){launcher_rect(0,0,256,28,nds_theme_header());launcher_text(title,10,7,RGB15(31,31,31),248);}
 static void launcher_icon(int x,int y){for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++){u16 c=app_icon[yy*32+xx];if(c)launcher_rect(x+xx,y+yy,1,1,c);}}
 /* ROM-resident glyphs work before FAT or a game's font cache is available. */
 static void launcher_splash_text(const char* text,int y,bool large,u16 color){
@@ -276,8 +278,8 @@ static void launcher_intro(const LauncherGame* game,unsigned line,int x,int y,u1
 static bool nds_aux_clock_suppressed;
 static void nds_clock_patch_aux(bool show){
  if(debug_trace||!launcher_sub||nds_aux_hidden())return;
- for(unsigned y=96;y<114;y++)for(unsigned x=196;x<244;x++)launcher_sub[y*256+x]=RGB15(3,5,8)|BIT(15);
- if(show){nds_clock_paint(launcher_sub,196,96,RGB15(21,24,27));clock_state[7]++;}
+ for(unsigned y=96;y<114;y++)for(unsigned x=196;x<244;x++)launcher_sub[y*256+x]=nds_theme_bg()|BIT(15);
+ if(show){nds_clock_paint_impl(launcher_sub,196,96,RGB15(21,24,27),false);clock_state[7]++;}
 }
 static void nds_clock_sync_aux_visibility(void){
  bool suppress=nds_menu_clock_visible;
@@ -288,29 +290,39 @@ static void launcher_play_panel(const char* message){
  /* Enhanced mode owns the sub LCD; never repaint it with the classic help UI. */
  if(nds_dual_active())return;
  if(nds_aux_hidden()){if(launcher_sub)dmaFillHalfWords(BIT(15),launcher_sub,256*192*2);return;}
- u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
+ u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=nds_theme_accent();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  /* Physical touch is a native game coordinate only in classic-lower.
     Do not imply the help LCD is a universal virtual A button. D-pad
     story shortcuts use the physical controller's UP/DOWN labels.
     Keep the game icon at x=196,y=40 and clock at x=196,y=96 untouched. */
- launcher_text(nds_ui("A / DOWN：继续"),12,32,white,183);
- launcher_text(nds_ui("UP：历史对话"),12,50,white,183);
- launcher_text(nds_ui("X：菜单 · B：返回"),12,68,white,183);
+ if(nds_dual_title_allow_split(&nds_title_gate)){
+  launcher_text(nds_ui("A / DOWN：继续"),12,32,white,183);
+  launcher_text(nds_ui("UP：历史对话"),12,50,white,183);
+  launcher_text(nds_ui("X：菜单 · B：返回"),12,68,white,183);
+  launcher_text(nds_ui("B：按住隐藏文字"),12,86,white,183);
+  launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,104,white,183);
+  launcher_text(nds_ui("R：快进 · L：切换显示模式"),12,122,white,245);
+  launcher_text(nds_ui("上屏游戏 / 下屏游戏 / 增强双屏"),12,140,accent,245);
+  launcher_text(nds_ui("START：快速保存  SELECT：快速读取"),12,158,muted,245);
+ }else{
+  launcher_text(nds_ui("标题菜单"),12,32,accent,183);
+  launcher_text(nds_ui("UP / DOWN：选择项目"),12,50,white,183);
+  launcher_text(nds_ui("A：确认"),12,68,white,183);
+  launcher_text(nds_ui("B：返回"),12,86,white,183);
+  launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,104,white,183);
+  launcher_text(nds_ui("L：切换显示模式"),12,122,white,245);
+  const char* active=nds_display_mode==0?"当前显示：上屏游戏":
+                     nds_display_mode==1?"当前显示：下屏游戏":"当前显示：增强双屏";
+  launcher_text(nds_ui(active),12,158,accent,245);
+ }
  if(launcher_count)launcher_game_icon(&launcher_games[launcher_selected],196,40,true);
- launcher_text(nds_ui("B：按住隐藏文字"),12,86,white,183);
- launcher_text(nds_ui("Y：隐藏／唤回辅助屏"),12,104,white,183);
- launcher_text(nds_ui("R：快进 · L：切换模式"),12,122,white,245);
- launcher_text(nds_ui("上屏游戏 / 下屏游戏 / 增强双屏"),12,140,accent,245);
- /* The two shortcuts fit on one line in the native small bitmap font;
-    leave a calm last row, used only for save/load/action feedback. */
- launcher_text(nds_ui("START：快速保存  SELECT：快速读取"),12,158,muted,245);
  /* Keep the last help row useful without placeholder text: status overlays
     native runtime mode metadata and resets when its toast expires. */
  launcher_text(message&&*message?nds_ui(message):nds_runtime_mode_label(),
                12,176,message&&*message?accent:muted,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
- if(!nds_aux_clock_suppressed)nds_clock_paint(framebuffer,196,96,RGB15(21,24,27));clock_state[6]++;
+ if(!nds_aux_clock_suppressed)nds_clock_paint_impl(framebuffer,196,96,RGB15(21,24,27),false);clock_state[6]++;
  launcher_publish(launcher_sub);
 }
 static void nds_clock_poll(void){
@@ -370,32 +382,32 @@ static void launcher_failure_hint(const char* message,int error,const char* hint
  if(nds_playing){lcdMainOnTop();screens_swapped=false;presentation_state[1]=0;nds_aux_refresh();}
  error_ui_state[1]=fatal;error_ui_state[2]=(unsigned)error;error_ui_state[3]=nds_language_effective();
  error_ui_state[5]=error_ui_state[6]=error_ui_state[7]=0;
- launcher_background();launcher_rect(0,0,256,28,RGB15(5,10,16));
+ launcher_background();launcher_rect(0,0,256,28,nds_theme_header());
  launcher_rom_box("CPyMO for NDS",10,7,236,28,false,RGB15(31,31,31));launcher_icon(112,43);
  launcher_rom_center(nds_ui(message),90,true,RGB15(31,31,31));
  char code[64];snprintf(code,sizeof code,nds_ui("错误码：%d"),error);
  launcher_rom_center(code,143,false,RGB15(31,23,18));launcher_publish(vram);
- launcher_background();launcher_rect(0,0,256,28,RGB15(5,10,16));
+ launcher_background();launcher_rect(0,0,256,28,nds_theme_header());
  launcher_rom_box(nds_ui("处理建议"),10,7,236,28,false,RGB15(31,31,31));
  const char* advice=fatal?"关机后重新插好TF卡。\n检查读卡与R4内核文件，再重试。\n此错误码不代表TF卡已损坏。":"请检查转换结果和游戏资源。\n原始错误码已保留，便于反馈。";
  launcher_rom_box(nds_ui(advice),16,46,224,155,false,RGB15(27,28,30));
- launcher_rom_box(nds_ui(hint),16,169,224,192,false,RGB15(10,24,31));launcher_publish(launcher_sub);error_ui_state[4]++;
+ launcher_rom_box(nds_ui(hint),16,169,224,192,false,nds_theme_accent());launcher_publish(launcher_sub);error_ui_state[4]++;
 }
 static void launcher_failure(const char* message,int error){launcher_failure_hint(message,error,"按 B 返回游戏资料库");}
 static void launcher_library_clock(u16* pixels,bool erase){
  /* Header-only minute patch: never re-read game metadata or repaint the list. */
  /* Center the time numerals on the same visible baseline as the heading.
      Only modify this 48x18 patch, leaving the R7 list geometry unchanged. */
- if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=RGB15(5,10,16)|BIT(15);
+ if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=nds_theme_header()|BIT(15);
  nds_clock_paint_impl(pixels,200,6,RGB15(26,28,30),false);
 }
 static void launcher_draw(const char* message){
  launcher_scroll_ensure_visible();
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
- u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=RGB15(10,24,31);
+ u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=nds_theme_accent();
  launcher_selected_icon();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
- if(launcher_about){launcher_icon(12,40);launcher_text(nds_ui("CPyMO / PYMO"),53,47,white,246);launcher_text(nds_ui("NDS 平台移植：千岚之夏"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
+ if(launcher_about){launcher_icon(12,40);launcher_text("PyMO / CPyMO",53,47,white,246);launcher_text(nds_ui("NDS 移植：千岚之夏（Blueteemo）"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
  else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,53,accent,245);
  launcher_title(game,12,90,white,245);
  launcher_intro(game,1,12,114,RGB15(26,27,29));launcher_intro(game,2,12,132,RGB15(26,27,29));
@@ -406,13 +418,27 @@ static void launcher_draw(const char* message){
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
  if(!launcher_count||launcher_about)launcher_text(nds_runtime_mode_label(),12,177,muted,245);launcher_publish(vram);
  launcher_background();
- if(!launcher_about&&!launcher_language_menu){
-  launcher_rect(0,0,256,28,RGB15(5,10,16));
+ if(!launcher_about&&!launcher_language_menu&&!launcher_theme_menu){
+  launcher_rect(0,0,256,28,nds_theme_header());
   launcher_line(nds_ui("选择游戏"),10,7,white,194,1);
   nds_clock_sample();launcher_library_clock(framebuffer,false);
- }else launcher_header(nds_ui(launcher_about?"关于与许可":"界面语言"));
- if(launcher_language_menu){
- for(unsigned i=0;i<NDS_LANG_COUNT;i++){int y=34+i*25;launcher_rect(8,y,240,23,i==launcher_language_cursor?RGB15(7,15,23):RGB15(4,7,11));launcher_text(nds_language_choice_name(i),18,y+3,white,240);}
+ }else launcher_header(nds_ui(launcher_theme_menu?"主题设置":launcher_about?"关于与许可":"界面语言"));
+ if(launcher_theme_menu){
+  for(unsigned i=0;i<2;i++){
+   int x=i?131:8;
+   launcher_rect(x,33,i?117:115,22,launcher_theme_cursor==i?nds_theme_selected():nds_theme_card());
+   launcher_text(nds_theme_choice_name(i),x+30,36,white,x+(i?114:112));
+  }
+  for(unsigned i=0;i<16;i++){
+   int x=8+(i%4)*61,y=60+(i/4)*24;
+   if(launcher_theme_cursor==i+2)launcher_rect(x-2,y-2,61,25,white);
+   launcher_rect(x,y,57,21,nds_theme_color(i));
+  }
+  launcher_text(nds_theme_choice_name(launcher_theme_cursor),12,156,accent,245);
+  launcher_text(nds_ui("方向键选择 · A 确定 · B 返回"),7,174,muted,250);
+ }
+ else if(launcher_language_menu){
+ for(unsigned i=0;i<NDS_LANG_COUNT;i++){int y=34+i*25;launcher_rect(8,y,240,23,i==launcher_language_cursor?nds_theme_selected():nds_theme_card());launcher_text(nds_language_choice_name(i),18,y+3,white,240);}
  launcher_text(nds_ui("上下选择 · A 确定 · B 返回"),7,169,accent,250);
  }
  else if(launcher_about){
@@ -421,13 +447,13 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
-  launcher_rect(6,y,244,28,index==launcher_selected?RGB15(7,15,23):RGB15(4,7,11));launcher_game_icon(game,10,y+2,false);
+  launcher_rect(6,y,244,28,index==launcher_selected?nds_theme_selected():nds_theme_card());launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
  /* Preserve the original 28px game cards, touch hitboxes and 18px hint row spacing.
     Move both hint lines 4px up; do not redesign the UI. */
-  launcher_text(message&&*message?nds_ui(message):nds_ui("A 启动 · 上下选择 · SELECT 刷新"),7,156,accent,250);
-  launcher_text(nds_ui("轻触两次启动 · B 关于 · X 语言"),7,174,muted,250);}
+  launcher_text(message&&*message?nds_ui(message):nds_ui("A / START 启动 · 轻触两次启动"),7,156,accent,250);
+  launcher_text(nds_ui("上下选择 · B 关于 · X 语言 · Y 主题"),7,174,muted,250);}
  launcher_publish(launcher_sub);launcher_state[3]=launcher_selected;frontend_state[1]=launcher_about;
  if(splash_state[1]){splash_state[1]=0;splash_state[3]++;}
 }
@@ -438,12 +464,44 @@ static void launcher_choose(char* out,size_t size,const char* hint){
  nds_playing=false;nds_aux_override=false;nds_aux_refresh();lcdMainOnTop();screens_swapped=false;presentation_state[1]=0;presentation_state[2]=0;launcher_icon_path[0]=0;
  free(game_glyphs);game_glyphs=NULL;game_glyph_count=0;launcher_font_path[0]=0;free_pixel_fonts();clear_menu_images();nds_cache_enabled=false;
  nds_menu_clock_visible=false;clock_state[9]=0;
- launcher_about=false;launcher_language_menu=false;launcher_scroll_dragging=false;launcher_state[1]=1;launcher_scan(hint);launcher_draw(NULL);launcher_video_show();launcher_release_keys();
+ launcher_about=false;launcher_language_menu=false;launcher_theme_menu=false;launcher_refresh_notice_until=0;launcher_scroll_dragging=false;launcher_state[1]=1;launcher_scan(hint);launcher_draw(NULL);launcher_video_show();launcher_release_keys();
  while(1){nds_power_poll();swiWaitForVBlank();scanKeys();int down=keysDown(),held=keysHeld();bool redraw=false,start=false;
  if(!(held&KEY_TOUCH))launcher_scroll_dragging=false;
- if(nds_clock_sample()&&!launcher_about&&!launcher_language_menu)launcher_library_clock(launcher_sub,true);
- if(down&KEY_X){launcher_language_menu=!launcher_language_menu;launcher_about=false;launcher_language_cursor=nds_language_choice_get();launcher_draw(NULL);continue;}
- if(down&KEY_B){if(launcher_language_menu)launcher_language_menu=false;else launcher_about=!launcher_about;launcher_draw(NULL);continue;}
+ if(nds_clock_sample()&&!launcher_about&&!launcher_language_menu&&!launcher_theme_menu)launcher_library_clock(launcher_sub,true);
+ if(down&KEY_X){launcher_language_menu=!launcher_language_menu;launcher_theme_menu=false;launcher_about=false;launcher_language_cursor=nds_language_choice_get();launcher_draw(NULL);continue;}
+ if(down&KEY_Y){launcher_theme_menu=!launcher_theme_menu;launcher_language_menu=false;launcher_about=false;launcher_theme_cursor=nds_theme_get();launcher_draw(NULL);continue;}
+ if(down&KEY_B){if(launcher_language_menu)launcher_language_menu=false;else if(launcher_theme_menu)launcher_theme_menu=false;else launcher_about=!launcher_about;launcher_draw(NULL);continue;}
+ if(launcher_theme_menu){
+  if(down&KEY_UP){
+   if(launcher_theme_cursor>=2&&launcher_theme_cursor<=5)launcher_theme_cursor=(launcher_theme_cursor-2)/2;
+   else if(launcher_theme_cursor>=6)launcher_theme_cursor-=4;
+  }
+  if(down&KEY_DOWN){
+   if(launcher_theme_cursor<2)launcher_theme_cursor=launcher_theme_cursor?4:2;
+   else if(launcher_theme_cursor<14)launcher_theme_cursor+=4;
+  }
+  if(down&KEY_LEFT){
+   if(launcher_theme_cursor==1)launcher_theme_cursor=0;
+   else if(launcher_theme_cursor>=3&&(launcher_theme_cursor-2)%4)launcher_theme_cursor--;
+  }
+  if(down&KEY_RIGHT){
+   if(launcher_theme_cursor==0)launcher_theme_cursor=1;
+   else if(launcher_theme_cursor>=2&&(launcher_theme_cursor-2)%4!=3)launcher_theme_cursor++;
+  }
+  if(down&KEY_TOUCH){
+   touchPosition t;touchRead(&t);
+   if(t.py>=33&&t.py<55){if(t.px>=8&&t.px<123)launcher_theme_cursor=0;else if(t.px>=131&&t.px<248)launcher_theme_cursor=1;}
+   else if(t.py>=60&&t.py<153&&t.px>=8&&t.px<248){
+    unsigned col=(t.px-8)/61,row=(t.py-60)/24;
+    if(col<4&&row<4)launcher_theme_cursor=2+row*4+col;
+   }
+  }
+  if(down&KEY_A){
+   const char* msg=nds_theme_set(launcher_theme_cursor)?"主题已保存":"设置保存失败";
+   launcher_theme_menu=false;launcher_draw(msg);continue;
+  }
+  launcher_draw(NULL);continue;
+ }
  if(launcher_language_menu){
   if(!(down&(KEY_UP|KEY_DOWN|KEY_A)))continue;
   if(down&KEY_UP)launcher_language_cursor=(launcher_language_cursor+NDS_LANG_COUNT-1)%NDS_LANG_COUNT;
@@ -452,7 +510,7 @@ static void launcher_choose(char* out,size_t size,const char* hint){
   launcher_draw(notice);continue;
  }
  if(launcher_about)continue;
- if(down&KEY_SELECT){launcher_font_path[0]=0;launcher_scan(hint);redraw=true;}
+ if(down&KEY_SELECT){launcher_font_path[0]=0;launcher_scan(hint);launcher_refresh_notice_until=tickGetCount()+2*TICK_FREQ;redraw=true;}
  if(launcher_count){if(down&KEY_UP){launcher_selected=(launcher_selected+launcher_count-1)%launcher_count;redraw=true;}if(down&KEY_DOWN){launcher_selected=(launcher_selected+1)%launcher_count;redraw=true;}
  if(down&KEY_LEFT){launcher_selected=launcher_selected>=4?launcher_selected-4:0;redraw=true;}if(down&KEY_RIGHT){launcher_selected+=4;if(launcher_selected>=launcher_count)launcher_selected=launcher_count-1;redraw=true;}
  if(down&KEY_TOUCH){touchPosition t;touchRead(&t);
@@ -466,8 +524,9 @@ static void launcher_choose(char* out,size_t size,const char* hint){
   touchPosition t;touchRead(&t);
   if(launcher_scrollbar_move_touch(t.py))redraw=true;
  }
- if(down&KEY_A)start=true;
+ if(down&(KEY_A|KEY_START))start=true;
  if(start){LauncherGame* game=&launcher_games[launcher_selected];if(game->status==1){launcher_remember();snprintf(out,size,"%s",game->path);launcher_release_keys();launcher_state[1]=0;launcher_state[4]++;return;}launcher_draw("请在电脑上先转换或修复缓存");continue;}}
- if(redraw)launcher_draw(NULL);
+ if(launcher_refresh_notice_until&&tickGetCount()>=launcher_refresh_notice_until){launcher_refresh_notice_until=0;redraw=true;}
+ if(redraw)launcher_draw(launcher_refresh_notice_until?"游戏列表已刷新":NULL);
  }
 }
