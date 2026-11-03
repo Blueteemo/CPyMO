@@ -31,8 +31,11 @@ int main(void){
  CHECK(!nds_dual_title_observe(&gate,0,1,0)); /* later X menu */
  CHECK(nds_dual_title_allow_split(&gate));
  CHECK(!nds_dual_title_observe(&gate,1,0,0)); /* not twice */
- nds_dual_title_reset(&gate); /* a newly launched game is independent */
+ nds_dual_title_reset(&gate); /* a newly launched or restarted game */
  CHECK(!nds_dual_title_allow_split(&gate));
+ CHECK(!nds_dual_title_observe(&gate,0,0,1)); /* title selection again */
+ CHECK(nds_dual_title_observe(&gate,1,0,0)); /* next story */
+ CHECK(nds_dual_title_allow_split(&gate));
  return 0;
 }
 """

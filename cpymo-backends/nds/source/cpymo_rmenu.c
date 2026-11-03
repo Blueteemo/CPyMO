@@ -136,6 +136,7 @@ static void cpymo_rmenu_delete(cpymo_engine *e, void *ui_data)
 	cpymo_select_img_free(&r->menu);
 }
 
+extern void nds_request_title_guide_reset(void);
 error_t cpymo_rmenu_restart_game(cpymo_engine *e, void *data, bool confirm)
 {
 	if (!confirm) return CPYMO_ERR_SUCC;
@@ -146,7 +147,7 @@ error_t cpymo_rmenu_restart_game(cpymo_engine *e, void *data, bool confirm)
 	cpymo_engine_free(e);
 	error_t err = cpymo_engine_init(e, gamedir);
 	free(gamedir);
-
+	if (!err) nds_request_title_guide_reset();
 	return err;
 }
 

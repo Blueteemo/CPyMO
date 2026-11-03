@@ -38,5 +38,38 @@ class NdsV121Tests(unittest.TestCase):
   self.assertIn('0x4010u',main)
   self.assertIn('0x0200u',main)
 
+ def test_nondefault_colors_are_true_theme_families(self):
+  theme=load("theme-nds.h")
+  self.assertIn('nds_theme_tint(unsigned idx,unsigned strength,unsigned neutral)',theme)
+  for expected in ('i<0?RGB15(3,5,8):nds_theme_tint((unsigned)i,6,1)',
+                   'i<0?RGB15(5,10,16):nds_theme_tint((unsigned)i,11,3)',
+                   'i<0?RGB15(7,15,23):nds_theme_tint((unsigned)i,11,4)'):
+   self.assertIn(expected,theme)
+  mat=re.search(r'nds_ipl_theme_rgb\[16\]\[3\]=\{(.*?)\};',theme,re.S)
+  palette=[tuple(map(int,x)) for x in re.findall(r'\{(\d+),(\d+),(\d+)\}',mat.group(1))]
+  def luminance(rgb):
+   def linear(x):
+    v=x/31
+    return v/12.92 if v<=0.04045 else ((v+.055)/1.055)**2.4
+   return sum(a*linear(b) for a,b in zip((.2126,.7152,.0722),rgb))
+  for color in palette:
+   bg=tuple(1+(c*6+15)//31 for c in color)
+   selected=tuple(4+(c*11+15)//31 for c in color)
+   self.assertNotEqual(bg,(3,5,8))
+   self.assertGreaterEqual(1.05/(luminance(selected)+.05),4.5)
+  red=tuple(1+(c*6+15)//31 for c in palette[2])
+  self.assertGreater(red[0],red[2]) # no navy overlay on the red theme
+ def test_default_and_auto_labels_are_centered(self):
+  launcher=load("launcher.h")
+  self.assertIn('launcher_text_pixel_width(',launcher)
+  self.assertIn('launcher_text_centered(nds_theme_choice_name(i),x,w,36,white)',launcher)
+  self.assertNotIn('nds_theme_choice_name(i),x+30',launcher)
+ def test_restart_callback_rearms_title_guide(self):
+  main=load("main.c");rmenu=load("cpymo_rmenu.c")
+  self.assertIn('if (!err) nds_request_title_guide_reset();',rmenu)
+  self.assertIn('if(!err&&nds_title_restart_pending)',main)
+  self.assertIn('nds_dual_title_reset(&nds_title_gate);',main)
+  self.assertIn('nds_aux_refresh();',main)
+
 if __name__=="__main__":
  unittest.main()

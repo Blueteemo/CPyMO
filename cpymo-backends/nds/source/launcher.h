@@ -189,6 +189,20 @@ static void launcher_text_mode(const char* text,int x,int y,u16 color,int max_x,
  for(int yy=0;yy<(fallback>=0?16:(int)font_height(mode));yy++){unsigned bits=fallback>=0?ui_fallback_rows[fallback][yy]:text_row(mode,g,yy);for(int xx=0;xx<(fallback>=0?16:(int)font_width(mode));xx++)if(bits&(1u<<xx))launcher_rect(x+xx,y+yy,1,1,color);}x+=advance;}
 }
 static void launcher_text(const char* text,int x,int y,u16 color,int max_x){launcher_text_mode(text,x,y,color,max_x,nds_font_choices_available()?1:0);}
+static int launcher_text_pixel_width(const char* text){
+ unsigned mode=nds_font_choices_available()?1:0;int width=0;
+ const char* p=text;
+ while(*p){unsigned cp=decode(&p);int g=text_glyph(mode,cp);
+  if(g<0)g=text_glyph(mode,'?');
+  if(g>=0)width+=(int)text_advance(mode,g);
+ }
+ return width;
+}
+static void launcher_text_centered(const char* text,int cell_x,int cell_width,int y,u16 color){
+ int x=cell_x+(cell_width-launcher_text_pixel_width(text))/2;
+ if(x<cell_x+3)x=cell_x+3;
+ launcher_text(text,x,y,color,cell_x+cell_width-3);
+}
 static void launcher_publish(u16* dest){DC_FlushRange(framebuffer,sizeof framebuffer);dmaCopy(framebuffer,dest,sizeof framebuffer);}
 /* Keep both LCDs black while changing VRAM roles. Old console font/tile data
    must never be exposed as RGB555 pixels, including during FAT/library I/O. */
@@ -240,7 +254,16 @@ static void launcher_title(const LauncherGame* game,int x,int y,u16 color,int ma
  else if(!launcher_title_bitmap(game,x,y,color))launcher_line(game->title,x,y,color,max_x,0);
 }
 static void launcher_background(void){for(unsigned i=0;i<256*192;i++)framebuffer[i]=nds_theme_bg()|BIT(15);}
-static void launcher_header(const char* title){launcher_rect(0,0,256,28,nds_theme_header());launcher_text(title,10,7,RGB15(31,31,31),248);}
+/* Actual firmware swatch on the header trim; original default has none. */
+static void launcher_theme_header_trim(void){
+ int i=nds_theme_active_index();
+ if(i>=0)launcher_rect(0,26,256,2,nds_theme_color((unsigned)i));
+}
+static void launcher_header(const char* title){
+ launcher_rect(0,0,256,28,nds_theme_header());
+ launcher_theme_header_trim();
+ launcher_text(title,10,7,RGB15(31,31,31),248);
+}
 static void launcher_icon(int x,int y){for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++){u16 c=app_icon[yy*32+xx];if(c)launcher_rect(x+xx,y+yy,1,1,c);}}
 /* ROM-resident glyphs work before FAT or a game's font cache is available. */
 static void launcher_splash_text(const char* text,int y,bool large,u16 color){
@@ -279,7 +302,7 @@ static bool nds_aux_clock_suppressed;
 static void nds_clock_patch_aux(bool show){
  if(debug_trace||!launcher_sub||nds_aux_hidden())return;
  for(unsigned y=96;y<114;y++)for(unsigned x=196;x<244;x++)launcher_sub[y*256+x]=nds_theme_bg()|BIT(15);
- if(show){nds_clock_paint_impl(launcher_sub,196,96,RGB15(21,24,27),false);clock_state[7]++;}
+ if(show){nds_clock_paint_impl(launcher_sub,196,96,nds_theme_aux_clock_ink(),false);clock_state[7]++;}
 }
 static void nds_clock_sync_aux_visibility(void){
  bool suppress=nds_menu_clock_visible;
@@ -290,7 +313,7 @@ static void launcher_play_panel(const char* message){
  /* Enhanced mode owns the sub LCD; never repaint it with the classic help UI. */
  if(nds_dual_active())return;
  if(nds_aux_hidden()){if(launcher_sub)dmaFillHalfWords(BIT(15),launcher_sub,256*192*2);return;}
- u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=nds_theme_accent();
+ u16 white=RGB15(31,31,31),muted=nds_theme_muted(),accent=nds_theme_accent();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  /* Physical touch is a native game coordinate only in classic-lower.
     Do not imply the help LCD is a universal virtual A button. D-pad
@@ -322,7 +345,7 @@ static void launcher_play_panel(const char* message){
  launcher_text(message&&*message?nds_ui(message):nds_runtime_mode_label(),
                12,176,message&&*message?accent:muted,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
- if(!nds_aux_clock_suppressed)nds_clock_paint_impl(framebuffer,196,96,RGB15(21,24,27),false);clock_state[6]++;
+ if(!nds_aux_clock_suppressed)nds_clock_paint_impl(framebuffer,196,96,nds_theme_aux_clock_ink(),false);clock_state[6]++;
  launcher_publish(launcher_sub);
 }
 static void nds_clock_poll(void){
@@ -399,18 +422,18 @@ static void launcher_library_clock(u16* pixels,bool erase){
  /* Center the time numerals on the same visible baseline as the heading.
      Only modify this 48x18 patch, leaving the R7 list geometry unchanged. */
  if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=nds_theme_header()|BIT(15);
- nds_clock_paint_impl(pixels,200,6,RGB15(26,28,30),false);
+ nds_clock_paint_impl(pixels,200,6,nds_theme_clock_ink(),false);
 }
 static void launcher_draw(const char* message){
  launcher_scroll_ensure_visible();
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
- u16 white=RGB15(31,31,31),muted=RGB15(19,22,25),accent=nds_theme_accent();
+ u16 white=RGB15(31,31,31),muted=nds_theme_muted(),accent=nds_theme_accent();
  launcher_selected_icon();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  if(launcher_about){launcher_icon(12,40);launcher_text("PyMO / CPyMO",53,47,white,246);launcher_text(nds_ui("NDS 移植：千岚之夏（Blueteemo）"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
  else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,53,accent,245);
  launcher_title(game,12,90,white,245);
- launcher_intro(game,1,12,114,RGB15(26,27,29));launcher_intro(game,2,12,132,RGB15(26,27,29));
+ launcher_intro(game,1,12,114,nds_theme_detail());launcher_intro(game,2,12,132,nds_theme_detail());
  const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,215);
  if(!strncasecmp(game->path,"sd:/",4))launcher_text("SD",220,153,accent,248);
  else if(!strncasecmp(game->path,"fat:/",5))launcher_text("TF",220,153,accent,248);
@@ -420,14 +443,15 @@ static void launcher_draw(const char* message){
  launcher_background();
  if(!launcher_about&&!launcher_language_menu&&!launcher_theme_menu){
   launcher_rect(0,0,256,28,nds_theme_header());
+  launcher_theme_header_trim();
   launcher_line(nds_ui("选择游戏"),10,7,white,194,1);
   nds_clock_sample();launcher_library_clock(framebuffer,false);
  }else launcher_header(nds_ui(launcher_theme_menu?"主题设置":launcher_about?"关于与许可":"界面语言"));
  if(launcher_theme_menu){
   for(unsigned i=0;i<2;i++){
-   int x=i?131:8;
-   launcher_rect(x,33,i?117:115,22,launcher_theme_cursor==i?nds_theme_selected():nds_theme_card());
-   launcher_text(nds_theme_choice_name(i),x+30,36,white,x+(i?114:112));
+   int x=i?131:8,w=i?117:115;
+   launcher_rect(x,33,w,22,launcher_theme_cursor==i?nds_theme_selected():nds_theme_card());
+   launcher_text_centered(nds_theme_choice_name(i),x,w,36,white);
   }
   for(unsigned i=0;i<16;i++){
    int x=8+(i%4)*61,y=60+(i/4)*24;
@@ -447,7 +471,10 @@ static void launcher_draw(const char* message){
 
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
-  launcher_rect(6,y,244,28,index==launcher_selected?nds_theme_selected():nds_theme_card());launcher_game_icon(game,10,y+2,false);
+  launcher_rect(6,y,244,28,index==launcher_selected?nds_theme_selected():nds_theme_card());
+  if(index==launcher_selected&&nds_theme_active_index()>=0)
+   launcher_rect(6,y,3,28,nds_theme_color((unsigned)nds_theme_active_index()));
+  launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();
  /* Preserve the original 28px game cards, touch hitboxes and 18px hint row spacing.

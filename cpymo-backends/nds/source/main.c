@@ -41,8 +41,10 @@ stbi_uc* __wrap_stbi_load_from_callbacks(const stbi_io_callbacks* cb,void* user,
 
 static cpymo_engine engine;
 /* UI requests only set this latch; the main game loop owns cleanup. */
-static bool nds_library_exit_requested;
+static bool nds_library_exit_requested,nds_title_restart_pending;
 void nds_request_exit_to_library(void){nds_library_exit_requested=true;}
+/* Restart callback runs during UI update; only set a latch here. */
+void nds_request_title_guide_reset(void){nds_title_restart_pending=true;}
 
 static u16 framebuffer[256*192] __attribute__((aligned(32)));
 static u16 *vram;
@@ -794,7 +796,7 @@ int main(int argc,char** argv){
  memset(&engine,0,sizeof engine);memset((void*)(engine_state+1),0,sizeof engine_state-sizeof engine_state[0]);
  if(debug_trace)consoleDemoInit();
  nds_cache_enabled=true;
- nds_library_exit_requested=false;
+ nds_library_exit_requested=false;nds_title_restart_pending=false;
  nds_dual_load(game_dir);
  nds_capture_init(game_dir);
  error_t err=(load_game_font(game_dir)&&load_pixel_fonts(game_dir))?CPYMO_ERR_SUCC:CPYMO_ERR_BAD_FILE_FORMAT;
@@ -852,6 +854,15 @@ int main(int argc,char** argv){
   if(trace){fputs("EXIT_TO_LIBRARY\n",trace);fclose(trace);}
   engine_state[1]=0;
   break;
+ }
+ if(!err&&nds_title_restart_pending){
+  nds_title_restart_pending=false;
+  nds_dual_title_reset(&nds_title_gate);
+  nds_menu_clock_visible=false;clock_state[9]=0;
+  nds_aux_clock_suppressed=false;
+  nds_aux_refresh();
+  cpymo_engine_request_redraw(&engine);
+  redraw=true;
  }
  if(!err){
   enforce_text_readability();

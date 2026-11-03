@@ -49,29 +49,45 @@ static const char* nds_theme_choice_name(unsigned v){
  if(v>17)return "?";
  return nds_ipl_theme_names[nds_language_effective()][v-2];
 }
+/* 1.2.1-test2: independent IPL color families rather than blue overlays.
+ * Default is byte-identical to 1.2.0. All 16 IPL colors use neutral, not
+ * blue, shading; selected rows keep >4.5:1 white-text contrast. */
+static u16 nds_theme_tint(unsigned idx,unsigned strength,unsigned neutral){
+ const unsigned char* c=nds_ipl_theme_rgb[idx];
+ return RGB15(neutral+(c[0]*strength+15)/31,
+              neutral+(c[1]*strength+15)/31,
+              neutral+(c[2]*strength+15)/31);
+}
 static u16 nds_theme_bg(void){
- int i=nds_theme_active_index();if(i<0)return RGB15(3,5,8);
- const unsigned char* c=nds_ipl_theme_rgb[i];
- return RGB15(2+c[0]/10,3+c[1]/10,4+c[2]/10);
+ int i=nds_theme_active_index();
+ return i<0?RGB15(3,5,8):nds_theme_tint((unsigned)i,6,1);
 }
 static u16 nds_theme_header(void){
- int i=nds_theme_active_index();if(i<0)return RGB15(5,10,16);
- const unsigned char* c=nds_ipl_theme_rgb[i];
- return RGB15(4+c[0]/7,7+c[1]/7,11+c[2]/7);
+ int i=nds_theme_active_index();
+ return i<0?RGB15(5,10,16):nds_theme_tint((unsigned)i,11,3);
 }
 static u16 nds_theme_card(void){
- int i=nds_theme_active_index();if(i<0)return RGB15(4,7,11);
- const unsigned char* c=nds_ipl_theme_rgb[i];
- return RGB15(3+c[0]/11,5+c[1]/11,8+c[2]/11);
+ int i=nds_theme_active_index();
+ return i<0?RGB15(4,7,11):nds_theme_tint((unsigned)i,9,3);
 }
 static u16 nds_theme_selected(void){
- int i=nds_theme_active_index();if(i<0)return RGB15(7,15,23);
- const unsigned char* c=nds_ipl_theme_rgb[i];
- return RGB15(6+c[0]/6,11+c[1]/6,16+c[2]/6);
+ int i=nds_theme_active_index();
+ return i<0?RGB15(7,15,23):nds_theme_tint((unsigned)i,11,4);
 }
 static u16 nds_theme_accent(void){
- int i=nds_theme_active_index();if(i<0)return RGB15(10,24,31);
- const unsigned char* c=nds_ipl_theme_rgb[i];
- return RGB15(14+c[0]*17/31,14+c[1]*17/31,14+c[2]*17/31);
+ int i=nds_theme_active_index();
+ return i<0?RGB15(10,24,31):nds_theme_tint((unsigned)i,15,16);
+}
+static u16 nds_theme_muted(void){
+ return nds_theme_active_index()<0?RGB15(19,22,25):RGB15(22,22,22);
+}
+static u16 nds_theme_detail(void){
+ return nds_theme_active_index()<0?RGB15(26,27,29):RGB15(27,27,27);
+}
+static u16 nds_theme_clock_ink(void){
+ return nds_theme_active_index()<0?RGB15(26,28,30):RGB15(28,28,28);
+}
+static u16 nds_theme_aux_clock_ink(void){
+ return nds_theme_active_index()<0?RGB15(21,24,27):RGB15(24,24,24);
 }
 #endif
