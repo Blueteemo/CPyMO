@@ -1,0 +1,106 @@
+name: CPyMO 1.2.1 ROM Windows and Sources Preflight (NO PUBLISH)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/nds-v1.2.1-release-candidate
+    paths:
+      - .github/workflows/nds-v121-preflight.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: b8b07a805edc3a6d6bf5504d6c8720e92ed547e9
+      - name: Download frozen first-run artifacts, independently of macOS queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .audit/rom .audit/windows .audit/sources
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC --dir .audit/rom
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE --dir .audit/windows
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-SOURCES-RC-LICENSE-REVIEW --dir .audit/sources
+      - name: Independently inspect archives, executable icon, ROM and licenses
+        run: |
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, zipfile
+          from pathlib import Path
+          root=Path('.audit')
+          rom=root/'rom/cpymo-nds.nds'
+          win=root/'windows/CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip'
+          source=root/'sources/CPyMO-for-NDS-1.2.1-Sources-RC.zip'
+          def sha(data):return hashlib.sha256(data).hexdigest()
+          def load_py(path):
+              spec=importlib.util.spec_from_file_location(path.stem,path)
+              assert spec and spec.loader
+              mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+              return mod
+          source_commit='b8b07a805edc3a6d6bf5504d6c8720e92ed547e9'
+          base=Path('cpymo-backends/nds/tools')
+          verifier=load_py(base/'verify-release-artifact.py')
+          audit=load_py(base/'audit-desktop-release.py')
+          raw=rom.read_bytes()
+          validation=verifier.validate_rom_bytes(raw)
+          assert len(raw)==935936
+          assert sha(raw)=='9046c0440109f6c196ac7af0106625bc5407fbf5128e35beab07d8cff38b8de2'
+          assert validation['single_rom_for_NTR_TWL']
+          assert win.is_file() and source.is_file()
+          results={'status':'PARTIAL-PREFLIGHT-ONLY; macOS and final source freeze NOT checked',
+                   'source_commit':source_commit,
+                   'rom':validation,'archives':{}}
+          with zipfile.ZipFile(win) as z:
+              assert z.testzip() is None
+              files=z.namelist()
+              roms=[name for name in files if name.endswith('/cpymo-nds.nds')
+                    and z.getinfo(name).file_size==len(raw)]
+              assert len(roms)==2,roms
+              assert all(z.read(name)==raw for name in roms)
+              metadata=json.loads(z.read(audit.member(z,'VERSION.json')))
+              assert metadata['version']=='1.2.1'
+              assert metadata['rom_sha256']==sha(raw)
+              exe=z.read(audit.member(z,'Converter/Converter.exe'))
+              icon=audit.ensure_pe_icon(exe)
+              assert set(map(tuple,icon['sizes'])) >= {
+                  (16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)}
+              for label in ('图标来源与署名.txt','PYMO-ORIGINAL-MIT-LICENSE.txt'):
+                  contents=z.read(audit.member(z,label))
+                  assert len(contents)>100 and b'pymo' in contents.lower()
+              ffmpeg=z.read(audit.member(z,'FFmpeg-Corresponding-Source/ffmpeg-7.1.5.tar.xz'))
+              assert sha(ffmpeg)==audit.APPROVED_FFMPEG_SOURCE_SHA256
+              config=z.read(audit.member(z,'FFmpeg-Corresponding-Source/FFMPEG-BUILDCONF.txt')).decode()
+              assert '--disable-gpl' in config and '--disable-nonfree' in config
+              assert '--enable-gpl' not in config and '--enable-nonfree' not in config
+              results['archives']['windows']={'size':win.stat().st_size,'sha256':sha(win.read_bytes()),
+                  'embedded_roms':len(roms),'pe_icon':icon,'ffmpeg_source_sha256':sha(ffmpeg)}
+          with zipfile.ZipFile(source) as z:
+              assert z.testzip() is None
+              names=z.namelist()
+              original=z.read(audit.member(z,'cpymo-tool/nds-converter/assets/converter-icon-source.png'))
+              assert sha(original)==audit.APPROVED_ICON_SOURCE_SHA256
+              generator=z.read(audit.member(z,'cpymo-tool/nds-converter/tools/build_desktop_icons.py'))
+              assert b'3534161a2e9594802247f735c5ed70eedab0a55e40bce9fa3860a0f0d7f174f1' in generator
+              assert not any('fvds-vlc-tables' in s.lower() or 'gen_vlc_tables' in s.lower()
+                             for s in names)
+              for label in ('ICON-ATTRIBUTION.txt','PYMO-ORIGINAL-MIT-LICENSE.txt'):
+                  assert z.getinfo(audit.member(z,'cpymo-tool/nds-converter/assets/'+label)).file_size>100
+              results['archives']['sources']={'size':source.stat().st_size,'sha256':sha(source.read_bytes()),
+                  'approved_original_icon_sha256':sha(original),'clean_derivative_recipe':'pinned and present',
+                  'archive_entries':len(names)}
+          out=Path('release-preflight');out.mkdir(exist_ok=True)
+          (out/'PREFLIGHT.json').write_text(json.dumps(results,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
+          (out/'PRELIMINARY-SHA256SUMS.txt').write_text(
+              ''.join(sha(p.read_bytes())+'  '+p.name+'\n' for p in (rom,win,source)),
+              encoding='ascii')
+          print(json.dumps(results,indent=2,ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2.1-PREFLIGHT-ROM-WINDOWS-SOURCES
+          path: release-preflight/
+          retention-days: 30
+          if-no-files-found: error
