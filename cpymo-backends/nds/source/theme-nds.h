@@ -44,12 +44,12 @@ static void nds_theme_resolve(void){
  }
  nds_theme_effective_index=idx;
  if(idx<0){
-  /* Keep 1.2.0 default color roles identical. The rail is the only addition. */
+  /* Keep original default color roles intact; B rail is the only change. */
   nds_theme_scheme=(NdsThemeScheme){
    RGB15(3,5,8),RGB15(5,10,16),RGB15(4,7,11),RGB15(7,15,23),
    RGB15(10,24,31),RGB15(31,31,31),RGB15(19,22,25),
    RGB15(26,27,29),RGB15(26,28,30),RGB15(21,24,27),
-   RGB15(10,20,25)};
+   RGB15(16,27,31)};
  }else{
   unsigned i=(unsigned)idx;
   /* Every role derives from the original IPL hue, never a blue base.
@@ -57,9 +57,11 @@ static void nds_theme_resolve(void){
   nds_theme_scheme=(NdsThemeScheme){
    nds_theme_tint(i,6,1),nds_theme_tint(i,11,3),
    nds_theme_tint(i,9,3),nds_theme_tint(i,11,4),
-   nds_theme_tint(i,10,21),nds_theme_tint(i,5,26),
-   nds_theme_tint(i,8,22),nds_theme_tint(i,7,24),
-   nds_theme_tint(i,6,25),nds_theme_tint(i,8,22),
+   /* Approved A typography: neutral primary, hue-aware accents,
+    * softened secondary/detail/clock ink. Keep every surface and rail. */
+   nds_theme_tint(i,13,17),RGB15(30,30,30),
+   nds_theme_tint(i,3,23),nds_theme_tint(i,3,24),
+   nds_theme_tint(i,2,24),nds_theme_tint(i,3,23),
    nds_theme_tint(i,13,13)};
  }
 }

@@ -44,6 +44,10 @@ class NdsV121Tests(unittest.TestCase):
   self.assertIn('RGB15(3,5,8),RGB15(5,10,16),RGB15(4,7,11),RGB15(7,15,23)',theme)
   self.assertIn('nds_theme_tint(i,6,1),nds_theme_tint(i,11,3)',theme)
   self.assertIn('nds_theme_tint(i,9,3),nds_theme_tint(i,11,4)',theme)
+  self.assertIn('RGB15(16,27,31)};',theme) # approved Default B rail
+  self.assertIn('nds_theme_tint(i,13,17),RGB15(30,30,30)',theme)
+  self.assertIn('nds_theme_tint(i,3,23),nds_theme_tint(i,3,24)',theme)
+  self.assertIn('nds_theme_tint(i,2,24),nds_theme_tint(i,3,23)',theme)
   self.assertIn('u16 white=nds_theme_primary(),muted=nds_theme_muted(),accent=nds_theme_accent();',launcher)
   self.assertNotIn('launcher_theme_header_trim',launcher)
   self.assertNotIn('launcher_rect(6,y,3,28',launcher)
@@ -58,10 +62,10 @@ class NdsV121Tests(unittest.TestCase):
     return x/12.92 if x<=.04045 else ((x+.055)/1.055)**2.4
    return sum(weight*linear(x) for weight,x in zip((.2126,.7152,.0722),rgb))
   for c in colors:
-   primary=tinted(c,5,26);selected=tinted(c,11,4)
+   primary=(30,30,30);selected=tinted(c,11,4)
    self.assertGreaterEqual((luminance(primary)+.05)/(luminance(selected)+.05),4.5)
-   for strength,neutral in ((6,1),(11,3),(9,3),(11,4),(10,21),
-                            (5,26),(8,22),(7,24),(6,25),(13,13)):
+   for strength,neutral in ((6,1),(11,3),(9,3),(11,4),(13,17),
+                            (3,23),(3,24),(2,24),(13,13)):
     self.assertTrue(all(0<=v<=31 for v in tinted(c,strength,neutral)))
   red=tinted(colors[2],6,1)
   self.assertGreater(red[0],red[2])
@@ -96,6 +100,7 @@ int main(void){
  nds_theme_preference=0;nds_theme_resolve();
  assert(nds_theme_bg()==RGB15(3,5,8));
  assert(nds_theme_primary()==RGB15(31,31,31));
+ assert(nds_theme_rail()==RGB15(16,27,31));
  nds_theme_preference=1;nds_theme_resolve();
  assert(nds_theme_active_index()==2);
  const u16 first=nds_theme_bg();
@@ -108,6 +113,13 @@ int main(void){
  for(unsigned i=0;i<16;i++){
   nds_theme_preference=i+2;nds_theme_resolve();
   assert(nds_theme_active_index()==(int)i);
+  assert(nds_theme_primary()==RGB15(30,30,30));
+  assert(nds_theme_accent()==nds_theme_tint(i,13,17));
+  assert(nds_theme_muted()==nds_theme_tint(i,3,23));
+  assert(nds_theme_detail()==nds_theme_tint(i,3,24));
+  assert(nds_theme_clock_ink()==nds_theme_tint(i,2,24));
+  assert(nds_theme_aux_clock_ink()==nds_theme_tint(i,3,23));
+  assert(nds_theme_rail()==nds_theme_tint(i,13,13));
  }
  pd.settingsLost=1;nds_theme_preference=1;nds_theme_resolve();
  assert(nds_theme_active_index()==-1);

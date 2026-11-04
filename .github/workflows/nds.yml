@@ -70,13 +70,13 @@ jobs:
         if: github.ref_name == 'codex/nds-v1.2.1-test-20261030'
         run: |
           mkdir -p out-v121
-          python3 cpymo-backends/nds/tools/patch-rom-bg.py --rom cpymo-backends/nds/cpymo-dsi-experiment.nds --art cpymo-backends/nds/assets/nds-dual-bg.rgb555 --output out-v121/CPyMO-for-NDS-v1.2.1-test3.nds
-          python3 cpymo-backends/nds/tools/verify-release-artifact.py --rom out-v121/CPyMO-for-NDS-v1.2.1-test3.nds
-          sha256sum out-v121/CPyMO-for-NDS-v1.2.1-test3.nds > out-v121/SHA256SUMS.txt
+          python3 cpymo-backends/nds/tools/patch-rom-bg.py --rom cpymo-backends/nds/cpymo-dsi-experiment.nds --art cpymo-backends/nds/assets/nds-dual-bg.rgb555 --output out-v121/CPyMO-for-NDS-v1.2.1-test4.nds
+          python3 cpymo-backends/nds/tools/verify-release-artifact.py --rom out-v121/CPyMO-for-NDS-v1.2.1-test4.nds
+          sha256sum out-v121/CPyMO-for-NDS-v1.2.1-test4.nds > out-v121/SHA256SUMS.txt
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         if: github.ref_name == 'codex/nds-v1.2.1-test-20261030'
         with:
-          name: CPyMO-NDS-v1.2.1-universal-TEST3
+          name: CPyMO-NDS-v1.2.1-universal-TEST4
           path: out-v121/
           retention-days: 30
           if-no-files-found: error
