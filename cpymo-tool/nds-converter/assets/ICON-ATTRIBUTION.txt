@@ -1,4 +1,4 @@
-CPyMO for NDS — Desktop converter icon attribution (1.2.0)
+CPyMO for NDS — Desktop converter icon attribution (1.2.1)
 ==================================================================
 
 Source motif:
@@ -17,9 +17,20 @@ CPyMO desktop artwork:
   Archival master: 04_高清像素图标_透明外框.png
   1254 × 1254 RGBA; SHA-256:
   3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62
+  On 2026-11-01, the contributor approved an alpha-only perimeter cleanup
+  of this archival original: 16px Euclidean inset and 1.8px feather.
+  Approved cleaned 1254x1254 RGBA pixel SHA-256:
+  3534161a2e9594802247f735c5ed70eedab0a55e40bce9fa3860a0f0d7f174f1
+  Matching approved cleaned PNG SHA-256 (Pillow optimize):
+  00c83413db94122ed52447120eed2b67739b43990fa81b65c937d369e5495044
+  The original is retained for traceability. The shared icon builder
+  deterministically regenerates the clean master into
+  converter-icon-source-clean.png, verifies its RGBA pixel SHA-256,
+  and never uses the original dark perimeter in desktop derivatives.
+  No new illustration or character design is generated.
   Generated app icon formats: Windows .ico, macOS .icns and PNG,
   produced by scaling/container conversion with 2.4% horizontal optical
-  balancing on desktop derivatives only. The master and NDS banner are unchanged.
+  balancing on desktop derivatives only. The archival master and NDS banner are unchanged.
   The source file is included in the corresponding CPyMO source archive:
   cpymo-tool/nds-converter/assets/converter-icon-source.png
 

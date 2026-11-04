@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from tools.build_desktop_icons import build, SOURCE_SHA256, WINDOWS_SIZES, OPTICAL_WIDTH_SCALE
+from tools.build_desktop_icons import build, SOURCE_SHA256, WINDOWS_SIZES, OPTICAL_WIDTH_SCALE, APPROVED_CLEAN_RGBA_SHA256
 
 
 class DesktopIconBuildTests(unittest.TestCase):
@@ -36,6 +36,7 @@ class DesktopIconBuildTests(unittest.TestCase):
             self.assertAlmostEqual(OPTICAL_WIDTH_SCALE,0.976)
             for item in ("png","png_64","ico","icns"):
                 self.assertGreater(manifest["outputs"][item]["bytes"],100)
+            self.assertTrue((output/"converter-icon-source-clean.png").is_file())
             with Image.open(output/"converter-icon.png") as im:
                 self.assertEqual(im.size,(1024,1024))
                 bbox=im.getchannel("A").getbbox()
@@ -45,6 +46,21 @@ class DesktopIconBuildTests(unittest.TestCase):
             with Image.open(output/"converter-icon.icns") as im:
                 self.assertEqual(im.size,(1024,1024))
                 self.assertIn((512,512,2),im.info["sizes"])
+
+    def test_approved_production_master_matches_pixel_hash(self):
+        source=ROOT/"assets/converter-icon-source.png"
+        with tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp)/"approved"
+            manifest=build(source,out)
+            self.assertEqual(manifest["approved_clean_pixel_sha256"],
+                             APPROVED_CLEAN_RGBA_SHA256)
+            with Image.open(source) as original, Image.open(
+                out/"converter-icon-source-clean.png"
+            ) as modified:
+                self.assertEqual(original.convert("RGB").tobytes(),
+                                 modified.convert("RGB").tobytes())
+                self.assertEqual(modified.getchannel("A").getbbox(),
+                                 (84,99,1171,1159))
 
     def test_app_icon_resource_is_nonfatal_when_running_source(self):
         app=(ROOT/"app.py").read_text(encoding="utf8")
