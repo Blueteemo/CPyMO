@@ -8,8 +8,10 @@ Status: release candidate, **not yet a public GitHub Release**.
 - [x] 16 console IPL colors, cached Auto palette, theme-matched readable text, 2-pixel selection rail.
 - [x] Title auxiliary guide reset on in-game Restart; START launcher action; RGB555 Alpha rounding.
 - [x] Conservative +1.5 dB audio gain with lookahead peak guard; no game-volume changes.
-- [x] Approved 16px alpha-only perimeter cleanup integrated into the shared desktop icon pipeline.
-- [x] Original PyMO source motif and MIT attribution preserved; NDS 32x32 icon untouched.
+- [x] Final image design selected: NDS full square, Windows/macOS companion converter rounded, from same user-supplied illustration.
+- [x] NDS 32x32/15-color banner and compiled fallback icon resources updated together, with matching source-level regression tests.
+- [ ] Desktop converter source and deterministic build generator changed from the previous outline-cleanup artwork to the new round-mask illustration.
+- [ ] New desktop icon source licensing/attribution and final Windows/macOS binary embedding audit completed.
 - [x] 1.2.1 metadata, release notes draft, and NDS documentation updated on the candidate branch.
 
 ## Immutable first-pass paired release candidate
@@ -18,7 +20,7 @@ Status: release candidate, **not yet a public GitHub Release**.
 - CI snapshot: `b8b07a805edc3a6d6bf5504d6c8720e92ed547e9` (before the later documentation-only commit).
 - Verified universal ROM: 935,936 bytes, SHA-256 `9046c0440109f6c196ac7af0106625bc5407fbf5128e35beab07d8cff38b8de2`.
 - [x] NTR/TWL combined header, approved 02-B background, standalone ROM validation.
-- [x] Converter regression and actual pinned artwork regeneration.
+- [x] Earlier converter regression and prior pinned icon generation (historical; repeat after the new desktop icon integration).
 - [x] Source RC ZIP, original icon and third-party attribution included.
 - [x] Windows frozen build + synthetic video conversion, exact ROM pairing, FFmpeg 7.1.5 LGPL-only corresponding source.
 - [x] Independent ROM + Windows + Sources preflight: https://github.com/Blueteemo/CPyMO/actions/runs/41905633936 (PASSED; **not** a cross-platform release audit).
