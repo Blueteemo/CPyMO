@@ -1,0 +1,116 @@
+name: CPyMO 1.2.1 macOS 26 ARM64 release fallback (NO PUBLISH)
+on:
+  push:
+    branches:
+      - codex/nds-v1.2.1-release-candidate
+    paths:
+      - .github/workflows/nds-v121-macos26-fallback.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  macos26-rc:
+    # Public release targets native Apple Silicon only, no Rosetta.
+    # Intel macOS users can use the source converter on supported Python.
+    runs-on: macos-26
+    env:
+      CPYMO_MAC_ARCH: arm64
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: b8b07a805edc3a6d6bf5504d6c8720e92ed547e9
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Download immutable checked ROM from the first 1.2.1 RC run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .release-rom
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC --dir .release-rom
+          test "$(shasum -a 256 .release-rom/cpymo-nds.nds | awk '{print $1}')" = "9046c0440109f6c196ac7af0106625bc5407fbf5128e35beab07d8cff38b8de2"
+      - name: Build and verify LGPL-only FFmpeg from corresponding FFmpeg source
+        run: |
+          test "$(uname -m)" = "$CPYMO_MAC_ARCH" || { echo "Host is not native $CPYMO_MAC_ARCH"; exit 1; }
+          python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
+          bash cpymo-tool/nds-converter/tools/build_ffmpeg_macos_lgpl.sh macos-ffmpeg-lgpl
+          python - <<'PY'
+          import os,sys
+          from pathlib import Path
+          sys.path.insert(0,'cpymo-tool/nds-converter')
+          from video_nvl import validate_ffmpeg
+          ffmpeg=Path('macos-ffmpeg-lgpl/bin/ffmpeg').resolve()
+          validate_ffmpeg(str(ffmpeg))
+          with open(os.environ['GITHUB_ENV'],'a') as out:
+              out.write('NDS_FFMPEG='+str(ffmpeg)+'\n')
+          PY
+      - name: Build paired macOS .app using the exact VERIFIED ROM
+        run: |
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds
+          python cpymo-tool/nds-converter/build_portable_macos.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH" --output macos-rc --require-desktop-icon
+          python cpymo-tool/nds-converter/tests/smoke_macos_portable.py --portable macos-rc --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH"
+      - name: Package native macOS ARM64 RC for local Finder test
+        run: |
+          folder="out/CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC"
+          mkdir -p "$folder/FFmpeg-Corresponding-Source"
+          ditto macos-rc/CPyMO-NDS-Converter.app "$folder/CPyMO-NDS-Converter.app"
+          cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt "$folder/"
+          # macOS ditto's ZIP entry name encoding can mangle Chinese basenames.
+          # Keep Mac package filenames ASCII; contents remain UTF-8.
+          cp cpymo-tool/nds-converter/README.md "$folder/Converter-README.md"
+          cp cpymo-tool/nds-converter/assets/ICON-ATTRIBUTION.txt "$folder/ICON-ATTRIBUTION.txt"
+          cp cpymo-tool/nds-converter/assets/PYMO-ORIGINAL-MIT-LICENSE.txt "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
+          test -s "$folder/ICON-ATTRIBUTION.txt" && test -s "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
+          cp -R macos-ffmpeg-lgpl/source/. "$folder/FFmpeg-Corresponding-Source/"
+          cd out
+          ditto -c -k --sequesterRsrc --keepParent "CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC" "../CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
+          cd ..
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter "CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2.1-macOS-arm64-PAIRED-ROM-RC-MAC26
+          path: CPyMO-for-NDS-1.2.1-Starter-macOS-arm64-RC.zip
+          retention-days: 21
+          if-no-files-found: error
+
+  cross-run-paired-audit:
+    needs: [macos26-rc]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: b8b07a805edc3a6d6bf5504d6c8720e92ed547e9
+      - uses: actions/download-artifact@v4
+        with:
+          name: CPyMO-1.2.1-macOS-arm64-PAIRED-ROM-RC-MAC26
+          path: .pairs/macos
+      - name: Fetch original SAME-COMMIT Windows, sources and verified ROM
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .pairs/{windows,source,rom}
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE --dir .pairs/windows
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-SOURCES-RC-LICENSE-REVIEW --dir .pairs/source
+          gh run download 41901139830 --repo "$GITHUB_REPOSITORY" --name CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC --dir .pairs/rom
+      - name: Verify all four same-commit outputs and third-party compliance
+        env:
+          GITHUB_SHA: b8b07a805edc3a6d6bf5504d6c8720e92ed547e9
+        run: |
+          python3 cpymo-backends/nds/tools/audit-desktop-release.py \
+            --rom .pairs/rom/cpymo-nds.nds \
+            --windows .pairs/windows/CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip \
+            --macos .pairs/macos/CPyMO-for-NDS-1.2.1-Starter-macOS-arm64-RC.zip \
+            --sources .pairs/source/CPyMO-for-NDS-1.2.1-Sources-RC.zip \
+            --output release-paired-audit
+          test -s release-paired-audit/RC-PAIRED-AUDIT.json
+          test -s release-paired-audit/CPyMO-for-NDS-1.2.1-RC-SHA256SUMS.txt
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.2.1-CROSS-RUN-SAME-COMMIT-RC-AUDIT
+          path: release-paired-audit/
+          retention-days: 30
+          if-no-files-found: error
