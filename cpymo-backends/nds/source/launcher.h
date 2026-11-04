@@ -253,16 +253,11 @@ static void launcher_title(const LauncherGame* game,int x,int y,u16 color,int ma
  if(nds_font_choices_available())launcher_line(game->title,x,y,color,max_x,2);
  else if(!launcher_title_bitmap(game,x,y,color))launcher_line(game->title,x,y,color,max_x,0);
 }
-static void launcher_background(void){for(unsigned i=0;i<256*192;i++)framebuffer[i]=nds_theme_bg()|BIT(15);}
-/* Actual firmware swatch on the header trim; original default has none. */
-static void launcher_theme_header_trim(void){
- int i=nds_theme_active_index();
- if(i>=0)launcher_rect(0,26,256,2,nds_theme_color((unsigned)i));
-}
+static void launcher_background(void){const u16 color=nds_theme_bg()|BIT(15);for(unsigned i=0;i<256*192;i++)framebuffer[i]=color;}
+/* C scheme: no redundant bar across the entire top of the screen. */
 static void launcher_header(const char* title){
  launcher_rect(0,0,256,28,nds_theme_header());
- launcher_theme_header_trim();
- launcher_text(title,10,7,RGB15(31,31,31),248);
+ launcher_text(title,10,7,nds_theme_primary(),248);
 }
 static void launcher_icon(int x,int y){for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++){u16 c=app_icon[yy*32+xx];if(c)launcher_rect(x+xx,y+yy,1,1,c);}}
 /* ROM-resident glyphs work before FAT or a game's font cache is available. */
@@ -275,9 +270,9 @@ static void launcher_splash_text(const char* text,int y,bool large,u16 color){
 static void launcher_show_splash(void){
  launcher_background();
  for(unsigned y=0;y<32;y++)for(unsigned x=0;x<32;x++){u16 c=app_icon[y*32+x];if(c)launcher_rect(96+x*2,38+y*2,2,2,c);}
- launcher_splash_text("CPyMO for NDS",121,true,RGB15(31,31,31));launcher_publish(vram);
- launcher_background();launcher_splash_text(nds_ui("正在读取游戏列表..."),88,false,RGB15(28,29,31));
- launcher_splash_text(nds_runtime_mode_label(),166,false,RGB15(19,22,25));launcher_publish(launcher_sub);
+ launcher_splash_text("CPyMO for NDS",121,true,nds_theme_primary());launcher_publish(vram);
+ launcher_background();launcher_splash_text(nds_ui("正在读取游戏列表..."),88,false,nds_theme_active_index()<0?RGB15(28,29,31):nds_theme_detail());
+ launcher_splash_text(nds_runtime_mode_label(),166,false,nds_theme_muted());launcher_publish(launcher_sub);
  /* Both planes are complete already. No timer, key wait or extra VBlank. */
  setBrightness(3,0);splash_state[1]=1;splash_state[2]++;
 }
@@ -313,7 +308,7 @@ static void launcher_play_panel(const char* message){
  /* Enhanced mode owns the sub LCD; never repaint it with the classic help UI. */
  if(nds_dual_active())return;
  if(nds_aux_hidden()){if(launcher_sub)dmaFillHalfWords(BIT(15),launcher_sub,256*192*2);return;}
- u16 white=RGB15(31,31,31),muted=nds_theme_muted(),accent=nds_theme_accent();
+ u16 white=nds_theme_primary(),muted=nds_theme_muted(),accent=nds_theme_accent();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  /* Physical touch is a native game coordinate only in classic-lower.
     Do not imply the help LCD is a universal virtual A button. D-pad
@@ -406,14 +401,14 @@ static void launcher_failure_hint(const char* message,int error,const char* hint
  error_ui_state[1]=fatal;error_ui_state[2]=(unsigned)error;error_ui_state[3]=nds_language_effective();
  error_ui_state[5]=error_ui_state[6]=error_ui_state[7]=0;
  launcher_background();launcher_rect(0,0,256,28,nds_theme_header());
- launcher_rom_box("CPyMO for NDS",10,7,236,28,false,RGB15(31,31,31));launcher_icon(112,43);
- launcher_rom_center(nds_ui(message),90,true,RGB15(31,31,31));
+ launcher_rom_box("CPyMO for NDS",10,7,236,28,false,nds_theme_primary());launcher_icon(112,43);
+ launcher_rom_center(nds_ui(message),90,true,nds_theme_primary());
  char code[64];snprintf(code,sizeof code,nds_ui("错误码：%d"),error);
  launcher_rom_center(code,143,false,RGB15(31,23,18));launcher_publish(vram);
  launcher_background();launcher_rect(0,0,256,28,nds_theme_header());
- launcher_rom_box(nds_ui("处理建议"),10,7,236,28,false,RGB15(31,31,31));
+ launcher_rom_box(nds_ui("处理建议"),10,7,236,28,false,nds_theme_primary());
  const char* advice=fatal?"关机后重新插好TF卡。\n检查读卡与R4内核文件，再重试。\n此错误码不代表TF卡已损坏。":"请检查转换结果和游戏资源。\n原始错误码已保留，便于反馈。";
- launcher_rom_box(nds_ui(advice),16,46,224,155,false,RGB15(27,28,30));
+ launcher_rom_box(nds_ui(advice),16,46,224,155,false,nds_theme_active_index()<0?RGB15(27,28,30):nds_theme_detail());
  launcher_rom_box(nds_ui(hint),16,169,224,192,false,nds_theme_accent());launcher_publish(launcher_sub);error_ui_state[4]++;
 }
 static void launcher_failure(const char* message,int error){launcher_failure_hint(message,error,"按 B 返回游戏资料库");}
@@ -427,7 +422,7 @@ static void launcher_library_clock(u16* pixels,bool erase){
 static void launcher_draw(const char* message){
  launcher_scroll_ensure_visible();
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
- u16 white=RGB15(31,31,31),muted=nds_theme_muted(),accent=nds_theme_accent();
+ u16 white=nds_theme_primary(),muted=nds_theme_muted(),accent=nds_theme_accent();
  launcher_selected_icon();
  launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
  if(launcher_about){launcher_icon(12,40);launcher_text("PyMO / CPyMO",53,47,white,246);launcher_text(nds_ui("NDS 移植：千岚之夏（Blueteemo）"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
@@ -443,7 +438,6 @@ static void launcher_draw(const char* message){
  launcher_background();
  if(!launcher_about&&!launcher_language_menu&&!launcher_theme_menu){
   launcher_rect(0,0,256,28,nds_theme_header());
-  launcher_theme_header_trim();
   launcher_line(nds_ui("选择游戏"),10,7,white,194,1);
   nds_clock_sample();launcher_library_clock(framebuffer,false);
  }else launcher_header(nds_ui(launcher_theme_menu?"主题设置":launcher_about?"关于与许可":"界面语言"));
@@ -472,8 +466,8 @@ static void launcher_draw(const char* message){
  else {unsigned first=launcher_scroll_first;
  for(unsigned row=0;row<4&&first+row<launcher_count;row++){unsigned index=first+row;int y=33+row*31;LauncherGame* game=&launcher_games[index];
   launcher_rect(6,y,244,28,index==launcher_selected?nds_theme_selected():nds_theme_card());
-  if(index==launcher_selected&&nds_theme_active_index()>=0)
-   launcher_rect(6,y,3,28,nds_theme_color((unsigned)nds_theme_active_index()));
+  /* C scheme: a restrained two-pixel selection rail, including default. */
+  if(index==launcher_selected)launcher_rect(6,y,2,28,nds_theme_rail());
   launcher_game_icon(game,10,y+2,false);
  launcher_list_title(game,40,y+6,game->status==1?white:muted);}
  launcher_scrollbar_draw();

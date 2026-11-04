@@ -39,26 +39,92 @@ class NdsV121Tests(unittest.TestCase):
   self.assertIn('0x0200u',main)
 
  def test_nondefault_colors_are_true_theme_families(self):
-  theme=load("theme-nds.h")
+  theme=load("theme-nds.h");launcher=load("launcher.h")
   self.assertIn('nds_theme_tint(unsigned idx,unsigned strength,unsigned neutral)',theme)
-  for expected in ('i<0?RGB15(3,5,8):nds_theme_tint((unsigned)i,6,1)',
-                   'i<0?RGB15(5,10,16):nds_theme_tint((unsigned)i,11,3)',
-                   'i<0?RGB15(7,15,23):nds_theme_tint((unsigned)i,11,4)'):
-   self.assertIn(expected,theme)
+  self.assertIn('RGB15(3,5,8),RGB15(5,10,16),RGB15(4,7,11),RGB15(7,15,23)',theme)
+  self.assertIn('nds_theme_tint(i,6,1),nds_theme_tint(i,11,3)',theme)
+  self.assertIn('nds_theme_tint(i,9,3),nds_theme_tint(i,11,4)',theme)
+  self.assertIn('u16 white=nds_theme_primary(),muted=nds_theme_muted(),accent=nds_theme_accent();',launcher)
+  self.assertNotIn('launcher_theme_header_trim',launcher)
+  self.assertNotIn('launcher_rect(6,y,3,28',launcher)
+  self.assertIn('if(index==launcher_selected)launcher_rect(6,y,2,28,nds_theme_rail());',launcher)
   mat=re.search(r'nds_ipl_theme_rgb\[16\]\[3\]=\{(.*?)\};',theme,re.S)
-  palette=[tuple(map(int,x)) for x in re.findall(r'\{(\d+),(\d+),(\d+)\}',mat.group(1))]
+  colors=[tuple(map(int,m)) for m in re.findall(r'\{(\d+),(\d+),(\d+)\}',mat.group(1))]
+  self.assertEqual(len(colors),16)
+  def tinted(c,s,n):return tuple(n+(v*s+15)//31 for v in c)
   def luminance(rgb):
-   def linear(x):
-    v=x/31
-    return v/12.92 if v<=0.04045 else ((v+.055)/1.055)**2.4
-   return sum(a*linear(b) for a,b in zip((.2126,.7152,.0722),rgb))
-  for color in palette:
-   bg=tuple(1+(c*6+15)//31 for c in color)
-   selected=tuple(4+(c*11+15)//31 for c in color)
-   self.assertNotEqual(bg,(3,5,8))
-   self.assertGreaterEqual(1.05/(luminance(selected)+.05),4.5)
-  red=tuple(1+(c*6+15)//31 for c in palette[2])
-  self.assertGreater(red[0],red[2]) # no navy overlay on the red theme
+   def linear(c):
+    x=c/31
+    return x/12.92 if x<=.04045 else ((x+.055)/1.055)**2.4
+   return sum(weight*linear(x) for weight,x in zip((.2126,.7152,.0722),rgb))
+  for c in colors:
+   primary=tinted(c,5,26);selected=tinted(c,11,4)
+   self.assertGreaterEqual((luminance(primary)+.05)/(luminance(selected)+.05),4.5)
+   for strength,neutral in ((6,1),(11,3),(9,3),(11,4),(10,21),
+                            (5,26),(8,22),(7,24),(6,25),(13,13)):
+    self.assertTrue(all(0<=v<=31 for v in tinted(c,strength,neutral)))
+  red=tinted(colors[2],6,1)
+  self.assertGreater(red[0],red[2])
+ def test_auto_palette_is_cached_across_all_redraws(self):
+  theme=load("theme-nds.h");launcher=load("launcher.h")
+  self.assertIn('static int nds_theme_effective_index=-1;',theme)
+  self.assertIn('static int nds_theme_active_index(void){return nds_theme_effective_index;}',theme)
+  self.assertEqual(theme.count('nds_theme_firmware()'),1)
+  self.assertIn('if(ok){nds_theme_preference=v;nds_theme_resolve();}',theme)
+  self.assertIn('const u16 color=nds_theme_bg()|BIT(15)',launcher)
+  self.assertIn('static u16 nds_theme_bg(void){return nds_theme_scheme.bg;}',theme)
+ def test_auto_firmware_snapshot_on_host(self):
+  import shutil,subprocess,tempfile
+  if not shutil.which("gcc"):self.skipTest("gcc unavailable")
+  program=r"""
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/stat.h>
+typedef uint16_t u16;
+#define RGB15(r,g,b) ((u16)((r)|((g)<<5)|((b)<<10)))
+struct FakeEnv { unsigned version; };
+struct FakePersonal { unsigned settingsLost,theme; };
+static struct FakeEnv env={5};
+static struct FakePersonal pd={0,2};
+static struct FakeEnv* g_envUserSettings=&env;
+static struct FakePersonal* PersonalData=&pd;
+static const char* nds_ui(const char* text){return text;}
+static int nds_language_effective(void){return 0;}
+#include "theme-nds.h"
+int main(void){
+ nds_theme_preference=0;nds_theme_resolve();
+ assert(nds_theme_bg()==RGB15(3,5,8));
+ assert(nds_theme_primary()==RGB15(31,31,31));
+ nds_theme_preference=1;nds_theme_resolve();
+ assert(nds_theme_active_index()==2);
+ const u16 first=nds_theme_bg();
+ pd.theme=7;
+ for(int i=0;i<100000;i++)assert(nds_theme_bg()==first);
+ assert(nds_theme_active_index()==2);
+ nds_theme_resolve();
+ assert(nds_theme_active_index()==7);
+ assert(nds_theme_bg()!=first);
+ for(unsigned i=0;i<16;i++){
+  nds_theme_preference=i+2;nds_theme_resolve();
+  assert(nds_theme_active_index()==(int)i);
+ }
+ pd.settingsLost=1;nds_theme_preference=1;nds_theme_resolve();
+ assert(nds_theme_active_index()==-1);
+ return 0;
+}
+"""
+  with tempfile.TemporaryDirectory() as td:
+   from pathlib import Path
+   p=Path(td);(p/"calico/nds").mkdir(parents=True)
+   (p/"calico/nds/env.h").write_text("/* host shim */\n",encoding="utf8")
+   (p/"main.c").write_text(program,encoding="utf8")
+   subprocess.run(["gcc","-std=c11","-O2","-Wall","-Wextra","-Werror",
+                   "-Wno-unused-function","-fsanitize=undefined",
+                   "-I",str(p),"-I",str(SRC),
+                   str(p/"main.c"),"-o",str(p/"program")],
+                  check=True,capture_output=True,text=True)
+   subprocess.run([str(p/"program")],check=True,capture_output=True,text=True)
  def test_default_and_auto_labels_are_centered(self):
   launcher=load("launcher.h")
   self.assertIn('launcher_text_pixel_width(',launcher)
