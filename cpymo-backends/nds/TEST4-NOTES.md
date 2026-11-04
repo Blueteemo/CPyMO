@@ -1,9 +1,9 @@
 # CPyMO for NDS v1.2.1-test4 — approved final typography review
 
 Based on the fully built v1.2.1-test3 candidate (commit 953cee7242650ea19e8425f88d4e04d3117c8c8e).
-This test4 iteration changes **only the theme palette's typography and Default selection rail**.
+This test4 iteration changes **only the theme palette's typography and Default selection rail**. The final one-step reduction of the Default rail is intentionally not a new device-test cycle.
 
-- Default: 2-pixel selection rail RGB555 (16,27,31), the approved B variant; every other default role remains unchanged.
+- Default: 2-pixel selection rail RGB555 (15,26,30), the final approved B variant with a slightly softened luminance; every other default role remains unchanged.
 - Sixteen native IPL themes: approved A typography, RGB555 primary (30,30,30); accent theme_tint(13,17); muted theme_tint(3,23); detail theme_tint(3,24); clock theme_tint(2,24); auxiliary clock theme_tint(3,23). Existing colorful selection rail, surface background, header, card and highlight colors remain unchanged.
 - All language choices, centered theme labels, automatic firmware caching, title-guide restart behavior, alpha rounding, and the test3 +1.5 dB guarded audio remain as before.
 

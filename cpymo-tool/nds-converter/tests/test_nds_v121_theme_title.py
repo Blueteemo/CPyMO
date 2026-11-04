@@ -44,7 +44,7 @@ class NdsV121Tests(unittest.TestCase):
   self.assertIn('RGB15(3,5,8),RGB15(5,10,16),RGB15(4,7,11),RGB15(7,15,23)',theme)
   self.assertIn('nds_theme_tint(i,6,1),nds_theme_tint(i,11,3)',theme)
   self.assertIn('nds_theme_tint(i,9,3),nds_theme_tint(i,11,4)',theme)
-  self.assertIn('RGB15(16,27,31)};',theme) # approved Default B rail
+  self.assertIn('RGB15(15,26,30)};',theme) # approved Default B rail
   self.assertIn('nds_theme_tint(i,13,17),RGB15(30,30,30)',theme)
   self.assertIn('nds_theme_tint(i,3,23),nds_theme_tint(i,3,24)',theme)
   self.assertIn('nds_theme_tint(i,2,24),nds_theme_tint(i,3,23)',theme)
@@ -100,7 +100,7 @@ int main(void){
  nds_theme_preference=0;nds_theme_resolve();
  assert(nds_theme_bg()==RGB15(3,5,8));
  assert(nds_theme_primary()==RGB15(31,31,31));
- assert(nds_theme_rail()==RGB15(16,27,31));
+ assert(nds_theme_rail()==RGB15(15,26,30));
  nds_theme_preference=1;nds_theme_resolve();
  assert(nds_theme_active_index()==2);
  const u16 first=nds_theme_bg();

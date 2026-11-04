@@ -49,7 +49,7 @@ static void nds_theme_resolve(void){
    RGB15(3,5,8),RGB15(5,10,16),RGB15(4,7,11),RGB15(7,15,23),
    RGB15(10,24,31),RGB15(31,31,31),RGB15(19,22,25),
    RGB15(26,27,29),RGB15(26,28,30),RGB15(21,24,27),
-   RGB15(16,27,31)};
+   RGB15(15,26,30)};
  }else{
   unsigned i=(unsigned)idx;
   /* Every role derives from the original IPL hue, never a blue base.
