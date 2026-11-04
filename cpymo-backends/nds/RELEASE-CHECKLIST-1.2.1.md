@@ -21,7 +21,12 @@ Status: release candidate, **not yet a public GitHub Release**.
 - [x] Converter regression and actual pinned artwork regeneration.
 - [x] Source RC ZIP, original icon and third-party attribution included.
 - [x] Windows frozen build + synthetic video conversion, exact ROM pairing, FFmpeg 7.1.5 LGPL-only corresponding source.
+- [x] Independent ROM + Windows + Sources preflight: https://github.com/Blueteemo/CPyMO/actions/runs/41905633936 (PASSED; **not** a cross-platform release audit).
 - [ ] macOS native ARM64 build and package from the SAME source snapshot.
+  - 2026-11-04: macOS 15 job in run 41901139830 cancelled after 15m without a runner or steps.
+  - 2026-11-04: macOS 26 fallback run 41903702349 also cancelled after 15m without a runner or steps.
+  - GitHub Actions had service degradation and there are independent community reports of similar macOS hosted-runner acquisition failures. This is no evidence of a CPyMO build error.
+  - Apple Silicon local reproducible alternative: [MACOS-ARM64-LOCAL-VALIDATION-1.2.1.md](MACOS-ARM64-LOCAL-VALIDATION-1.2.1.md).
 - [ ] Cross-platform paired audit with both platforms and source ZIP, final SHA-256 ledger.
 - [ ] macOS Finder/Dock actual rendering of **new** cleaned icon and single user-facing lightweight acceptance.
 - [ ] Freeze one final source commit, re-audit if source changes, and publish `nds-v1.2.1` only if all release gates pass.
