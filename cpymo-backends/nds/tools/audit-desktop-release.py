@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -17,10 +18,9 @@ import plistlib
 import struct
 import zipfile
 
-APPROVED_ROM_SHA256 = "7759a5db97d744aa3e3014e24550cd6b23d0c758735c60cfd835f0b92e51ae31"
 APPROVED_ICON_SOURCE_SHA256 = "3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62"
 APPROVED_FFMPEG_SOURCE_SHA256 = "de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f"
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 
 def digest(data: bytes) -> str:
@@ -111,11 +111,21 @@ def main():
         if not path.is_file():
             ap.error(f"Missing paired distribution {path}")
     rom = args.rom.read_bytes()
-    assert len(rom) == 924672 and digest(rom) == APPROVED_ROM_SHA256
+    # Version-specific ROM length and hash are discovered from THIS build.
+    # The shared release verifier independently checks NTR/TWL headers and
+    # exact owner-approved dual-screen background; placeholder ROMs fail.
+    verifier_path = Path(__file__).with_name("verify-release-artifact.py")
+    spec = importlib.util.spec_from_file_location("nds_release_verifier", verifier_path)
+    assert spec and spec.loader
+    verifier = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(verifier)
+    verified_rom = verifier.validate_rom_bytes(rom)
+    assert verified_rom["single_rom_for_NTR_TWL"]
     report = {"status": "RC verified, not a published GitHub Release",
               "source_commit": os.environ.get("GITHUB_SHA", "unknown"),
               "workflow_run": os.environ.get("GITHUB_RUN_ID", "local"),
-              "rom_sha256": digest(rom), "distributions": {}}
+              "rom_sha256": digest(rom), "verified_rom": verified_rom,
+              "distributions": {}}
     zip_reports = {}
     ffmpeg_sources = []
     for kind in ("windows", "macos"):
@@ -126,7 +136,7 @@ def main():
             info = {"bytes": paths[kind].stat().st_size,
                     "sha256": digest(paths[kind].read_bytes())}
             roms = [p for p in z.namelist() if p.endswith("/cpymo-nds.nds")
-                    and z.getinfo(p).file_size == 924672]
+                    and z.getinfo(p).file_size == len(rom)]
             assert len(roms) == 2, (kind, roms)
             assert all(digest(z.read(n)) == digest(rom) for n in roms)
             metadata = json.loads(z.read(member(z, "VERSION.json")))
@@ -167,15 +177,19 @@ def main():
     with read_zip(paths["sources"]) as z:
         source_icon = z.read(member(z, "cpymo-tool/nds-converter/assets/converter-icon-source.png"))
         assert digest(source_icon) == APPROVED_ICON_SOURCE_SHA256
+        generator = z.read(member(z, "cpymo-tool/nds-converter/tools/build_desktop_icons.py"))
+        assert b"3534161a2e9594802247f735c5ed70eedab0a55e40bce9fa3860a0f0d7f174f1" in generator
+        # Source archive retains untouched original plus the reproducible
+        # 16px cleanup recipe, so the clean PNG is never an untracked asset.
         for name in ("ICON-ATTRIBUTION.txt", "PYMO-ORIGINAL-MIT-LICENSE.txt"):
             assert z.getinfo(member(z, "cpymo-tool/nds-converter/assets/" + name)).file_size > 100
-        assert z.getinfo("CPyMO-for-NDS-1.2.0-Sources/LICENSE").file_size > 100
+        assert z.getinfo("CPyMO-for-NDS-1.2.1-Sources/LICENSE").file_size > 100
     report["distributions"]["sources"] = {"bytes": paths["sources"].stat().st_size,
                                            "sha256": digest(paths["sources"].read_bytes()),
                                            "approved_icon_source_sha256": digest(source_icon)}
     report["distributions"]["rom"] = {"bytes": len(rom), "sha256": digest(rom)}
     args.output.mkdir(parents=True, exist_ok=True)
-    output = args.output / "CPyMO-for-NDS-1.2.0-RC-SHA256SUMS.txt"
+    output = args.output / "CPyMO-for-NDS-1.2.1-RC-SHA256SUMS.txt"
     output.write_text("".join(f"{digest(paths[name].read_bytes())}  {paths[name].name}\n"
                               for name in ("rom","windows","macos","sources")), encoding="ascii")
     (args.output / "RC-PAIRED-AUDIT.json").write_text(
