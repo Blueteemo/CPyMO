@@ -9,7 +9,11 @@ from release_info import VERSION
 from ui_i18n import tr, tr_log, LANGUAGES
 
 def apply_desktop_icon(window):
-    """Use the bundled PyMO icon for the live window; .ico/.icns cover OS UI."""
+    """Keep the native macOS bundle icon; use the small PNG on other hosts."""
+    # Tk's iconphoto replaces the macOS Dock tile with the 64px window PNG.
+    # Frozen .apps already carry the correctly sized, high-resolution ICNS.
+    if sys.platform == 'darwin' and getattr(sys, 'frozen', False):
+        return False
     base=Path(sys._MEIPASS) if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
     icon=base/'assets/converter-icon-64.png'
     if not icon.is_file():

@@ -1,4 +1,4 @@
-"""Desktop converter artwork: immutable approved PNG, no further geometry edits."""
+"""Immutable approved source, unchanged Windows output and explicit Mac padding."""
 from __future__ import annotations
 import hashlib
 import importlib.util
@@ -8,13 +8,15 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 from PIL import Image, ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools.build_desktop_icons import (build, SOURCE_SHA256, APPROVED_RGBA_SHA256,
                                       ARTWORK_ID, WINDOWS_SIZES, OPTICAL_WIDTH_SCALE,
-                                      ico_frame_hashes, pixel_sha)
+                                      ico_frame_hashes, pixel_sha, MACOS_CONTENT_SCALE)
 
 class DesktopIconBuildTests(unittest.TestCase):
     @classmethod
@@ -47,11 +49,25 @@ class DesktopIconBuildTests(unittest.TestCase):
         frames=ico_frame_hashes(self.out/"converter-icon.ico")
         self.assertEqual(frames,self.manifest["windows_ico_frames_sha256"])
         self.assertEqual(len(frames),7)
-    def test_macos_largest_icns_retains_all_source_pixels(self):
+    def test_macos_icns_uniform_scale_and_centered_transparent_canvas(self):
+        with Image.open(self.source) as source:
+            expected=Image.new('RGBA',(1024,1024))
+            expected.alpha_composite(source.convert('RGBA').resize((819,819),Image.Resampling.LANCZOS),(102,102))
         with Image.open(self.out/"converter-icon.icns") as icon:
             self.assertEqual(icon.size,(1024,1024))
-            self.assertEqual(pixel_sha(icon),APPROVED_RGBA_SHA256)
+            self.assertEqual(icon.convert('RGBA').tobytes(),expected.tobytes())
+            self.assertNotEqual(pixel_sha(icon),APPROVED_RGBA_SHA256)
             self.assertIn((512,512,2),icon.info["sizes"])
+            for size in icon.info['sizes']:
+                frame=icon.icns.getimage(size).convert('RGBA')
+                self.assertEqual(frame.tobytes(),expected.resize(frame.size,Image.Resampling.LANCZOS).tobytes(),size)
+        rule=self.manifest['macos_derivation']
+        self.assertEqual(MACOS_CONTENT_SCALE,0.8)
+        self.assertEqual(rule['content_size'],[819,819])
+        self.assertEqual(rule['offset'],[102,102])
+        self.assertEqual(rule['padding'],[102,102,103,103])
+        self.assertEqual(rule['derived_rgba_sha256'],pixel_sha(expected))
+        self.assertIsNone(expected.getchannel('A').crop((0,0,1024,102)).getbbox())
     def test_gui_png_matches_direct_resample(self):
         with Image.open(self.source) as src, Image.open(self.out/"converter-icon-64.png") as small:
             expected=src.convert("RGBA").resize((64,64),Image.Resampling.LANCZOS)
@@ -87,5 +103,35 @@ class DesktopIconBuildTests(unittest.TestCase):
         self.assertIn("def apply_desktop_icon(window):",text)
         self.assertIn("window._cpymo_icon_photo=photo",text)
         self.assertNotIn("cpymo-backends/nds/assets/icon.png",text)
+
+    def test_frozen_macos_keeps_bundle_icon_and_windows_still_sets_photo(self):
+        import app
+        window=mock.Mock()
+        with mock.patch.object(app,'sys',SimpleNamespace(platform='darwin',frozen=True)), mock.patch.object(app.tk,'PhotoImage') as photo:
+            self.assertFalse(app.apply_desktop_icon(window))
+            photo.assert_not_called()
+            window.iconphoto.assert_not_called()
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td);(base/'assets').mkdir();(base/'assets/converter-icon-64.png').write_bytes(b'fixture')
+            image=object()
+            with mock.patch.object(app,'sys',SimpleNamespace(platform='win32',frozen=True,_MEIPASS=td)), mock.patch.object(app.tk,'PhotoImage',return_value=image):
+                self.assertTrue(app.apply_desktop_icon(window))
+                window.iconphoto.assert_called_once_with(True,image)
+                self.assertIs(window._cpymo_icon_photo,image)
+
+    def test_audit_reconstructs_mac_rule_and_rejects_wrong_source_scale_or_icon(self):
+        import copy,io
+        audit_path=ROOT.parents[1]/'cpymo-backends/nds/tools/audit-desktop-release.py'
+        spec=importlib.util.spec_from_file_location('mac_icon_audit',audit_path)
+        audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
+        source=self.source.read_bytes();icon=(self.out/'converter-icon.icns').read_bytes()
+        self.assertEqual(audit.verify_macos_icon(source,self.manifest,icon)['status'],'PASS')
+        wrong=copy.deepcopy(self.manifest);wrong['macos_derivation']['content_scale']=0.9
+        with self.assertRaises(AssertionError):audit.verify_macos_icon(source,wrong,icon)
+        with self.assertRaises(AssertionError):audit.verify_macos_icon(b'wrong source',self.manifest,icon)
+        with Image.open(self.source) as im:
+            buf=io.BytesIO();im.save(buf,format='ICNS')
+        wrong=copy.deepcopy(self.manifest);wrong['outputs']['icns']['sha256']=hashlib.sha256(buf.getvalue()).hexdigest()
+        with self.assertRaises(AssertionError):audit.verify_macos_icon(source,wrong,buf.getvalue())
 
 if __name__=="__main__":unittest.main()

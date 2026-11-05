@@ -288,6 +288,7 @@ jobs:
           merge-multiple: false
       - name: Audit real archives, ROM pairing, FFmpeg source, attribution and embedded icons
         run: |
+          python -m pip install Pillow==12.3.0
           python cpymo-backends/nds/tools/audit-desktop-release.py \
             --rom ".paired-download/CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC/cpymo-nds.nds" \
             --windows ".paired-download/CPyMO-1.2.1-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE/CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip" \

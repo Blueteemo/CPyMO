@@ -79,8 +79,9 @@ def main():
         branding = build / "branding"
         icon_manifest=build_icons(icon_source,branding)
         shutil.copy2(branding/"icon-manifest.json",output/"ICON-MANIFEST.json")
-        icon_args=["--icon",str(branding/"converter-icon.icns"),
-                   "--add-data",f"{branding/'converter-icon-64.png'}:assets"]
+        # macOS uses only the native bundle ICNS. A Tk 64px iconphoto would
+        # replace the Dock tile, discarding both its padding and resolution.
+        icon_args=["--icon",str(branding/"converter-icon.icns")]
     elif args.require_desktop_icon:
         parser.error(f"Missing owner-approved desktop icon: {icon_source}")
     command = [sys.executable, "-m", "PyInstaller",
@@ -166,6 +167,8 @@ def main():
     metadata.update(desktop_icon=icon_manifest["artwork_id"] if icon_manifest else "default-not-public",
                     desktop_icon_source_sha256=icon_manifest["source_sha256"] if icon_manifest else None,
                     desktop_icon_pixel_sha256=icon_manifest["source_rgba_sha256"] if icon_manifest else None,
+                    macos_dock_icon_source="bundle_icns",
+                    macos_icon_derivation=icon_manifest["macos_derivation"] if icon_manifest else None,
                     macos_architecture=args.target_arch,
                     app_bundle_version=metadata["version"],
                     rosetta_required=False if args.target_arch=="arm64" else "Apple silicon only",

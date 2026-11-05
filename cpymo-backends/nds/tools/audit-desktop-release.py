@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Audit the four paired CPyMO 1.2 RC distributions built in one Actions run.
 
-Stdlib only: read the actual ZIPs, check paired ROM, corresponding FFmpeg
+Read the actual ZIPs, check paired ROM, corresponding FFmpeg
 source, the Windows PE icon, Mac Finder icon, and required artwork attribution.
 Never treat a green individual build job as cross-package acceptance.
+Pillow reconstructs the pinned Mac derivation and checks every actual ICNS frame.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ import zipfile
 APPROVED_ICON_SOURCE_SHA256 = "133abae11b6d958c8e02d70e67dcf997049b5277bde3c734860e19f80257d90e"
 APPROVED_ICON_RGBA_SHA256 = "a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a582f50ec15a4460"
 APPROVED_ICON_ID = "approved-pymo-original-rounded-2026"
+MACOS_CONTENT_SCALE = 0.80
 APPROVED_FFMPEG_SOURCE_SHA256 = "de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f"
 VERSION = "1.2.1"
 
@@ -35,6 +37,39 @@ def read_zip(path: Path) -> zipfile.ZipFile:
     if damaged is not None:
         raise ValueError(f"Corrupt member in {path}: {damaged}")
     return z
+
+
+def verify_macos_icon(source_png: bytes, manifest: dict, icns: bytes) -> dict:
+    """Independently reconstruct the approved Mac derivation, including every frame."""
+    from PIL import Image
+    assert digest(source_png) == APPROVED_ICON_SOURCE_SHA256
+    with Image.open(io.BytesIO(source_png)) as opened:
+        source = opened.convert("RGBA")
+    assert source.size == (1024, 1024)
+    assert digest(source.tobytes()) == APPROVED_ICON_RGBA_SHA256
+    side = round(1024 * MACOS_CONTENT_SCALE)
+    offset = (1024 - side) // 2
+    expected = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+    expected.alpha_composite(source.resize((side, side), Image.Resampling.LANCZOS), (offset, offset))
+    rule = manifest["macos_derivation"]
+    assert rule == {"content_scale": MACOS_CONTENT_SCALE, "canvas_size": [1024, 1024],
+                    "content_size": [side, side], "offset": [offset, offset],
+                    "padding": [offset, offset, 1024-side-offset, 1024-side-offset],
+                    "resampling": "LANCZOS", "uniform_scale": True,
+                    "crop_or_corner_mask_applied": False,
+                    "derived_rgba_sha256": digest(expected.tobytes())}
+    assert digest(icns) == manifest["outputs"]["icns"]["sha256"]
+    frames = {}
+    with Image.open(io.BytesIO(icns)) as icon:
+        assert icon.size == (1024, 1024)
+        for size in icon.info["sizes"]:
+            frame = icon.icns.getimage(size).convert("RGBA")
+            required = expected.resize(frame.size, Image.Resampling.LANCZOS)
+            assert frame.tobytes() == required.tobytes(), ("Incorrect Mac ICNS frame", size)
+            frames[f"{size[0]}x{size[1]}@{size[2]}"] = digest(frame.tobytes())
+    return {"status": "PASS", "content_scale": MACOS_CONTENT_SCALE,
+            "content_size": [side, side], "offset": [offset, offset],
+            "derived_rgba_sha256": digest(expected.tobytes()), "frames_rgba_sha256": frames}
 
 
 def member(z: zipfile.ZipFile, suffix: str) -> str:
@@ -146,6 +181,8 @@ def main():
               "rom_sha256": digest(rom), "verified_rom": verified_rom,
               "distributions": {}}
     zip_reports = {}
+    with read_zip(paths["sources"]) as source_zip:
+        approved_source_png = source_zip.read(member(source_zip, "cpymo-tool/nds-converter/assets/converter-icon-source.png"))
     ffmpeg_sources = []
     for kind in ("windows", "macos"):
         with read_zip(paths[kind]) as z:
@@ -197,9 +234,13 @@ def main():
                 icns = z.read(member(z, "Contents/Resources/converter-icon.icns"))
                 assert icns[:4] == b"icns" and len(icns) > 100000
                 assert digest(icns)==icon_manifest["outputs"]["icns"]["sha256"]
+                derivation = verify_macos_icon(approved_source_png, icon_manifest, icns)
+                assert metadata.get("macos_dock_icon_source") == "bundle_icns"
+                assert metadata.get("macos_icon_derivation") == icon_manifest["macos_derivation"]
                 assert metadata.get("macos_architecture") == "arm64"
                 assert metadata.get("rosetta_required") is False
-                info["macos_icon"] = {"sha256": digest(icns), "plist": "MATCH"}
+                info["macos_icon"] = {"sha256": digest(icns), "plist": "MATCH",
+                                      "derivation": derivation, "runtime_source": "bundle_icns"}
                 info["native_arch"] = "arm64"
             report["distributions"][kind] = info
     assert len(set(ffmpeg_sources)) == 1

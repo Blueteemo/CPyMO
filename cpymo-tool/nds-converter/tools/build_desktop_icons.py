@@ -20,6 +20,21 @@ APPROVED_RGBA_SHA256 = "a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a582f50e
 SOURCE_SIZE = (1024, 1024)
 WINDOWS_SIZES = ((16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256))
 OPTICAL_WIDTH_SCALE = 1.0  # Retained for compatibility; never alter the new art.
+MACOS_CONTENT_SCALE = 0.80
+
+def macos_canvas(image: Image.Image) -> tuple[Image.Image, dict]:
+    """Scale the whole approved artwork uniformly onto a transparent Mac canvas."""
+    side = round(SOURCE_SIZE[0] * MACOS_CONTENT_SCALE)
+    offset = (SOURCE_SIZE[0] - side) // 2
+    canvas = Image.new("RGBA", SOURCE_SIZE, (0, 0, 0, 0))
+    canvas.alpha_composite(image.convert("RGBA").resize((side, side), Image.Resampling.LANCZOS),
+                           (offset, offset))
+    rule = {"content_scale": MACOS_CONTENT_SCALE, "canvas_size": list(SOURCE_SIZE),
+            "content_size": [side, side], "offset": [offset, offset],
+            "padding": [offset, offset, SOURCE_SIZE[0]-side-offset, SOURCE_SIZE[1]-side-offset],
+            "resampling": "LANCZOS", "uniform_scale": True,
+            "crop_or_corner_mask_applied": False, "derived_rgba_sha256": pixel_sha(canvas)}
+    return canvas, rule
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -65,6 +80,7 @@ def build(source: Path, dest: Path, *, allow_alternate_source: bool=False) -> di
         raise ValueError("Approved source's decoded pixels differ: "+rgba_hash)
     dest.mkdir(parents=True,exist_ok=True)
     paths={"png":dest/"converter-icon.png", "png_64":dest/"converter-icon-64.png",
+           "macos_png":dest/"converter-icon-macos.png",
            "ico":dest/"converter-icon.ico", "icns":dest/"converter-icon.icns"}
     if source.resolve()==paths["png"].resolve():
         raise ValueError("Do not generate output over the canonical source")
@@ -72,19 +88,25 @@ def build(source: Path, dest: Path, *, allow_alternate_source: bool=False) -> di
     shutil.copyfile(source,paths["png"])
     image.resize((64,64),Image.Resampling.LANCZOS).save(paths["png_64"],format="PNG",optimize=True)
     image.save(paths["ico"],format="ICO",sizes=list(WINDOWS_SIZES))
-    image.save(paths["icns"],format="ICNS")
+    mac_image, mac_rule = macos_canvas(image)
+    mac_image.save(paths["macos_png"],format="PNG",optimize=True)
+    # Pillow's ICNS default resize uses BICUBIC; provide explicit frames so
+    # every stored resolution follows the recorded LANCZOS derivation.
+    mac_image.save(paths["icns"],format="ICNS",append_images=[
+        mac_image.resize((n,n),Image.Resampling.LANCZOS) for n in (32,64,128,256,512,1024)])
     with Image.open(paths["ico"]) as check:
         if set(check.info["sizes"])!=set(WINDOWS_SIZES):
             raise ValueError("Windows ICO resolution inventory mismatch")
     with Image.open(paths["icns"]) as check:
-        if check.size!=SOURCE_SIZE or pixel_sha(check)!=rgba_hash:
-            raise ValueError("ICNS largest frame must preserve all approved RGBA pixels")
+        if check.size!=SOURCE_SIZE or pixel_sha(check)!=mac_rule["derived_rgba_sha256"]:
+            raise ValueError("ICNS largest frame must match the approved Mac scale and transparent padding")
     manifest={
         "artwork_id":ARTWORK_ID,
         "source":"converter-icon-source.png",
         "source_sha256":source_hash,
         "source_rgba_sha256":rgba_hash,
         "source_size":list(SOURCE_SIZE),
+        "macos_derivation":mac_rule,
         "optical_width_scale":1.0,
         "reapplied_crop_or_mask":False,
         "lossy_reencoding":False,

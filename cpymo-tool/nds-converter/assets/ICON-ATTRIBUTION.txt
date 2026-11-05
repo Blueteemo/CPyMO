@@ -25,6 +25,11 @@ Desktop companion converters:
   Decoded 1024x1024 RGBA pixel SHA-256:
   a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a582f50ec15a4460
   All Windows ICO, macOS ICNS and GUI PNG variants share this source.
+  macOS alone uniformly scales the complete image to 80% and centers it
+  on a transparent canvas. No extra crop, edge erosion, corner mask or
+  horizontal compression is applied. Frozen Mac applications retain the
+  native Bundle ICNS instead of replacing the Dock tile with a Tk PNG.
+  Windows ICO and its small GUI PNG retain the original direct resampling.
   There is no second round-corner mask, 16px erosion or horizontal compression.
   The former 04 pixel-art / perimeter-cleanup icon is superseded, not bundled
   as an alternative design. Git history is not rewritten.
