@@ -175,10 +175,18 @@ def main():
     spec.loader.exec_module(verifier)
     verified_rom = verifier.validate_rom_bytes(rom)
     assert verified_rom["single_rom_for_NTR_TWL"]
+    icon_path = Path(__file__).with_name("verify_nds_icons.py")
+    icon_spec = importlib.util.spec_from_file_location("nds_icon_verifier", icon_path)
+    assert icon_spec and icon_spec.loader
+    icon_verifier = importlib.util.module_from_spec(icon_spec)
+    icon_spec.loader.exec_module(icon_verifier)
+    nds_root = Path(__file__).resolve().parents[1]
+    verified_icons = icon_verifier.verify(nds_root, args.rom)
     report = {"status": "Same-commit release assets verified",
               "source_commit": os.environ.get("GITHUB_SHA", "unknown"),
               "workflow_run": os.environ.get("GITHUB_RUN_ID", "local"),
               "rom_sha256": digest(rom), "verified_rom": verified_rom,
+              "nds_icons": verified_icons,
               "distributions": {}}
     zip_reports = {}
     with read_zip(paths["sources"]) as source_zip:
@@ -255,6 +263,12 @@ def main():
         for name in ("ICON-ATTRIBUTION.txt", "PYMO-ORIGINAL-MIT-LICENSE.txt"):
             assert z.getinfo(member(z, "cpymo-tool/nds-converter/assets/" + name)).file_size > 100
         assert z.getinfo(f"CPyMO-for-NDS-{VERSION}-Sources/LICENSE").file_size > 100
+        nds_manifest = json.loads((nds_root / 'assets/NDS-ICON-MANIFEST.json').read_text())
+        nds_files = ['assets/' + nds_manifest['source'], 'assets/NDS-ICON-MANIFEST.json',
+                     'tools/build_nds_icons.py', 'tools/verify_nds_icons.py',
+                     *nds_manifest['outputs']]
+        for relative in nds_files:
+            assert z.read(member(z, 'cpymo-backends/nds/' + relative)) == (nds_root / relative).read_bytes(), relative
     report["distributions"]["sources"] = {"bytes": paths["sources"].stat().st_size,
                                            "sha256": digest(paths["sources"].read_bytes()),
                                            "approved_icon_source_sha256": digest(source_icon)}
