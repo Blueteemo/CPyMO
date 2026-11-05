@@ -1,0 +1,4 @@
+Build the final 1.3.0 paired distributions after the Windows native-proof
+stdout JSON encoding fix. Keep UTF-8 result files and exact Chinese footer
+assertions; ASCII escaping is only for legacy Windows console output.
+Rebuild all four assets from this commit; do not reuse earlier packages.

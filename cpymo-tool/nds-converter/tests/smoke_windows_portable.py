@@ -94,7 +94,7 @@ def main():
             'frames':report['videos'][0]['frames'],'rom_pair':'MATCH',
             'source_preservation':'PASS','release_version':VERSION,
             'frozen_gui':'PASS','actual_ui_version_footer':gui_report['ui_version_footer'],
-            'ui_screenshot':gui_report.get('ui_screenshot')},ensure_ascii=False))
+            'ui_screenshot':gui_report.get('ui_screenshot')},ensure_ascii=True))
 
 
 if __name__=='__main__':
