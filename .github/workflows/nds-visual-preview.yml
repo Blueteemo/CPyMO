@@ -1,0 +1,60 @@
+name: NDS 1.3.0 Visual Hardware Test
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/nds-v1.2.1-release-candidate]
+    paths:
+      - .github/workflows/nds-visual-preview.yml
+      - .github/ci-requests/nds-visual-preview.txt
+permissions:
+  contents: read
+jobs:
+  visual-rom:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:20260610
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Verify committed resources and build universal NTR/TWL ROM
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init stb endianness.h
+          python3 cpymo-backends/nds/tools/verify_nds_icons.py
+          nice -n 10 python3 cpymo-backends/nds/build.py --dsi-experiment
+      - name: Verify actual ROM and keep test identity separate from release assets
+        run: |
+          mkdir -p visual-test
+          python3 cpymo-backends/nds/tools/patch-rom-bg.py --rom cpymo-backends/nds/cpymo-dsi-experiment.nds --art cpymo-backends/nds/assets/nds-dual-bg.rgb555 --output visual-test/CPyMO-for-NDS-1.3.0-Visual-Test.nds
+          python3 cpymo-backends/nds/tools/verify-release-artifact.py --rom visual-test/CPyMO-for-NDS-1.3.0-Visual-Test.nds --report visual-test/ROM-VERIFICATION.json
+          python3 cpymo-backends/nds/tools/verify_nds_icons.py --rom visual-test/CPyMO-for-NDS-1.3.0-Visual-Test.nds --report visual-test/ICON-VERIFICATION.json
+          cp cpymo-backends/nds/assets/NDS-ICON-MANIFEST.json visual-test/
+          cp cpymo-backends/nds/VISUAL-TEST-1.3.0.md visual-test/README.md
+          printf '%s\n' "$GITHUB_SHA" > visual-test/SOURCE-SHA.txt
+          sha256sum visual-test/CPyMO-for-NDS-1.3.0-Visual-Test.nds > visual-test/SHA256SUMS.txt
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CPyMO-1.3.0-NDS-VISUAL-TEST
+          path: visual-test/
+          retention-days: 21
+          if-no-files-found: error
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install pinned host dependencies and isolated FFmpeg
+        run: |
+          python -m pip install -r cpymo-tool/nds-converter/requirements.txt imageio-ffmpeg==0.6.0
+          python - <<'PY'
+          import os,pathlib,imageio_ffmpeg
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'ffmpeg'
+          p.symlink_to(imageio_ffmpeg.get_ffmpeg_exe())
+          with open(os.environ['GITHUB_PATH'],'a') as out:out.write(str(p.parent)+'\n')
+          PY
+      - name: Full converter regression including generated native icon protection
+        run: |
+          python cpymo-backends/nds/tools/generate-ui-font.py
+          python -m unittest discover -s cpymo-tool/nds-converter/tests -v

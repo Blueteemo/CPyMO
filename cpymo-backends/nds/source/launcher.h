@@ -269,7 +269,7 @@ static void launcher_splash_text(const char* text,int y,bool large,u16 color){
 }
 static void launcher_show_splash(void){
  launcher_background();
- for(unsigned y=0;y<32;y++)for(unsigned x=0;x<32;x++){u16 c=app_icon[y*32+x];if(c)launcher_rect(96+x*2,38+y*2,2,2,c);}
+ for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){u16 c=app_icon_splash[y*64+x];if(c)launcher_rect(96+x,38+y,1,1,c);}
  launcher_splash_text("CPyMO for NDS",121,true,nds_theme_primary());launcher_publish(vram);
  launcher_background();launcher_splash_text(nds_ui("正在读取游戏列表..."),88,false,nds_theme_active_index()<0?RGB15(28,29,31):nds_theme_detail());
  launcher_splash_text(nds_runtime_mode_label(),166,false,nds_theme_muted());launcher_publish(launcher_sub);
@@ -287,7 +287,7 @@ static void launcher_game_icon(const LauncherGame* game,int x,int y,bool large){
  if(large&&selected_icon_ok){for(unsigned yy=0;yy<48;yy++)for(unsigned xx=0;xx<48;xx++){u16 c=selected_icon[yy*48+xx];if(c&BIT(15))launcher_rect(x+xx,y+yy,1,1,c);}}
  else if(!large&&game->icon_ok){for(unsigned yy=0;yy<24;yy++)for(unsigned xx=0;xx<24;xx++){u16 c=game->icon[yy*24+xx];if(c&BIT(15))launcher_rect(x+xx,y+yy,1,1,c);}}
  else if(large)launcher_icon(x+8,y+8);
- else {for(unsigned yy=0;yy<24;yy++)for(unsigned xx=0;xx<24;xx++){u16 c=app_icon[(yy*32/24)*32+xx*32/24];if(c)launcher_rect(x+xx,y+yy,1,1,c);}}
+ else {for(unsigned yy=0;yy<24;yy++)for(unsigned xx=0;xx<24;xx++){u16 c=app_icon_small[yy*24+xx];if(c)launcher_rect(x+xx,y+yy,1,1,c);}}
 }
 static void launcher_intro(const LauncherGame* game,unsigned line,int x,int y,u16 color){
  /* Small dialogue font on its native grid; title remains the visual anchor. */
