@@ -22,22 +22,22 @@ CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
 | 首次使用、转换游戏、添加视频 | [Windows Starter](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Starter-Windows.zip) / [macOS ARM64 Starter](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Starter-macOS-arm64.zip)；不提供 Intel Mac 预编译版 |
 | 查看全部变更与校验 | [发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0) · [完整源码](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Sources.zip) · [SHA256SUMS](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-SHA256SUMS.txt) |
 
-转换助手在电脑上运行，游戏程序在 DS / DSi 上运行。**本仓库不附任何商业游戏。**
+转换助手在电脑上运行，游戏程序在 DS / DSi 上运行。**发行包不附任何游戏或用户存档。**
 
 ## 1.3.0 更新
 
 - **16 色主题**：默认配色、自动跟随主机设置，以及原版 NDS 的 16 种固件主题色。
 - **游戏库与双屏交互**：支持 START 启动，完善资料库脚注、辅助屏指引与重新开始后的标题阶段提示。
-- **高亮与音频**：修正标题菜单高亮混合取整，音频增加保守目标增益并保留峰值保护。
+- **高亮与音频**：修正标题菜单高亮混合取整，音频采用约 +1.5 dB 的保守目标增益并保留峰值保护。
 - **NDS 程序及配套转换器图标焕新**：NDS 使用完整方形构图与暖灰棕细边框，加载图更清楚；Mac 转换器改善图标显示比例。
 
 继续保留 DSi/TWL 模式、三态增强双屏、NVL1/NVA1 视频、多游戏资料库和四语界面。完整变化见 [1.3.0 发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。
 
 ## 安装
 
-1. 在 Windows 或 Apple Silicon macOS 转换助手中选择自己的 PyMO 游戏 ZIP 或游戏文件夹，使用推荐默认选项转换。
+1. 在 Windows 或 Apple Silicon macOS 转换助手中选择自己的 PyMO 游戏 ZIP 或包含 `gameconfig.txt` 的游戏文件夹，使用推荐默认选项转换。
 2. 将转换结果的 `cpymo-nds.nds` 和 `pymo/` 文件夹复制到 TF 卡根目录。
-3. 保留已有烧录卡内核、游戏和存档。覆盖同名游戏目录前，**先备份 `save/`**。
+3. 保留已有烧录卡内核、游戏和存档。安装同名游戏前先备份 `save/`，**不要用新转换结果的空存档目录覆盖旧存档**。
 4. 在掌机启动 `cpymo-nds.nds`，从游戏列表选择游戏。
 
 ```text
@@ -58,13 +58,14 @@ TF 卡根目录/
 
 | 输入 | 作用 |
 |---|---|
-| A、DOWN、轻触 | 对白继续／操作当前界面 |
-| X | 游戏内菜单；游戏列表中可切换界面语言 |
+| A、轻触 | 确认、继续；游戏库轻触两次可启动选中游戏 |
+| X | 游戏正文打开引擎菜单；游戏列表中可切换界面语言 |
 | B | 返回／取消；视频播放时跳过 |
 | L | 上屏游戏 → 下屏游戏 → 增强双屏 |
 | Y | 游戏中隐藏或唤回辅助屏；资料库打开主题设置 |
 | R | 根据游戏设置快进 |
-| START / SELECT | 游戏中快速保存／快速读取标准存档 1；资料库按 START 启动 |
+| START | 资料库启动选中游戏；游戏正文快速保存到标准存档 1，会覆盖该存档 |
+| SELECT | 游戏正文快速读取标准存档 1；资料库刷新列表 |
 | 合盖 / 开盖 | 暂停与静音／恢复 |
 
 ## 兼容性、转换器和开发文档
@@ -76,6 +77,7 @@ TF 卡根目录/
 
 Mac ARM64 包采用临时签名，未经 Apple Developer ID 签名及 Apple 公证。
 
+转换器支持 Android PyMO 游戏数据，**不直接接受 APK 安装包**。视频默认转换为 NVL1，可选 NVA1 或跳过视频。
 转换器不会修改原游戏包、原脚本或汉化署名；缺字默认显示方框并记录警告。
 部分打包／加密脚本、特殊片源及个别烧录卡配置可能需要额外处理。
 
