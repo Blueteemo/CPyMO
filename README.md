@@ -30,6 +30,7 @@ CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
 - **游戏库与双屏交互**：支持 START 启动，完善资料库脚注、辅助屏指引与重新开始后的标题阶段提示。
 - **高亮与音频**：修正标题菜单高亮混合取整，音频采用约 +1.5 dB 的保守目标增益并保留峰值保护。
 - **NDS 程序及配套转换器图标焕新**：NDS 使用完整方形构图与暖灰棕细边框，加载图更清楚；Mac 转换器改善图标显示比例。
+- **桌面界面维护**：补回此前 1.2 维护版已有的进度条空闲隐藏、游戏版本列表按数量调整及视频选项宽度自适应。版本号保持 1.3.0，NDS ROM 不变。
 
 继续保留 DSi/TWL 模式、三态增强双屏、NVL1/NVA1 视频、多游戏资料库和四语界面。完整变化见 [1.3.0 发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。
 
@@ -88,7 +89,7 @@ Mac ARM64 包采用临时签名，未经 Apple Developer ID 签名及 Apple 公�
 本移植基于 [Strrationalism/CPyMO](https://github.com/Strrationalism/CPyMO)
 （Seng Jik 及贡献者），其基础引擎来自
 [PyMO](https://github.com/pymo/pymo)（chen_xin_ming 及贡献者）。
-本 Fork 的首页以 Nintendo DS 发行版为重点。**1.3.0 的完整对应实现请以 [正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0) 为准**；
+本 Fork 的首页以 Nintendo DS 发行版为重点。**1.3.0 首发源码保留在 [正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0)**；桌面维护版的对应源码 ZIP、构建提交和校验值见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。
 `main` 已同步本次 NDS 发行源码；其他平台的使用与维护请参考原上游仓库。
 
 CPyMO 引擎及 NDS 后端按 AGPL-3.0-or-later 发行，
