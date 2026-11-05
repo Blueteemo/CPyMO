@@ -10,7 +10,7 @@
 - 游戏内确认“重新开始”时恢复标题阶段的辅助屏指引，进入正文后再次自动切换；三种显示模式仍可通过 **L** 切换。原游戏标题菜单图像与脚本不改动。
 - 修复《水仙1》《水仙2》标题菜单选中高亮的 RGB555 Alpha 混合取整问题，无需重新转换原游戏资源。
 - 音频增加约 **+1.5 dB** 的保守目标增益，峰值保护避免 PCM 输出数字削波；BGM、语音、音效和视频音轨共用保护逻辑，不改变游戏配置或硬件音量。听感仍因录音响度和主机而异。
-- **NDS 程序及配套转换器图标焕新。** 采用同一张用户提供的原始插画：NDS 系统菜单 Banner、启动加载画面和内部默认图标使用完整方形构图，缩放为 32×32、15 色 RGB555；Windows／macOS 的**配套游戏转换器**采用平滑圆角版本。两款桌面工具为转换器，并不是新增的 Windows／macOS 游戏客户端。
+- **NDS 程序及配套转换器图标焕新。** 采用同一张用户提供的原始插画：NDS 系统菜单 Banner、启动加载画面和内部默认图标使用完整方形构图，缩放为 32×32、15 色 RGB555；Windows／macOS 的**配套游戏转换器**采用平滑圆角版本。macOS 同时改善图标显示比例。两款桌面工具为配套游戏转换器。
 
 ## 兼容、升级与下载
 
@@ -25,6 +25,6 @@ NDS 移植：**千岚之夏（Blueteemo）**；CPyMO：Seng Jik 与贡献者；P
 
 发行时应提供同一构建的 ROM、Windows 版、macOS ARM64 版、源码与 SHA-256 清单。macOS 首次运行可能触发 Gatekeeper：请验证下载来源与 SHA-256，按 Apple 系统设置中的官方流程处理；不要关闭 SIP 或全局 Gatekeeper。
 
-> **待冻结填写**：最终各附件大小与 SHA-256、对应 Actions 构建审计链接、最终 macOS Finder／Dock 视觉复核结论。本文件是发行候选说明，尚不是已发布 Release。
+> **发行候选状态**：批准图标和 Mac 显示比例修正已合入，本地研究候选已通过真实 Mac 复测。最终同提交配套构建、附件大小与 SHA-256、跨包审计及最终 CI Mac 包确认须以冻结提交后的仓库外验收回执为准。本文件尚不是已发布 Release。
 
 [项目仓库](https://github.com/Blueteemo/CPyMO) · [NDS 后端说明](https://github.com/Blueteemo/CPyMO/tree/main/cpymo-backends/nds) · [上游 PR #60](https://github.com/Strrationalism/CPyMO/pull/60)
