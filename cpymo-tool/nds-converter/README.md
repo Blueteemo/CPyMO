@@ -1,6 +1,6 @@
-# CPyMO for NDS 1.2.1 转换助手
+# CPyMO for NDS 1.3.0 转换助手
 
-## v1.2.1（维护更新）
+## v1.3.0（维护更新）
 
 此版本沿用 1.2.0 的缓存格式与视频转换策略，并进行 **NDS 程序及配套转换器图标焕新**：采用同一张原始插画，NDS 程序使用完整方形图标，Windows/macOS 配套游戏转换器使用平滑圆角版本。macOS 同时改善图标显示比例。
 
@@ -9,9 +9,11 @@
 
 NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；字体与依赖保留各自许可。
 
+程序及配套元数据由同一份 1.3.0 源码真实构建；[当前发行说明](../../cpymo-backends/nds/RELEASE-NOTES-1.3.0.md)。
+
 ## 给玩家
 
-Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用通过最终验收的 ARM64 `.app` 安装包（RC 阶段暂不公开）；Intel Mac 可按下文从源码运行。
+Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用通过最终验收的 ARM64 `.app` 发行包；Intel Mac 可按下文从源码运行。
 免安装套件已内置 Python 运行时和 FFmpeg，普通玩家无须另行安装。打开助手后，可选择简体中文或 English（界面选择会保存）；选择游戏 ZIP 或含 gameconfig.txt 的文件夹，
 支持嵌套 ZIP 与 S60v3 / S60v5 / Android PyMO 数据（指输入数据平台，非电脑系统）。
 同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
@@ -34,7 +36,7 @@ Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运
 
 ## 1.2 游戏视频转换
 
-1.1.0 正式版不受影响。1.2.1 继承 1.2.0 的转换流程，视频默认使用 NVL1、原样保留脚本；
+1.1.0 正式版不受影响。1.3.0 继承 1.2.0 的转换流程，视频默认使用 NVL1、原样保留脚本；
 1.2 提供 **NVL1**（22050 Hz PCM16）与 **NVA1**（NAR2
 无损压缩音频）视频转换，在 GUI 的“游戏视频”下拉框中选择（默认 NVL1，NVA1 和跳过视频可选）。默认
 12 FPS、256×192 RGB555；保留原始画面比例，居中补黑边，不随意拉伸。
@@ -64,7 +66,7 @@ python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目�
 ## 从源码运行与构建
 
 Python 3.10+，安装 requirements.txt，另备 FFmpeg；完整仓库内运行 `python app.py`。
-Windows 提供免安装包；macOS 正式版拟**仅发行 Apple Silicon 原生 ARM64 `.app`**，不提供 Intel macOS 预编译包。Apple Silicon 版本使用 ARM64 Python、PyInstaller 和 FFmpeg 构建，需通过原生 CI、Finder 图形操作及本机验收后才能公开。Intel Mac、Linux 仍可按要求从源码运行命令行工具；未签名／未公证的 macOS RC 不能冒充已发布版本。
+Windows 提供免安装包；macOS **仅发行 Apple Silicon 原生 ARM64 `.app`**，不提供 Intel macOS 预编译包。Apple Silicon 版本使用 ARM64 Python、PyInstaller 和 FFmpeg 构建，通过同提交原生构建及配套验收发布。Intel Mac、Linux 仍可按要求从源码运行命令行工具；Mac 采用临时签名，未经 Apple Developer ID 签名及 Apple 公证；请核对来源与 SHA-256。
 
 ```sh
 python -m pip install -r cpymo-tool/nds-converter/requirements.txt
@@ -87,10 +89,10 @@ python build_portable.py --rom /path/to/verified/cpymo-nds.nds --ffmpeg /path/to
 加速库可选，源码模式缺失时使用 Python 实现；公开 Windows 包包含该库。
 打包脚本嵌入并检查同一 ROM 与版本元数据。发布时还需附玩家必读、第三方许可和完整对应源码。
 FFmpeg 独立进程运行，不链接进 MIT 转换器；tools/ 提供音频专用构建脚本。
-发行页 Sources.zip 包含相应 FFmpeg 官方源码、构建配置及工具链许可。
+Windows/macOS 包内的 `FFmpeg-Corresponding-Source` 提供对应 FFmpeg 官方源码、编译配置及许可；发行源码包提供引擎、转换器和构建脚本。
 
 
-macOS 开发候选构建（须在 Mac 上运行，且显式传入与目标发行版本匹配的 ROM）：
+macOS ARM64 源码构建（须在 Mac 上运行，且显式传入与目标发行版本匹配的 ROM）：
 
 ```sh
 python cpymo-tool/nds-converter/build_portable_macos.py \
@@ -98,7 +100,7 @@ python cpymo-tool/nds-converter/build_portable_macos.py \
   --output /path/to/new-macos-package
 ```
 
-已通过 [原生 macOS CI](https://github.com/Blueteemo/CPyMO/actions/runs/40484402394)：
+历史原生构建记录：[原生 macOS CI](https://github.com/Blueteemo/CPyMO/actions/runs/40484402394)：
 使用打包后的 `.app` 工作进程转换原创 MP4 为 NVL1 并校验配套 ROM 的 SHA。
 该 CI 的 ROM 是**内部构建测试输入**，不是用户最终验收并内置星夜素材的发行 ROM，
 不能直接拿该构建的研究包替代正式版；仍需完整许可证、最终 ROM 配套及发行门槛。

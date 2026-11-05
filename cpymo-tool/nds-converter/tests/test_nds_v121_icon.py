@@ -29,8 +29,8 @@ class NdsV121IconTests(unittest.TestCase):
   self.assertTrue(all(v&0x8000 for v in pixels))
   self.assertEqual([rgb555(v) for v in pixels],actual)
  def test_release_language_precise(self):
-  self.assertEqual((NDS/"VERSION").read_text().strip(),"1.2.1")
-  notes=(NDS/"RELEASE-NOTES-1.2.1.md").read_text(encoding="utf8")
+  self.assertEqual((NDS/"VERSION").read_text().strip(),"1.3.0")
+  notes=(NDS/"RELEASE-NOTES-1.3.0.md").read_text(encoding="utf8")
   self.assertIn("NDS 程序及配套转换器图标焕新",notes)
   self.assertIn("配套游戏转换器",notes)
 

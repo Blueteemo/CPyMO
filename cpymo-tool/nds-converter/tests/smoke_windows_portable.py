@@ -3,7 +3,8 @@
 Run on Windows Actions after build_portable.py. Uses original synthetic media;
 never embeds private or commercial video. This verifies _MEIPASS lookups,
 FFmpeg *video* decoding, generated ROM, game cache and source immutability.
-The test does NOT certify the graphical window or real NDS frame rate.
+Also constructs the frozen GUI and records its actual version footer.
+This does not certify real NDS frame rate or all Windows display settings.
 """
 from pathlib import Path
 import argparse
@@ -19,6 +20,7 @@ sys.path.insert(0,str(HERE))
 sys.path.insert(0,str(HERE.parent))
 from test_converter import fixture,hashes
 from convert import verify
+from release_info import VERSION
 
 
 def main():
@@ -32,6 +34,7 @@ def main():
     rom=root/'cpymo-nds.nds'
     assert exe.is_file() and (internal/'ffmpeg.exe').is_file(), 'Portable app or FFmpeg missing'
     assert rom.is_file() and (internal/'cpymo-nds.nds').is_file()
+    assert json.loads((root/'VERSION.json').read_text())['version']==VERSION
     digest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
     assert digest(rom)==digest(internal/'cpymo-nds.nds'),'Paired ROM mismatch'
     with tempfile.TemporaryDirectory(prefix='cpymo-portable-smoke-') as temp:
@@ -62,6 +65,7 @@ def main():
         report=json.loads(result.read_text(encoding='utf-8'))
         assert completed.returncode==0,report
         assert report['ok'],report
+        assert report['release_version']==VERSION,report
         assert len(report['videos'])==1,report
         assert report['videos'][0]['format']=='NVL1',report
         game=Path(report['game_directory'])
@@ -70,9 +74,27 @@ def main():
         assert (game/'script/START.txt').read_bytes()==original_script
         assert (Path(report['output'])/'cpymo-nds.nds').is_file(),'ROM not bundled with converted output'
         assert digest(Path(report['output'])/'cpymo-nds.nds')==digest(rom),'ROM mismatch in conversion'
+        proof=root/'native-validation';proof.mkdir()
+        gui_result=proof/'result.json'
+        gui_cfg={'source':str(src),'output_base':str(work/'gui-output'),
+                 'result':str(gui_result),'screenshot':str(proof/'window.png')}
+        (work/'gui-output').mkdir()
+        gui_path=work/'gui.json';gui_path.write_text(json.dumps(gui_cfg),encoding='utf8')
+        gui=subprocess.run([str(exe),'--state-root',str(proof/'jobs'),'--self-test',str(gui_path)],
+                           capture_output=True,timeout=180)
+        assert gui.returncode==0 and gui_result.is_file(),gui.stderr[-500:]
+        gui_report=json.loads(gui_result.read_text(encoding='utf8'))
+        assert gui_report['ok'] and gui_report['release_version']==VERSION,gui_report
+        assert VERSION in gui_report['ui_version_footer'],gui_report
+        assert gui_report['ui_title'],gui_report
+        verify(Path(gui_report['game_directory']))
+        assert hashes(src)==before,'GUI modified original source'
+        assert digest(Path(gui_report['output'])/'cpymo-nds.nds')==digest(rom)
         print(json.dumps({'frozen_worker':'PASS','ffmpeg_video':'PASS','format':'NVL1',
             'frames':report['videos'][0]['frames'],'rom_pair':'MATCH',
-            'source_preservation':'PASS'},ensure_ascii=False))
+            'source_preservation':'PASS','release_version':VERSION,
+            'frozen_gui':'PASS','actual_ui_version_footer':gui_report['ui_version_footer'],
+            'ui_screenshot':gui_report.get('ui_screenshot')},ensure_ascii=False))
 
 
 if __name__=='__main__':

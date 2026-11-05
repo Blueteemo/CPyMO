@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit the four paired CPyMO 1.2 RC distributions built in one Actions run.
+"""Audit four same-commit CPyMO for NDS release distributions.
 
 Read the actual ZIPs, check paired ROM, corresponding FFmpeg
 source, the Windows PE icon, Mac Finder icon, and required artwork attribution.
@@ -24,7 +24,7 @@ APPROVED_ICON_RGBA_SHA256 = "a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a58
 APPROVED_ICON_ID = "approved-pymo-original-rounded-2026"
 MACOS_CONTENT_SCALE = 0.80
 APPROVED_FFMPEG_SOURCE_SHA256 = "de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f"
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 
 
 def digest(data: bytes) -> str:
@@ -175,7 +175,7 @@ def main():
     spec.loader.exec_module(verifier)
     verified_rom = verifier.validate_rom_bytes(rom)
     assert verified_rom["single_rom_for_NTR_TWL"]
-    report = {"status": "RC verified, not a published GitHub Release",
+    report = {"status": "Same-commit release assets verified",
               "source_commit": os.environ.get("GITHUB_SHA", "unknown"),
               "workflow_run": os.environ.get("GITHUB_RUN_ID", "local"),
               "rom_sha256": digest(rom), "verified_rom": verified_rom,
@@ -254,16 +254,16 @@ def main():
         # all desktop derivatives are reproducible without the retired artwork.
         for name in ("ICON-ATTRIBUTION.txt", "PYMO-ORIGINAL-MIT-LICENSE.txt"):
             assert z.getinfo(member(z, "cpymo-tool/nds-converter/assets/" + name)).file_size > 100
-        assert z.getinfo("CPyMO-for-NDS-1.2.1-Sources/LICENSE").file_size > 100
+        assert z.getinfo(f"CPyMO-for-NDS-{VERSION}-Sources/LICENSE").file_size > 100
     report["distributions"]["sources"] = {"bytes": paths["sources"].stat().st_size,
                                            "sha256": digest(paths["sources"].read_bytes()),
                                            "approved_icon_source_sha256": digest(source_icon)}
     report["distributions"]["rom"] = {"bytes": len(rom), "sha256": digest(rom)}
     args.output.mkdir(parents=True, exist_ok=True)
-    output = args.output / "CPyMO-for-NDS-1.2.1-RC-SHA256SUMS.txt"
+    output = args.output / f"CPyMO-for-NDS-{VERSION}-SHA256SUMS.txt"
     output.write_text("".join(f"{digest(paths[name].read_bytes())}  {paths[name].name}\n"
                               for name in ("rom","windows","macos","sources")), encoding="ascii")
-    (args.output / "RC-PAIRED-AUDIT.json").write_text(
+    (args.output / "RELEASE-PAIRED-AUDIT.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, ensure_ascii=False))
 

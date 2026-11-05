@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only gate for CPyMO for NDS 1.2 release artifacts.
+"""Read-only gate for CPyMO for NDS release artifacts.
 
 Validates the *actual published ROM*, not an intermediate SDK build. The
 unpatched/placeholder build must FAIL. Also check any paired Windows/macOS
@@ -9,6 +9,8 @@ GUI testing, FFmpeg licensing, or full corresponding-source review.
 from __future__ import annotations
 import argparse
 import hashlib
+import importlib.util
+import io
 import json
 import stat
 from pathlib import Path
@@ -18,6 +20,11 @@ import zipfile
 READY = b"CPYMO_BG_READY12"
 EXPECTED_BG_SHA256 = "92d91514ac12ccab6037a86a71e0c4cf1047917d15de59b91bcc8e4bb4d7d1b2"
 FRAME_BYTES = 256 * 192 * 2
+BACKEND = Path(__file__).resolve().parents[1]
+EXPECTED_VERSION = json.loads((BACKEND / "release.json").read_text(encoding="utf8"))["version"]
+_banner_spec = importlib.util.spec_from_file_location("release_rom_banner", BACKEND / "rom_banner.py")
+_banner_module = importlib.util.module_from_spec(_banner_spec)
+_banner_spec.loader.exec_module(_banner_module)
 
 
 def sha(b: bytes) -> str:
@@ -33,6 +40,18 @@ def validate_rom_bytes(b: bytes) -> dict:
     if offset < 0x200 or size < FRAME_BYTES or offset + size > len(b):
         raise ValueError("Invalid ARM9 ROM bounds")
     arm9 = b[offset:offset + size]
+    # Check compiled ARM9 text independently of the outer filename and Banner.
+    runtime_title = f"CPyMO for NDS   {EXPECTED_VERSION}".encode("ascii")
+    if runtime_title not in arm9:
+        raise ValueError(f"Compiled runtime version is not {EXPECTED_VERSION}")
+    _, banner = _banner_module._load_banner(io.BytesIO(b))
+    titles = []
+    for i in range(_banner_module.LANGUAGE_COUNT):
+        start = _banner_module.TITLE_START + i * _banner_module.TITLE_SLOT_BYTES
+        text = banner[start:start + _banner_module.TITLE_SLOT_BYTES].decode("utf-16le")
+        titles.append(text.split("\x00", 1)[0].split("\n"))
+    if any(title != ["CPyMO for NDS", EXPECTED_VERSION, "千岚之夏"] for title in titles):
+        raise ValueError(f"Banner version/title is not {EXPECTED_VERSION}")
     found = []
     i = 0
     while True:
@@ -52,6 +71,8 @@ def validate_rom_bytes(b: bytes) -> dict:
             "do not publish the placeholder-only CI ROM"
         )
     return {"rom_bytes": len(b), "rom_sha256": sha(b),
+            "release_version": EXPECTED_VERSION, "compiled_runtime_version": EXPECTED_VERSION,
+            "banner_titles": titles, "banner_crc16": "PASS",
             "runtime_header_unit": b[0x12], "approved_art_sha256": EXPECTED_BG_SHA256,
             "approved_art_offset": found[0], "single_rom_for_NTR_TWL": True}
 

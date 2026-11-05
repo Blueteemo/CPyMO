@@ -8,11 +8,13 @@ import argparse
 import hashlib
 import json
 import platform
+import plistlib
 import subprocess
 import sys
 import tempfile
 
 from test_converter import fixture, hashes
+from release_info import VERSION
 
 
 def digest(path):
@@ -38,6 +40,9 @@ def main():
     rom=root/"cpymo-nds.nds"
     assert rom.is_file()
     metadata=json.loads((root/"VERSION.json").read_text())
+    assert metadata["version"]==VERSION
+    info=plistlib.loads((app/"Contents/Info.plist").read_bytes())
+    assert info["CFBundleVersion"]==info["CFBundleShortVersionString"]==VERSION
     assert metadata["macos_architecture"]==a.target_arch
     assert digest(rom)==metadata["rom_sha256"]
     bundled=app/"Contents/Frameworks/ffmpeg"
@@ -72,12 +77,13 @@ def main():
         assert result.is_file(),f"Frozen conversion failed {done.returncode}: {done.stderr[-1200:]}"
         report=json.loads(result.read_text(encoding="utf8"))
         assert done.returncode==0 and report["ok"], (report,log.read_text(errors="replace")[-1400:])
+        assert report["release_version"]==VERSION,report
         assert report["videos"][0]["format"]=="NVL1",report
         assert report["missing_policy"]=="box",report
         assert hashes(source)==original,"Source was modified"
         assert digest(out/"cpymo-nds.nds")==digest(rom),"Bundled ROM mismatch"
         assert (Path(report["game_directory"])/"nds-cache/video").is_dir()
-        print(json.dumps({"mac_frozen_worker":"PASS","default_video":"NVL1",
+        print(json.dumps({"mac_frozen_worker":"PASS","release_version":VERSION,"default_video":"NVL1",
                           "missing_glyph_policy":"box","paired_rom":"MATCH",
                           "source_integrity":"PASS","ffmpeg_license_flags":"LGPL-compatible",
                           "ffmpeg_bundle_sha256":bundled_hash,"native_arch":a.target_arch,

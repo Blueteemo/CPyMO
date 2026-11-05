@@ -1,4 +1,4 @@
-name: CPyMO 1.2.1 Universal ROM and Paired Desktop RC
+name: CPyMO 1.3.0 Universal ROM and Paired Desktop Release
 on:
   workflow_dispatch:
   push:
@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Build the SINGLE universal NTR/TWL ROM from tagged source
+      - name: Build the SINGLE universal NTR/TWL ROM from checked-out source
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git submodule update --init stb endianness.h
@@ -35,7 +35,7 @@ jobs:
           sha256sum release-rom/cpymo-nds.nds
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC
+          name: CPyMO-1.3.0-UNIVERSAL-VERIFIED-ROM
           path: release-rom/
           retention-days: 21
           if-no-files-found: error
@@ -85,14 +85,14 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
-          name: CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC
+          name: CPyMO-1.3.0-UNIVERSAL-VERIFIED-ROM
           path: .release-rom
       - name: Install pinned converter dependencies
         run: python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
       - name: Download paired macOS package for its verified original FFmpeg source
         uses: actions/download-artifact@v4
         with:
-          name: CPyMO-1.2.1-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
+          name: CPyMO-1.3.0-macOS-arm64-PAIRED-ROM
           path: .paired-ffmpeg-source
       - name: Extract only the approved FFmpeg source archive from the paired package
         shell: pwsh
@@ -102,7 +102,7 @@ jobs:
           from pathlib import Path
           import zipfile
           root = Path('.paired-ffmpeg-source')
-          with zipfile.ZipFile(root / 'CPyMO-for-NDS-1.2.1-Starter-macOS-arm64-RC.zip') as z:
+          with zipfile.ZipFile(root / 'CPyMO-for-NDS-1.3.0-Starter-macOS-arm64.zip') as z:
               matches = [name for name in z.namelist() if name.endswith('/FFmpeg-Corresponding-Source/ffmpeg-7.1.5.tar.xz')]
               assert len(matches) == 1, matches
               source = z.read(matches[0])
@@ -147,10 +147,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows frozen package build failed' }
           python cpymo-tool/nds-converter/tests/smoke_windows_portable.py --portable windows-rc --ffmpeg "$env:NDS_FFMPEG"
           if ($LASTEXITCODE -ne 0) { throw 'Windows synthetic video conversion failed' }
-      - name: Assemble user-facing Windows RC without copyrighted game content
+      - name: Assemble user-facing Windows distribution without copyrighted game content
         shell: pwsh
         run: |
-          $folder = 'out/CPyMO-for-NDS-1.2.1-Starter-Windows-RC'
+          $folder = 'out/CPyMO-for-NDS-1.3.0-Starter-Windows'
           New-Item -ItemType Directory -Force -Path "$folder/Converter", "$folder/pymo/games" | Out-Null
           Copy-Item -Recurse 'windows-rc/app/Converter/*' "$folder/Converter/"
           Copy-Item windows-rc/cpymo-nds.nds "$folder/cpymo-nds.nds"
@@ -164,19 +164,22 @@ jobs:
           Set-Content -Path "$folder/启动转换器.bat" -Value '@echo off' -Encoding ascii
           Add-Content -Path "$folder/启动转换器.bat" -Value 'start "" "%~dp0Converter\Converter.exe"' -Encoding ascii
           @'
-          CPyMO for NDS 1.2.1 -- RELEASE CANDIDATE FOR INTERNAL REVIEW
-          This Windows package has been tested with synthetic video.
-          Missing third-party redistribution notices and FFmpeg corresponding
-          sources MUST be resolved before a public GitHub Release.
+          CPyMO for NDS 1.3.0
+          Companion game-data converter for Nintendo DS / DSi.
+          Corresponding FFmpeg source, build configuration and third-party
+          licenses are included. Keep them with redistributed binaries.
           Back up old save folders and do not overwrite personal game files.
-          '@ | Set-Content -Path "$folder/发行前须知.txt" -Encoding UTF8
-          Compress-Archive -Path "$folder" -DestinationPath CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip
+          '@ | Set-Content -Path "$folder/安装须知.txt" -Encoding UTF8
+          Compress-Archive -Path "$folder" -DestinationPath CPyMO-for-NDS-1.3.0-Starter-Windows.zip
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "Windows zip stage failed" }
-          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --windows-starter CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --windows-starter CPyMO-for-NDS-1.3.0-Starter-Windows.zip
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2.1-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE
-          path: CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip
+          name: CPyMO-1.3.0-WINDOWS-PAIRED-ROM
+          path: |
+            CPyMO-for-NDS-1.3.0-Starter-Windows.zip
+            windows-rc/native-validation/result.json
+            windows-rc/native-validation/window.png
           retention-days: 21
           if-no-files-found: error
 
@@ -195,7 +198,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
-          name: CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC
+          name: CPyMO-1.3.0-UNIVERSAL-VERIFIED-ROM
           path: .release-rom
       - name: Build and verify LGPL-only FFmpeg from corresponding FFmpeg source
         run: |
@@ -217,9 +220,9 @@ jobs:
           python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds
           python cpymo-tool/nds-converter/build_portable_macos.py --rom .release-rom/cpymo-nds.nds --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH" --output macos-rc --require-desktop-icon
           python cpymo-tool/nds-converter/tests/smoke_macos_portable.py --portable macos-rc --ffmpeg "$NDS_FFMPEG" --target-arch "$CPYMO_MAC_ARCH"
-      - name: Package native macOS ARM64 RC for local Finder test
+      - name: Package native macOS ARM64 distribution
         run: |
-          folder="out/CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC"
+          folder="out/CPyMO-for-NDS-1.3.0-Starter-macOS-${CPYMO_MAC_ARCH}"
           mkdir -p "$folder/FFmpeg-Corresponding-Source"
           ditto macos-rc/CPyMO-NDS-Converter.app "$folder/CPyMO-NDS-Converter.app"
           cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt macos-rc/ICON-MANIFEST.json "$folder/"
@@ -231,13 +234,13 @@ jobs:
           test -s "$folder/ICON-ATTRIBUTION.txt" && test -s "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
           cp -R macos-ffmpeg-lgpl/source/. "$folder/FFmpeg-Corresponding-Source/"
           cd out
-          ditto -c -k --sequesterRsrc --keepParent "CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC" "../CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
+          ditto -c -k --sequesterRsrc --keepParent "CPyMO-for-NDS-1.3.0-Starter-macOS-${CPYMO_MAC_ARCH}" "../CPyMO-for-NDS-1.3.0-Starter-macOS-${CPYMO_MAC_ARCH}.zip"
           cd ..
-          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter "CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC.zip"
+          python cpymo-backends/nds/tools/verify-release-artifact.py --rom .release-rom/cpymo-nds.nds --macos-starter "CPyMO-for-NDS-1.3.0-Starter-macOS-${CPYMO_MAC_ARCH}.zip"
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2.1-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
-          path: CPyMO-for-NDS-1.2.1-Starter-macOS-arm64-RC.zip
+          name: CPyMO-1.3.0-macOS-arm64-PAIRED-ROM
+          path: CPyMO-for-NDS-1.3.0-Starter-macOS-arm64.zip
           retention-days: 21
           if-no-files-found: error
 
@@ -254,19 +257,19 @@ jobs:
           from pathlib import Path
           import zipfile
           root=Path('.')
-          name='CPyMO-for-NDS-1.2.1-Sources-RC.zip'
+          name='CPyMO-for-NDS-1.3.0-Sources.zip'
           with zipfile.ZipFile(name,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
               for p in sorted(root.rglob('*')):
                   if not p.is_file() or '.git' in p.parts or any(s in p.parts for s in ('node_modules','__pycache__','.pytest_cache')):
                       continue
                   if p==Path(name):continue
-                  z.write(p, 'CPyMO-for-NDS-1.2.1-Sources/'+p.as_posix())
+                  z.write(p, 'CPyMO-for-NDS-1.3.0-Sources/'+p.as_posix())
           print('Source tree ZIP',Path(name).stat().st_size)
           PY
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2.1-SOURCES-RC-LICENSE-REVIEW
-          path: CPyMO-for-NDS-1.2.1-Sources-RC.zip
+          name: CPyMO-1.3.0-SOURCES
+          path: CPyMO-for-NDS-1.3.0-Sources.zip
           retention-days: 21
           if-no-files-found: error
 
@@ -283,24 +286,24 @@ jobs:
       - name: Download all four distributions from the SAME workflow run
         uses: actions/download-artifact@v4
         with:
-          pattern: CPyMO-1.2.1-*
+          pattern: CPyMO-1.3.0-*
           path: .paired-download
           merge-multiple: false
       - name: Audit real archives, ROM pairing, FFmpeg source, attribution and embedded icons
         run: |
           python -m pip install Pillow==12.3.0
           python cpymo-backends/nds/tools/audit-desktop-release.py \
-            --rom ".paired-download/CPyMO-1.2.1-UNIVERSAL-VERIFIED-ROM-RC/cpymo-nds.nds" \
-            --windows ".paired-download/CPyMO-1.2.1-WINDOWS-PAIRED-ROM-RC-NOT-RELEASE/CPyMO-for-NDS-1.2.1-Starter-Windows-RC.zip" \
-            --macos ".paired-download/CPyMO-1.2.1-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW/CPyMO-for-NDS-1.2.1-Starter-macOS-arm64-RC.zip" \
-            --sources ".paired-download/CPyMO-1.2.1-SOURCES-RC-LICENSE-REVIEW/CPyMO-for-NDS-1.2.1-Sources-RC.zip" \
+            --rom ".paired-download/CPyMO-1.3.0-UNIVERSAL-VERIFIED-ROM/cpymo-nds.nds" \
+            --windows ".paired-download/CPyMO-1.3.0-WINDOWS-PAIRED-ROM/CPyMO-for-NDS-1.3.0-Starter-Windows.zip" \
+            --macos ".paired-download/CPyMO-1.3.0-macOS-arm64-PAIRED-ROM/CPyMO-for-NDS-1.3.0-Starter-macOS-arm64.zip" \
+            --sources ".paired-download/CPyMO-1.3.0-SOURCES/CPyMO-for-NDS-1.3.0-Sources.zip" \
             --output release-paired-audit
-          test -s release-paired-audit/CPyMO-for-NDS-1.2.1-RC-SHA256SUMS.txt
-          test -s release-paired-audit/RC-PAIRED-AUDIT.json
-      - name: Upload cross-platform release candidate audit and SHA256SUMS
+          test -s release-paired-audit/CPyMO-for-NDS-1.3.0-SHA256SUMS.txt
+          test -s release-paired-audit/RELEASE-PAIRED-AUDIT.json
+      - name: Upload cross-platform release audit and SHA256SUMS
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CPyMO-1.2.1-PAIRED-STAGING-AUDIT-SHA256SUMS
+          name: CPyMO-1.3.0-PAIRED-AUDIT-SHA256SUMS
           path: release-paired-audit/
           retention-days: 21
           if-no-files-found: error

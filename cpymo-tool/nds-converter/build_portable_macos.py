@@ -117,7 +117,7 @@ def main():
         if len(verified)!=1:
             raise RuntimeError("Configured Finder/Dock icon does not match approved rounded original ICNS")
         icon_name=verified[0].name
-    # PyInstaller defaults to Finder's 0.0.0 even though the UI says 1.2.0.
+    # PyInstaller defaults to Finder's 0.0.0 unless the actual release is set.
     # Set the release metadata and re-apply only an ad-hoc local code signature:
     # this is NOT Apple Developer ID signing or notarization.
     info = app / "Contents/Info.plist"
@@ -176,22 +176,22 @@ def main():
                     ffmpeg_input_sha256=ffmpeg_input_sha,
                     ffmpeg_bundled_sha256=ffmpeg_bundle_sha,
                     ffmpeg_sha256=ffmpeg_input_sha,
-                    macos_bundle_validation="paired ROM and FFmpeg captured; unsigned/not notarized")
+                    macos_bundle_validation="paired ROM and FFmpeg captured; ad-hoc signed/not notarized")
     (output / "VERSION.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf8")
     (output / "README-macOS.txt").write_text(
-        "CPyMO NDS 转换助手 macOS 开发候选包（非正式发行版）\n"
+        f"CPyMO NDS 转换助手 {metadata['version']} macOS ARM64\n"
         "打开 CPyMO-NDS-Converter.app 转换原版 PyMO 游戏。\n"
-        "本候选版没有 Apple Developer ID 签名，也未经 Apple 公证。\n"
+        "本应用采用临时签名，未经 Apple Developer ID 签名及 Apple 公证。\n"
         "请确认从可信发布来源获取并核对 SHA-256 后再决定是否打开。\n"
         "若被 Gatekeeper 拦截，可参照 Apple 官方说明在「系统设置 > 隐私与安全性」\n"
         "中检查「仍要打开」；不要全局关闭 Gatekeeper 或系统完整性保护。\n"
         "官方文档：https://support.apple.com/zh-cn/102445\n"
-        "正式公开发布前仍须核对第三方来源与发行安全注意事项。\n"
+        "第三方来源、构建信息和许可随包提供，请保留对应材料。\n"
         "可运行游戏程序为同目录 cpymo-nds.nds，不含商业游戏。\n",
         encoding="utf8")
     print(json.dumps({"version": metadata["version"], "architecture":args.target_arch,
                       "rom_sha256": digest(rom),
-                      "app": str(output / app.name), "macos_candidate": True},
+                      "app": str(output / app.name), "macos_package": True},
                      ensure_ascii=False, indent=2))
 
 

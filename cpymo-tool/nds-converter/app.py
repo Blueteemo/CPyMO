@@ -112,7 +112,8 @@ class App:
         self.log=tk.Text(frame,height=4,wrap='word',background='#f1f4f8',foreground='#233247',insertbackground='#233247',selectbackground='#27659c',selectforeground='#ffffff',relief='solid',borderwidth=1,font=log_font,spacing1=3,spacing2=4,spacing3=5,padx=10,pady=8)
         self.log.pack(fill='both',expand=True,pady=(4,8))
         self.log.configure(state='disabled')
-        ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579').pack(anchor='w')
+        self.version_label=ttk.Label(frame,text='NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 '+VERSION,foreground='#526579')
+        self.version_label.pack(anchor='w')
         window.protocol('WM_DELETE_WINDOW',self.close)
         self._capture_localizable_widgets(self.window)
         self.change_language()
@@ -314,6 +315,8 @@ class App:
             result=dict(report)
             try:
                 self.window.lift();self.window.update()
+                result['ui_title']=self.window.title()
+                result['ui_version_footer']=str(self.version_label.cget('text'))
                 from PIL import ImageGrab
                 # Screenshot capture is ancillary on macOS: permissions and
                 # unsupported window capture APIs must not discard the actual
