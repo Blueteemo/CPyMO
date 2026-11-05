@@ -1,44 +1,41 @@
-CPyMO for NDS — Desktop converter icon attribution (1.2.1)
-==================================================================
+CPyMO for NDS — NDS program and companion-converter icon refresh (1.2.1)
+=======================================================================
 
 Source motif:
   PyMO original app icon (girl, yellow mascot and game controller)
   https://github.com/pymo/pymo/blob/master/images/pymo-icon.png
   https://github.com/pymo/pymo/blob/master/images/pymo-icon.psd
+  Copyright (c) 2013 pymo.
+  The original project's MIT notice is retained in
+  PYMO-ORIGINAL-MIT-LICENSE.txt. No endorsement is implied.
 
-Original project:
-  PyMO (https://github.com/pymo/pymo)
-  Copyright (c) 2013 pymo
-  MIT License — see the accompanying PYMO-ORIGINAL-MIT-LICENSE.txt.
+Current artwork:
+  User-provided, AI-assisted high-resolution interpretation of the PyMO motif,
+  selected and approved for CPyMO for NDS 1.2.1 on 2026-11-05.
+  Original square illustration SHA-256:
+  c5144d0bc49afdbccb3ce336cbedfecf130eb50574e4df7de35c048db34b9c38
 
-CPyMO desktop artwork:
-  Selected high-resolution pixel-style derivative, approved by the
-  CPyMO for NDS contributor on 2026-10-25.
-  Archival master: 04_高清像素图标_透明外框.png
-  1254 × 1254 RGBA; SHA-256:
-  3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62
-  On 2026-11-01, the contributor approved an alpha-only perimeter cleanup
-  of this archival original: 16px Euclidean inset and 1.8px feather.
-  Approved cleaned 1254x1254 RGBA pixel SHA-256:
-  3534161a2e9594802247f735c5ed70eedab0a55e40bce9fa3860a0f0d7f174f1
-  Matching approved cleaned PNG SHA-256 (Pillow optimize):
-  00c83413db94122ed52447120eed2b67739b43990fa81b65c937d369e5495044
-  The original is retained for traceability. The shared icon builder
-  deterministically regenerates the clean master into
-  converter-icon-source-clean.png, verifies its RGBA pixel SHA-256,
-  and never uses the original dark perimeter in desktop derivatives.
-  No new illustration or character design is generated.
-  Generated app icon formats: Windows .ico, macOS .icns and PNG,
-  produced by scaling/container conversion with 2.4% horizontal optical
-  balancing on desktop derivatives only. The archival master and NDS banner are unchanged.
-  The source file is included in the corresponding CPyMO source archive:
-  cpymo-tool/nds-converter/assets/converter-icon-source.png
+Desktop companion converters:
+  The approved 1024x1024 RGBA PNG has a small outer-edge cleanup and a
+  supersampled antialiased rounded-corner mask. No CPyMO wordmark was added;
+  the characters, original colors, layout and internal linework are retained.
+  Canonical file: assets/converter-icon-source.png
+  Canonical PNG SHA-256:
+  133abae11b6d958c8e02d70e67dcf997049b5277bde3c734860e19f80257d90e
+  Decoded 1024x1024 RGBA pixel SHA-256:
+  a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a582f50ec15a4460
+  All Windows ICO, macOS ICNS and GUI PNG variants share this source.
+  There is no second round-corner mask, 16px erosion or horizontal compression.
+  The former 04 pixel-art / perimeter-cleanup icon is superseded, not bundled
+  as an alternative design. Git history is not rewritten.
 
-This is a visually modified, AI-assisted derivation of the PyMO icon,
-not an independently originating character design. The original rights
-and copyright notices are respected and not assigned to the AI tool.
-The upstream MIT license and attribution are retained. No affiliation
-with or endorsement by PyMO's original authors is implied.
+Nintendo DS program:
+  Its external banner, splash and internal fallback icon use the original
+  FULL-SQUARE composition at 32x32, 15 opaque RGB555 colors, with no rounded mask.
+  This desktop icon generator does not write those NDS resources or any
+  game's own cover/icon. See cpymo-backends/nds/assets/ICON-ORIGIN.md.
 
-This artwork is distinct from the Nintendo DS 32×32 banner artwork,
-which is not replaced by the desktop icon.
+These are an NDS game program and Windows/macOS companion data converters,
+not three independent game clients or new Windows/macOS playback backends.
+The original creators' rights and notices are retained. This update does not
+claim ownership of the original characters or authors' approval.

@@ -32,7 +32,7 @@ def main():
     parser.add_argument("--target-arch", choices=("arm64", "x86_64"), default=platform.machine(),
                         help="Build a native single-architecture app; ARM64 requires Apple silicon.")
     parser.add_argument("--require-desktop-icon", action="store_true",
-                        help="Fail packaging unless the approved 04 desktop icon source is present")
+                        help="Fail packaging unless the approved rounded original icon source is present")
     args = parser.parse_args()
     if sys.platform != "darwin":
         parser.error("Build native macOS applications on a macOS host.")
@@ -73,10 +73,12 @@ def main():
     paired_ffmpeg.chmod(paired_ffmpeg.stat().st_mode | 0o111)
     icon_source = HERE / "assets/converter-icon-source.png"
     icon_args=[]
+    icon_manifest=None
     if icon_source.is_file():
         from tools.build_desktop_icons import build as build_icons
         branding = build / "branding"
-        build_icons(icon_source,branding)
+        icon_manifest=build_icons(icon_source,branding)
+        shutil.copy2(branding/"icon-manifest.json",output/"ICON-MANIFEST.json")
         icon_args=["--icon",str(branding/"converter-icon.icns"),
                    "--add-data",f"{branding/'converter-icon-64.png'}:assets"]
     elif args.require_desktop_icon:
@@ -112,7 +114,7 @@ def main():
         candidates=list((app/"Contents/Resources").glob("*.icns"))
         verified=[p for p in candidates if digest(p)==expected_icon]
         if len(verified)!=1:
-            raise RuntimeError("Configured Finder/Dock icon does not match approved PyMO 04 ICNS")
+            raise RuntimeError("Configured Finder/Dock icon does not match approved rounded original ICNS")
         icon_name=verified[0].name
     # PyInstaller defaults to Finder's 0.0.0 even though the UI says 1.2.0.
     # Set the release metadata and re-apply only an ad-hoc local code signature:
@@ -161,7 +163,9 @@ def main():
     shutil.copytree(app, output / app.name, symlinks=True)
     shutil.copy2(rom, output / "cpymo-nds.nds")
     shutil.rmtree(build)
-    metadata.update(desktop_icon="approved-PyMO-04" if icon_args else "default-not-public",
+    metadata.update(desktop_icon=icon_manifest["artwork_id"] if icon_manifest else "default-not-public",
+                    desktop_icon_source_sha256=icon_manifest["source_sha256"] if icon_manifest else None,
+                    desktop_icon_pixel_sha256=icon_manifest["source_rgba_sha256"] if icon_manifest else None,
                     macos_architecture=args.target_arch,
                     app_bundle_version=metadata["version"],
                     rosetta_required=False if args.target_arch=="arm64" else "Apple silicon only",

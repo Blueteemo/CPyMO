@@ -1,74 +1,91 @@
-"""Packaging regression for PyMO 04 desktop icon; never rewrites the NDS banner."""
+"""Desktop converter artwork: immutable approved PNG, no further geometry edits."""
 from __future__ import annotations
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import shutil
 import sys
 import tempfile
-from pathlib import Path
 import unittest
 from PIL import Image, ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from tools.build_desktop_icons import build, SOURCE_SHA256, WINDOWS_SIZES, OPTICAL_WIDTH_SCALE, APPROVED_CLEAN_RGBA_SHA256
-
+from tools.build_desktop_icons import (build, SOURCE_SHA256, APPROVED_RGBA_SHA256,
+                                      ARTWORK_ID, WINDOWS_SIZES, OPTICAL_WIDTH_SCALE,
+                                      ico_frame_hashes, pixel_sha)
 
 class DesktopIconBuildTests(unittest.TestCase):
-    def test_source_hash_is_pinned(self):
-        self.assertEqual(len(SOURCE_SHA256),64)
-        self.assertIn("assets/converter-icon-source.png", (ROOT/"build_portable_macos.py").read_text(encoding="utf8"))
-        self.assertIn("--require-desktop-icon", (ROOT/"build_portable.py").read_text(encoding="utf8"))
-
-    def test_generator_produces_actual_multi_resolution_icons(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp)
-            # Synthetic drawing is ONLY a test fixture. A public release must
-            # use the real pinned image; the fixture cannot pass that check.
-            synthetic=Image.new("RGBA",(1254,1254),(0,0,0,0))
-            d=ImageDraw.Draw(synthetic)
-            d.ellipse((90,95,1165,1155),fill=(225,171,95,255))
-            source=root/"fixture.png"
-            synthetic.save(source)
-            with self.assertRaises(ValueError):
-                build(source,root/"forbidden")
-            output=root/"generated"
-            manifest=build(source,output,allow_alternate_source=True)
-            self.assertIn("outputs",manifest)
-            self.assertEqual(manifest["optical_width_scale"],0.976)
-            self.assertAlmostEqual(OPTICAL_WIDTH_SCALE,0.976)
-            for item in ("png","png_64","ico","icns"):
-                self.assertGreater(manifest["outputs"][item]["bytes"],100)
-            self.assertTrue((output/"converter-icon-source-clean.png").is_file())
-            with Image.open(output/"converter-icon.png") as im:
-                self.assertEqual(im.size,(1024,1024))
-                bbox=im.getchannel("A").getbbox()
-                self.assertLessEqual(abs((bbox[2]-bbox[0])-(bbox[3]-bbox[1])),18)
-            with Image.open(output/"converter-icon.ico") as im:
-                self.assertTrue(set(WINDOWS_SIZES)<=set(im.info["sizes"]))
-            with Image.open(output/"converter-icon.icns") as im:
-                self.assertEqual(im.size,(1024,1024))
-                self.assertIn((512,512,2),im.info["sizes"])
-
-    def test_approved_production_master_matches_pixel_hash(self):
-        source=ROOT/"assets/converter-icon-source.png"
-        with tempfile.TemporaryDirectory() as tmp:
-            out=Path(tmp)/"approved"
-            manifest=build(source,out)
-            self.assertEqual(manifest["approved_clean_pixel_sha256"],
-                             APPROVED_CLEAN_RGBA_SHA256)
-            with Image.open(source) as original, Image.open(
-                out/"converter-icon-source-clean.png"
-            ) as modified:
-                self.assertEqual(original.convert("RGB").tobytes(),
-                                 modified.convert("RGB").tobytes())
-                self.assertEqual(modified.getchannel("A").getbbox(),
-                                 (84,99,1171,1159))
-
+    @classmethod
+    def setUpClass(cls):
+        cls.temp=tempfile.TemporaryDirectory()
+        cls.source=ROOT/"assets/converter-icon-source.png"
+        cls.out=Path(cls.temp.name)/"production"
+        cls.manifest=build(cls.source,cls.out)
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+    def test_source_hash_and_size_are_pinned(self):
+        self.assertEqual(hashlib.sha256(self.source.read_bytes()).hexdigest(),SOURCE_SHA256)
+        with Image.open(self.source) as im:
+            self.assertEqual(im.size,(1024,1024))
+            self.assertEqual(pixel_sha(im),APPROVED_RGBA_SHA256)
+    def test_master_is_byte_identical_to_approved_png(self):
+        self.assertEqual(self.source.read_bytes(),(self.out/"converter-icon.png").read_bytes())
+        self.assertEqual(OPTICAL_WIDTH_SCALE,1.0)
+        self.assertFalse(self.manifest["reapplied_crop_or_mask"])
+        self.assertFalse(self.manifest["lossy_reencoding"])
+        self.assertFalse((self.out/"converter-icon-source-clean.png").exists())
+    def test_windows_ico_has_seven_exact_source_resizes(self):
+        with Image.open(self.source) as source, Image.open(self.out/"converter-icon.ico") as icon:
+            self.assertEqual(set(icon.info["sizes"]),set(WINDOWS_SIZES))
+            for size in WINDOWS_SIZES:
+                actual=icon.ico.getimage(size).convert("RGBA")
+                expected=source.convert("RGBA").resize(size,Image.Resampling.LANCZOS)
+                self.assertEqual(actual.tobytes(),expected.tobytes(),size)
+        frames=ico_frame_hashes(self.out/"converter-icon.ico")
+        self.assertEqual(frames,self.manifest["windows_ico_frames_sha256"])
+        self.assertEqual(len(frames),7)
+    def test_macos_largest_icns_retains_all_source_pixels(self):
+        with Image.open(self.out/"converter-icon.icns") as icon:
+            self.assertEqual(icon.size,(1024,1024))
+            self.assertEqual(pixel_sha(icon),APPROVED_RGBA_SHA256)
+            self.assertIn((512,512,2),icon.info["sizes"])
+    def test_gui_png_matches_direct_resample(self):
+        with Image.open(self.source) as src, Image.open(self.out/"converter-icon-64.png") as small:
+            expected=src.convert("RGBA").resize((64,64),Image.Resampling.LANCZOS)
+            self.assertEqual(small.convert("RGBA").tobytes(),expected.tobytes())
+    def test_manifest_hashes_cover_actual_outputs(self):
+        manifest=json.loads((self.out/"icon-manifest.json").read_text())
+        self.assertEqual(manifest["artwork_id"],ARTWORK_ID)
+        for item in manifest["outputs"].values():
+            data=(self.out/item["file"]).read_bytes()
+            self.assertEqual(len(data),item["bytes"])
+            self.assertEqual(hashlib.sha256(data).hexdigest(),item["sha256"])
+    def test_alternate_image_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            f=Path(td)/"fake.png"
+            Image.new("RGBA",(1024,1024),(0,0,0,0)).save(f)
+            with self.assertRaises(ValueError):build(f,Path(td)/"out")
+    def test_wrong_dimensions_and_opaque_source_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            f=Path(td)/"fixture.png"
+            Image.new("RGBA",(32,32),(0,0,0,0)).save(f)
+            with self.assertRaises(ValueError):build(f,Path(td)/"out",allow_alternate_source=True)
+            Image.new("RGBA",(1024,1024),(10,20,30,255)).save(f)
+            with self.assertRaises(ValueError):build(f,Path(td)/"out",allow_alternate_source=True)
+    def test_packagers_embed_and_preserve_new_manifest(self):
+        for name in ("build_portable.py","build_portable_macos.py"):
+            text=(ROOT/name).read_text(encoding="utf8")
+            self.assertIn("assets/converter-icon-source.png",text)
+            self.assertIn("ICON-MANIFEST.json",text)
+            self.assertNotIn('desktop_icon="approved-PyMO-04"',text)
+            self.assertIn('desktop_icon_pixel_sha256=',text)
     def test_app_icon_resource_is_nonfatal_when_running_source(self):
-        app=(ROOT/"app.py").read_text(encoding="utf8")
-        self.assertIn("def apply_desktop_icon(window):",app)
-        self.assertIn("window._cpymo_icon_photo=photo",app)
-        self.assertIn("apply_desktop_icon(window)",app)
-        self.assertNotIn("cpymo-backends/nds/assets/icon.png",app)
+        text=(ROOT/"app.py").read_text(encoding="utf8")
+        self.assertIn("def apply_desktop_icon(window):",text)
+        self.assertIn("window._cpymo_icon_photo=photo",text)
+        self.assertNotIn("cpymo-backends/nds/assets/icon.png",text)
 
-
-if __name__=="__main__":
-    unittest.main()
+if __name__=="__main__":unittest.main()

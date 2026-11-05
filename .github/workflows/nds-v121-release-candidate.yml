@@ -22,6 +22,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git submodule update --init stb endianness.h
           test -f cpymo-backends/nds/assets/nds-dual-bg.rgb555
+          python3 cpymo-backends/nds/tools/generate-ui-font.py
           python3 cpymo-backends/nds/build.py --dsi-experiment
       - name: Embed approved 02-B and forbid placeholder release
         run: |
@@ -66,9 +67,11 @@ jobs:
           import json
           from pathlib import Path
           data=json.loads(Path('/tmp/verified-desktop-icons/icon-manifest.json').read_text())
-          assert data['source_sha256']=='3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62'
+          assert data['source_sha256']=='133abae11b6d958c8e02d70e67dcf997049b5277bde3c734860e19f80257d90e'
+          assert data['artwork_id']=='approved-pymo-original-rounded-2026'
+          assert data['reapplied_crop_or_mask'] is False
           assert all(x['bytes']>100 for x in data['outputs'].values())
-          print('Pinned archived PyMO 04 source and desktop icon assets: PASS')
+          print('Approved rounded original PNG and desktop icon assets: PASS')
           PY
 
   windows-rc:
@@ -131,6 +134,7 @@ jobs:
           Copy-Item cpymo-tool/nds-converter/assets/ICON-ATTRIBUTION.txt "$folder/图标来源与署名.txt"
           Copy-Item cpymo-tool/nds-converter/assets/PYMO-ORIGINAL-MIT-LICENSE.txt "$folder/PYMO-ORIGINAL-MIT-LICENSE.txt"
           Copy-Item windows-rc/VERSION.json "$folder/VERSION.json"
+          Copy-Item windows-rc/ICON-MANIFEST.json "$folder/ICON-MANIFEST.json"
           New-Item -ItemType Directory -Force -Path "$folder/FFmpeg-Corresponding-Source" | Out-Null
           Copy-Item windows-ffmpeg-lgpl/source/* "$folder/FFmpeg-Corresponding-Source/"
           Set-Content -Path "$folder/启动转换器.bat" -Value '@echo off' -Encoding ascii
@@ -194,7 +198,7 @@ jobs:
           folder="out/CPyMO-for-NDS-1.2.1-Starter-macOS-${CPYMO_MAC_ARCH}-RC"
           mkdir -p "$folder/FFmpeg-Corresponding-Source"
           ditto macos-rc/CPyMO-NDS-Converter.app "$folder/CPyMO-NDS-Converter.app"
-          cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt "$folder/"
+          cp macos-rc/cpymo-nds.nds macos-rc/VERSION.json macos-rc/README-macOS.txt macos-rc/ICON-MANIFEST.json "$folder/"
           # macOS ditto's ZIP entry name encoding can mangle Chinese basenames.
           # Keep Mac package filenames ASCII; contents remain UTF-8.
           cp cpymo-tool/nds-converter/README.md "$folder/Converter-README.md"

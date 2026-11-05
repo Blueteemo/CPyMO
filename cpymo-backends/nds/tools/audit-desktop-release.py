@@ -18,7 +18,9 @@ import plistlib
 import struct
 import zipfile
 
-APPROVED_ICON_SOURCE_SHA256 = "3f110860ce4e242b79147ccd7b6c6d260efd1a232fa8039b41c02677aa3f8c62"
+APPROVED_ICON_SOURCE_SHA256 = "133abae11b6d958c8e02d70e67dcf997049b5277bde3c734860e19f80257d90e"
+APPROVED_ICON_RGBA_SHA256 = "a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a582f50ec15a4460"
+APPROVED_ICON_ID = "approved-pymo-original-rounded-2026"
 APPROVED_FFMPEG_SOURCE_SHA256 = "de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f"
 VERSION = "1.2.1"
 
@@ -42,7 +44,7 @@ def member(z: zipfile.ZipFile, suffix: str) -> str:
     return matches[0]
 
 
-def ensure_pe_icon(payload: bytes) -> dict:
+def ensure_pe_icon(payload: bytes, expected_frames: dict | None = None) -> dict:
     """Check the actual .exe resources, not just PyInstaller's --icon CLI."""
     u16 = lambda i: struct.unpack_from("<H", payload, i)[0]
     u32 = lambda i: struct.unpack_from("<I", payload, i)[0]
@@ -92,12 +94,29 @@ def ensure_pe_icon(payload: bytes) -> dict:
     reserved, kind, count = struct.unpack_from("<HHH", data)
     assert (reserved, kind, count) == (0, 1, 7)
     sizes = set()
+    frame_hashes = {}
     for i in range(count):
-        w, h, _, _, _, bpp, _, _ = struct.unpack_from("<BBBBHHIH", data, 6+i*14)
+        w, h, _, _, _, bpp, image_bytes, image_id = struct.unpack_from("<BBBBHHIH", data, 6+i*14)
         assert bpp == 32
         sizes.add((w or 256, h or 256))
+        candidates=[rel for key,rel in images if key==image_id]
+        assert len(candidates)==1 and candidates[0]&0x80000000
+        translations=entries(candidates[0]&0x7fffffff)
+        assert translations
+        hashes=[]
+        for _,image_leaf in translations:
+            assert not image_leaf&0x80000000
+            rva=u32(base+image_leaf);length=u32(base+image_leaf+4)
+            assert length==image_bytes
+            hashes.append(digest(payload[offset(rva):offset(rva)+length]))
+        assert len(set(hashes))==1
+        frame_hashes[f"{w or 256}x{h or 256}"]=hashes[0]
     assert {(16,16), (24,24), (32,32), (48,48), (64,64), (128,128), (256,256)} <= sizes
-    return {"PE_group_icon": "PASS", "sizes": sorted(sizes)}
+    if expected_frames is not None:
+        assert frame_hashes==expected_frames, "PE contains wrong icon image bytes"
+    return {"PE_group_icon": "PASS", "sizes": sorted(sizes),
+            "frame_payloads_sha256":frame_hashes,
+            "image_payloads_match_manifest":expected_frames is not None}
 
 
 def main():
@@ -142,7 +161,16 @@ def main():
             metadata = json.loads(z.read(member(z, "VERSION.json")))
             assert metadata["version"] == VERSION
             assert metadata["rom_sha256"] == digest(rom)
-            assert metadata["desktop_icon"] == "approved-PyMO-04"
+            assert metadata["desktop_icon"] == APPROVED_ICON_ID
+            assert metadata["desktop_icon_source_sha256"] == APPROVED_ICON_SOURCE_SHA256
+            assert metadata["desktop_icon_pixel_sha256"] == APPROVED_ICON_RGBA_SHA256
+            icon_manifest=json.loads(z.read(member(z,"ICON-MANIFEST.json")))
+            assert icon_manifest["artwork_id"] == APPROVED_ICON_ID
+            assert icon_manifest["source_sha256"] == APPROVED_ICON_SOURCE_SHA256
+            assert icon_manifest["source_rgba_sha256"] == APPROVED_ICON_RGBA_SHA256
+            assert icon_manifest["optical_width_scale"] == 1.0
+            assert icon_manifest["reapplied_crop_or_mask"] is False
+            info["desktop_artwork_id"]=APPROVED_ICON_ID
             # Windows Compress-Archive preserves the Chinese filename.
             # macOS ditto may mangle UTF-8 entry names; ship ASCII filenames there.
             label = "图标来源与署名.txt" if kind == "windows" else "ICON-ATTRIBUTION.txt"
@@ -160,7 +188,7 @@ def main():
             info["ffmpeg_corresponding_source_sha256"] = digest(src)
             if kind == "windows":
                 exe = z.read(member(z, "Converter/Converter.exe"))
-                info["windows_icon"] = ensure_pe_icon(exe)
+                info["windows_icon"] = ensure_pe_icon(exe,icon_manifest["windows_ico_frames_sha256"])
             else:
                 plist = plistlib.loads(z.read(member(z, "CPyMO-NDS-Converter.app/Contents/Info.plist")))
                 assert plist.get("CFBundleVersion") == VERSION
@@ -168,6 +196,7 @@ def main():
                 assert plist.get("CFBundleIconFile") == "converter-icon.icns"
                 icns = z.read(member(z, "Contents/Resources/converter-icon.icns"))
                 assert icns[:4] == b"icns" and len(icns) > 100000
+                assert digest(icns)==icon_manifest["outputs"]["icns"]["sha256"]
                 assert metadata.get("macos_architecture") == "arm64"
                 assert metadata.get("rosetta_required") is False
                 info["macos_icon"] = {"sha256": digest(icns), "plist": "MATCH"}
@@ -178,9 +207,10 @@ def main():
         source_icon = z.read(member(z, "cpymo-tool/nds-converter/assets/converter-icon-source.png"))
         assert digest(source_icon) == APPROVED_ICON_SOURCE_SHA256
         generator = z.read(member(z, "cpymo-tool/nds-converter/tools/build_desktop_icons.py"))
-        assert b"3534161a2e9594802247f735c5ed70eedab0a55e40bce9fa3860a0f0d7f174f1" in generator
-        # Source archive retains untouched original plus the reproducible
-        # 16px cleanup recipe, so the clean PNG is never an untracked asset.
+        assert APPROVED_ICON_SOURCE_SHA256.encode() in generator
+        assert APPROVED_ICON_RGBA_SHA256.encode() in generator
+        # The source archive carries the exact approved lossless rounded PNG;
+        # all desktop derivatives are reproducible without the retired artwork.
         for name in ("ICON-ATTRIBUTION.txt", "PYMO-ORIGINAL-MIT-LICENSE.txt"):
             assert z.getinfo(member(z, "cpymo-tool/nds-converter/assets/" + name)).file_size > 100
         assert z.getinfo("CPyMO-for-NDS-1.2.1-Sources/LICENSE").file_size > 100

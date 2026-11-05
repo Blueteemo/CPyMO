@@ -61,9 +61,11 @@ def main():
     source_icon = ROOT/'assets/converter-icon-source.png'
     icon_out = build/'branding'
     icon_args=[]
+    icon_manifest=None
     if source_icon.is_file():
         from tools.build_desktop_icons import build as build_icons
-        build_icons(source_icon,icon_out)
+        icon_manifest=build_icons(source_icon,icon_out)
+        shutil.copy2(icon_out/'icon-manifest.json',output/'ICON-MANIFEST.json')
         icon_args=['--icon',str(icon_out/'converter-icon.ico'),
                    '--add-data',f"{icon_out/'converter-icon-64.png'};assets"]
     elif args.require_desktop_icon:
@@ -88,7 +90,8 @@ def main():
     digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
     assert digest(rom) == digest(output/'app/Converter/_internal/cpymo-nds.nds')
     release.update(rom_sha256=digest(rom), ffmpeg_sha256=digest(ffmpeg),
-                   desktop_icon="approved-PyMO-04" if icon_args else "default-not-public",
+                   desktop_icon=icon_manifest["artwork_id"] if icon_manifest else "default-not-public",
+                   desktop_icon_pixel_sha256=icon_manifest["source_rgba_sha256"] if icon_manifest else None,
                    desktop_icon_source_sha256=digest(source_icon) if icon_args else None)
     (output/'VERSION.json').write_text(json.dumps(release, indent=2)+'\n', encoding='utf8')
     (output/'BUILD-COMMAND.json').write_text(json.dumps(command, indent=2), encoding='utf8')
