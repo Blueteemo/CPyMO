@@ -75,7 +75,7 @@ jobs:
           PY
 
   windows-rc:
-    needs: [final-rom,converter-regression]
+    needs: [final-rom,converter-regression,macos-rc]
     runs-on: windows-latest
     timeout-minutes: 55
     steps:
@@ -89,6 +89,28 @@ jobs:
           path: .release-rom
       - name: Install pinned converter dependencies
         run: python -m pip install -r cpymo-tool/nds-converter/requirements-build.txt
+      - name: Download paired macOS package for its verified original FFmpeg source
+        uses: actions/download-artifact@v4
+        with:
+          name: CPyMO-1.2.1-macOS-arm64-PAIRED-ROM-RC-LOCAL-DEEPSEEK-REVIEW
+          path: .paired-ffmpeg-source
+      - name: Extract only the approved FFmpeg source archive from the paired package
+        shell: pwsh
+        run: |
+          @'
+          import hashlib
+          from pathlib import Path
+          import zipfile
+          root = Path('.paired-ffmpeg-source')
+          with zipfile.ZipFile(root / 'CPyMO-for-NDS-1.2.1-Starter-macOS-arm64-RC.zip') as z:
+              matches = [name for name in z.namelist() if name.endswith('/FFmpeg-Corresponding-Source/ffmpeg-7.1.5.tar.xz')]
+              assert len(matches) == 1, matches
+              source = z.read(matches[0])
+          assert hashlib.sha256(source).hexdigest() == 'de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f'
+          (root / 'ffmpeg-7.1.5.tar.xz').write_bytes(source)
+          print('Paired original FFmpeg source: SHA-256 verified; Windows binary will be compiled natively')
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Paired FFmpeg source identity failed' }
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -103,6 +125,8 @@ jobs:
             xz
       - name: Compile self-contained LGPL-only FFmpeg from matched Windows source
         shell: msys2 {0}
+        env:
+          FFMPEG_SOURCE_ARCHIVE: .paired-ffmpeg-source/ffmpeg-7.1.5.tar.xz
         run: |
           bash cpymo-tool/nds-converter/tools/build_ffmpeg_windows_lgpl.sh windows-ffmpeg-lgpl
       - name: Verify Windows build and select paired FFmpeg

@@ -11,7 +11,20 @@ trap 'rc=$?; echo "Windows LGPL FFmpeg build failed; diagnostic logs:" >&2; for 
 VERSION="7.1.5"
 ARCHIVE="ffmpeg-${VERSION}.tar.xz"
 URL="https://ffmpeg.org/releases/${ARCHIVE}"
-curl --fail --location --retry 3 --silent --show-error "$URL" -o "$OUT/source/$ARCHIVE"
+EXPECTED_SOURCE_SHA256="de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f"
+# CI may reuse the original archive bundled by the paired macOS job. Local
+# callers can supply the same verified archive without changing the default URL.
+if [[ -n "${FFMPEG_SOURCE_ARCHIVE:-}" ]]; then
+  if [[ ! -f "$FFMPEG_SOURCE_ARCHIVE" ]]; then
+    echo "FFmpeg source archive missing: $FFMPEG_SOURCE_ARCHIVE" >&2; exit 1
+  fi
+  cp "$FFMPEG_SOURCE_ARCHIVE" "$OUT/source/$ARCHIVE"
+else
+  curl --fail --location --retry 3 --retry-all-errors \
+    --connect-timeout 20 --max-time 180 --retry-max-time 600 \
+    --silent --show-error "$URL" -o "$OUT/source/$ARCHIVE"
+fi
+printf '%s  %s\n' "$EXPECTED_SOURCE_SHA256" "$OUT/source/$ARCHIVE" | sha256sum --check --status
 sha256sum "$OUT/source/$ARCHIVE" > "$OUT/source/SOURCE-SHA256SUMS.txt"
 tar -xJf "$OUT/source/$ARCHIVE" -C "$OUT/build"
 cd "$OUT/build/ffmpeg-$VERSION"
