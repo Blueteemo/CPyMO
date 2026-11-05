@@ -89,7 +89,7 @@ Mac ARM64 包采用临时签名，未经 Apple Developer ID 签名及 Apple 公�
 本移植基于 [Strrationalism/CPyMO](https://github.com/Strrationalism/CPyMO)
 （Seng Jik 及贡献者），其基础引擎来自
 [PyMO](https://github.com/pymo/pymo)（chen_xin_ming 及贡献者）。
-本 Fork 的首页以 Nintendo DS 发行版为重点。**1.3.0 首发源码保留在 [正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0)**；桌面维护版的对应源码 ZIP、构建提交和校验值见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。
+本 Fork 的首页以 Nintendo DS 发行版为重点。**[1.3.0 正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0)已同步到通过验收的桌面维护提交**，与当前发行包的实现一致；完整对应源码 ZIP、构建提交和校验值见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。首发源码历史保留在提交 `989ae58762e7b56154fbf3d024a94bd5544c27d9`。
 `main` 已同步本次 NDS 发行源码；其他平台的使用与维护请参考原上游仓库。
 
 CPyMO 引擎及 NDS 后端按 AGPL-3.0-or-later 发行，
