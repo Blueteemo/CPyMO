@@ -1,0 +1,4 @@
+NDS 1.3.0 warm-grey-brown native icon hardware candidate.
+Rebuild after correcting cross-platform PNG encoding checks; keep pixel,
+native-array, banner, committed-file hash and complete regression gates strict.
+No publication, main or PR updates. Await user hardware visual acceptance.

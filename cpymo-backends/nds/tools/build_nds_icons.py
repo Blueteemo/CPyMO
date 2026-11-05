@@ -94,6 +94,9 @@ def build(source: Path, output: Path) -> dict:
         'outputs': {str(path.relative_to(output)): {'bytes': path.stat().st_size,
                     'sha256': sha(path.read_bytes())} for path in paths},
     }
+    for name, image in images.items():
+        manifest['outputs']['assets/' + name].update(
+            size=list(image.size), rgb_sha256=sha(image.tobytes()))
     (assets / 'NDS-ICON-MANIFEST.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='ascii')
     return manifest
 
