@@ -20,7 +20,7 @@ CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
 |---|---|
 | 已转换过游戏，只更新引擎 | [cpymo-nds.nds](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/cpymo-nds.nds) |
 | 首次使用、转换游戏、添加视频 | [Windows Starter（转换器 r1）](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Starter-Windows-r1.zip) / [macOS ARM64 Starter（转换器 r1）](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Starter-macOS-arm64-r1.zip)；不提供 Intel Mac 预编译版 |
-| 查看全部变更与校验 | [发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0) · [完整源码](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Sources.zip) · [SHA256SUMS](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-SHA256SUMS.txt) |
+| 查看全部变更与校验 | [发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0) · [1.3.0 基础源码](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Sources.zip) · [转换器 r1 源码](https://github.com/Blueteemo/CPyMO/commit/bbadeb970b355550b89875c633095ab4e5a61a34) · [SHA256SUMS](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-SHA256SUMS.txt) |
 
 转换助手在电脑上运行，游戏程序在 DS / DSi 上运行。**发行包不附任何游戏或用户存档。**
 
@@ -89,7 +89,7 @@ Mac ARM64 包采用临时签名，未经 Apple Developer ID 签名及 Apple 公�
 本移植基于 [Strrationalism/CPyMO](https://github.com/Strrationalism/CPyMO)
 （Seng Jik 及贡献者），其基础引擎来自
 [PyMO](https://github.com/pymo/pymo)（chen_xin_ming 及贡献者）。
-本 Fork 的首页以 Nintendo DS 发行版为重点。**[1.3.0 正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0)已同步到通过验收的桌面维护提交**，对应 1.3.0 基础发行包；基础发行的完整源码和校验值，以及 转换器 r1 的对应提交和校验值，见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。首发源码历史保留在提交 `989ae58762e7b56154fbf3d024a94bd5544c27d9`。
+本 Fork 的首页以 Nintendo DS 发行版为重点。**[1.3.0 正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0)已同步到通过验收的桌面维护提交**，对应 1.3.0 基础发行包；转换器 r1 的对应源码和两端套件的校验值见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。首发源码历史保留在提交 `989ae58762e7b56154fbf3d024a94bd5544c27d9`。
 `main` 已同步本次 NDS 发行源码；其他平台的使用与维护请参考原上游仓库。
 
 CPyMO 引擎及 NDS 后端按 AGPL-3.0-or-later 发行，
