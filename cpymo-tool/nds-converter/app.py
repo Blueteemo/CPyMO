@@ -51,6 +51,15 @@ class App:
         ui_font='PingFang SC' if sys.platform=='darwin' else 'Microsoft YaHei UI'
         window.option_add('*Font',(ui_font,10))
         style=ttk.Style();style.theme_use('clam');style.configure('TButton',padding=(12,7));style.configure('Title.TLabel',font=(ui_font,19,'bold'))
+        style.layout('Disclosure.TButton', [
+            ('Button.focus', {'sticky': 'nswe', 'children': [
+                ('Button.padding', {'sticky': 'nswe', 'children': [
+                    ('Button.label', {'sticky': 'w'}),
+                ]}),
+            ]}),
+        ])
+        style.configure('Disclosure.TButton', padding=(2, 4), anchor='w')
+        style.map('Disclosure.TButton', foreground=[('active', '!disabled', '#27659c')])
         frame=ttk.Frame(window,padding=22);frame.pack(fill='both',expand=True)
         head=ttk.Frame(frame);head.pack(fill='x')
         ttk.Label(head,text='CPyMO NDS 转换助手',style='Title.TLabel').pack(side='left')
@@ -89,7 +98,8 @@ class App:
         self.compression=tk.StringVar(value='无损压缩语音与适合的图片（推荐）')
         self.compression_modes=['不压缩缓存（读取优先）','无损压缩语音与适合的图片（推荐）','无损压缩全部音频与适合的图片（实验）']
         self.advanced_visible=False
-        self.advanced_button=ttk.Button(frame,text='更多设置（可选）',command=self.toggle_advanced)
+        self.advanced_button = ttk.Button(
+            frame, style='Disclosure.TButton', cursor='hand2', command=self.toggle_advanced)
         self.advanced_button.pack(anchor='w',pady=(8,0))
         self.advanced_frame=ttk.Frame(frame)
         ttk.Label(self.advanced_frame,text='缺字自动以 □ 显示并记录警告，不中断转换；原脚本保持不变。',foreground='#526579',wraplength=780).pack(anchor='w',pady=(4,3))
@@ -186,8 +196,8 @@ class App:
             pass  # Keep a usable UI if preferences are read-only.
 
     def _update_advanced_caption(self):
-        label='收起更多设置' if self.advanced_visible else '更多设置（可选）'
-        self.advanced_button.configure(text=self.tr(label))
+        arrow = '▾' if self.advanced_visible else '▸'
+        self.advanced_button.configure(text=f"{arrow} {self.tr('更多设置（可选）')}")
 
     def toggle_advanced(self):
         self.advanced_visible=not self.advanced_visible
