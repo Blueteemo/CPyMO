@@ -7,7 +7,7 @@ No game names, chapters, translated text, or machine-specific paths are assumed.
 """
 from __future__ import annotations
 import argparse, concurrent.futures, hashlib, io, json, os, shutil, struct
-import subprocess, sys, uuid, re
+import subprocess, sys, uuid, re, math
 from dataclasses import dataclass
 from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw, __version__ as pillow_version
@@ -111,7 +111,12 @@ def image_cache(asset, target, scale, mask=None, rgb=False):
     if mask is not None:
         image.putalpha(Image.open(io.BytesIO(mask.read())).convert('L').resize(image.size, Image.Resampling.BILINEAR))
     pw, ph = max(1,round(lw*scale)), max(1,round(lh*scale))
-    if max(lw,lh)>65535 or max(pw,ph)>2048 or pw*ph>262144: raise ValueError('Image exceeds cache/DS allocation limit')
+    if max(lw, lh) > 65535:
+        raise ValueError(f'Logical image size cannot be stored in NDS cache: {lw}x{lh}')
+    downscaled = max(pw, ph) > 2048 or pw * ph > 262144
+    if downscaled:
+        cache_scale = min(scale, 2048 / max(lw, lh), math.sqrt(262144 / (lw * lh)))
+        pw, ph = max(1, int(lw * cache_scale)), max(1, int(lh * cache_scale))
     image = image.resize((pw,ph), Image.Resampling.LANCZOS)
     colors = bytearray(); alpha = bytearray()
     for p in (image.get_flattened_data() if hasattr(image,"get_flattened_data") else image.getdata()):
@@ -120,7 +125,10 @@ def image_cache(asset, target, scale, mask=None, rgb=False):
     if alpha and all(a==255 for a in alpha): alpha.clear()
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_bytes(struct.pack('<4sHHHHI', b'NPI1', lw, lh, pw, ph, bool(alpha))+colors+alpha)
-    return {'source_sha256':hashlib.sha256(data).hexdigest(),'logical_size':[lw,lh],'physical_size':[pw,ph],'alpha':bool(alpha)}
+    meta = {'source_sha256':hashlib.sha256(data).hexdigest(),'logical_size':[lw,lh],'physical_size':[pw,ph],'alpha':bool(alpha)}
+    if downscaled:
+        meta['downscaled_to_nds_limit'] = True
+    return meta
 
 def font_cache(text, font_path, target):
     codes = sorted(set(map(ord,text)) | set(range(32,127)) | set(UI_CODEPOINTS))
