@@ -37,7 +37,7 @@ UI_EN = {
     "游戏视频：": "Game videos:",
     "视频默认转换为 256×192 / 12 FPS；可选 NVA1 或跳过，安装包已含对应引擎。":
         "Video defaults to 256×192 at 12 FPS. NVA1 or skip is optional; the matching engine is bundled.",
-    "3  开始转换": "3  Convert",
+    "开始转换": "Convert",
     "取消": "Cancel",
     "打开结果文件夹": "Open output folder",
     "NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 {version}":

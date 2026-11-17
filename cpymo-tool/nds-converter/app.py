@@ -101,7 +101,7 @@ class App:
         ttk.Label(self.advanced_frame,text='默认设置兼顾体积和读取速度，普通使用无需调整。',
                   foreground='#526579',wraplength=780).pack(anchor='w',pady=(3,0))
         row=ttk.Frame(frame);row.pack(fill='x',pady=(13,8))
-        self.convert_button=ttk.Button(row,text='3  开始转换',command=self.begin,state='disabled');self.convert_button.pack(side='left')
+        self.convert_button=ttk.Button(row,text='开始转换',command=self.begin,state='disabled');self.convert_button.pack(side='left')
         self.cancel_button=ttk.Button(row,text='取消',command=self.cancel,state='disabled');self.cancel_button.pack(side='left',padx=8)
         self.open_button=ttk.Button(row,text='打开结果文件夹',command=self.open_output,state='disabled');self.open_button.pack(side='right')
         self.progress=ttk.Progressbar(frame,mode='indeterminate')  # Show only while a job runs.
