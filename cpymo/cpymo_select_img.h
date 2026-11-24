@@ -55,6 +55,9 @@ struct cpymo_select_img {
 	enum cpymo_backend_image_draw_type draw_type;
 
 	cpymo_key_hold key_mouse_button;
+#ifdef __NDS__
+	float nds_menu_x, nds_menu_width;
+#endif
 };
 
 typedef struct cpymo_select_img cpymo_select_img;
@@ -82,6 +85,11 @@ void cpymo_select_img_configuare_end(
 
 error_t cpymo_select_img_update(struct cpymo_engine *engine, cpymo_select_img *o, float dt);
 void cpymo_select_img_draw(const cpymo_select_img *, int logical_screen_w, int logical_screen_h, bool gray_selected);
+#ifdef __NDS__
+void cpymo_select_img_nds_menu_layout(cpymo_select_img *, int x, int y, int width,
+	int height, int max_gap);
+void cpymo_select_img_nds_menu_draw(const cpymo_select_img *);
+#endif
 
 static inline void cpymo_select_img_init(cpymo_select_img *select_img)
 {
@@ -91,6 +99,9 @@ static inline void cpymo_select_img_init(cpymo_select_img *select_img)
 	select_img->option_background = NULL;
 	select_img->show_option_background = false;
 	select_img->draw_type = cpymo_backend_image_draw_type_sel_img;
+#ifdef __NDS__
+	select_img->nds_menu_width = 0;
+#endif
 
 	cpymo_key_pluse_init(&select_img->key_up, false);
 	cpymo_key_pluse_init(&select_img->key_down, false);

@@ -1,38 +1,38 @@
 <p align="center">
-  <img src="assets/branding/pymo-long-logo.webp" alt="PyMO — Python Memories Off" width="720">
+  <img src="assets/branding/pymo-long-logo.webp" alt="PyMO — Python Memories Off" width="640">
 </p>
 
 # CPyMO for Nintendo DS
 
-**在 Nintendo DS / DS Lite / DSi 上体验 PyMO 视觉小说。**
+**在 Nintendo DS、DS Lite 和 DSi 上体验 PyMO 视觉小说。**
 
 CPyMO for NDS 是基于 [CPyMO](https://github.com/Strrationalism/CPyMO)
-的 Nintendo DS 系列移植版本。一个 `.nds` 可从游戏资料库启动多个 PyMO 游戏；
-配套转换助手支持 S60v3、S60v5 与 Android PyMO 游戏数据。
+的 NDS 移植版本。一个 `.nds` 可从游戏资料库启动多款 PyMO 游戏。
+配套转换助手支持 S60v3、S60v5 和 Android 版 PyMO 游戏数据。
 
-**最新版本：** [CPyMO for NDS 1.3.0](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)（已正式发布）。
+**最新版本** [CPyMO for NDS 1.4.0](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.4.0)
 
 ## 下载与开始使用
 
-> Windows、macOS ARM64、通用 NDS 程序、完整源码及 SHA-256 校验清单均已在正式发行页提供。
+> 发行页汇总通用 NDS 程序、Windows 和 macOS ARM64 Starter、完整源码及 SHA-256 校验清单。
 
 | 用途 | 发行文件 |
 |---|---|
-| 已转换过游戏，只更新引擎 | [cpymo-nds.nds](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/cpymo-nds.nds) |
-| 首次使用、转换游戏、添加视频 | [Windows Starter（转换器 r1）](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Starter-Windows-r1.zip) / [macOS ARM64 Starter（转换器 r1）](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Starter-macOS-arm64-r1.zip)；不提供 Intel Mac 预编译版 |
-| 查看全部变更与校验 | [发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0) · [1.3.0 基础源码](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-Sources.zip) · [转换器 r1 源码](https://github.com/Blueteemo/CPyMO/commit/bbadeb970b355550b89875c633095ab4e5a61a34) · [SHA256SUMS](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.3.0/CPyMO-for-NDS-1.3.0-SHA256SUMS.txt) |
+| 已转换过游戏，只更新引擎 | [cpymo-nds.nds](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.4.0/cpymo-nds.nds) |
+| 首次使用、转换游戏、添加视频 | [Windows Starter](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.4.0/CPyMO-for-NDS-1.4.0-Starter-Windows.zip) / [macOS ARM64 Starter（Apple Silicon）](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.4.0/CPyMO-for-NDS-1.4.0-Starter-macOS-arm64.zip) |
+| 查看全部变更与校验 | [发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.4.0) · [完整对应源码](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.4.0/CPyMO-for-NDS-1.4.0-Sources.zip) · [SHA256SUMS](https://github.com/Blueteemo/CPyMO/releases/download/nds-v1.4.0/CPyMO-for-NDS-1.4.0-SHA256SUMS.txt) |
+
+**其他平台**　Symbian S60v3 和初代 RG35XX（GarlicOS）的客户端请前往 [CPyMO Ports](https://github.com/Blueteemo/CPyMO-Ports)。
 
 转换助手在电脑上运行，游戏程序在 DS / DSi 上运行。**发行包不附任何游戏或用户存档。**
 
-## 1.3.0 更新
+## 1.4.0 更新
 
-- **16 色主题**：默认配色、自动跟随主机设置，以及原版 NDS 的 16 种固件主题色。
-- **游戏库与双屏交互**：支持 START 启动，完善资料库脚注、辅助屏指引与重新开始后的标题阶段提示。
-- **高亮与音频**：修正标题菜单高亮混合取整，音频采用约 +1.5 dB 的保守目标增益并保留峰值保护。
-- **NDS 程序及配套转换器图标焕新**：NDS 使用完整方形构图与暖灰棕细边框，加载图更清楚；Mac 转换器改善图标显示比例。
-- **桌面界面维护**：补回此前 1.2 维护版已有的进度条空闲隐藏、游戏版本列表按数量调整及视频选项宽度自适应。版本号保持 1.3.0，NDS ROM 不变。
+- **完善存读档预览。** 每屏显示三个档位，两档字号均可查看章节、最多两行对白预览和存档时间。
+- **优化界面与交互。** 调整启动画面、游戏列表、游戏内菜单、确认提示和正文继续光标。
+- **同步更新桌面转换助手。** Windows 和 macOS ARM64 Starter 均内置 1.4.0 引擎，转换结果也会附带新版 `cpymo-nds.nds`。
 
-继续保留 DSi/TWL 模式、三态增强双屏、NVL1/NVA1 视频、多游戏资料库和四语界面。完整变化见 [1.3.0 发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。
+完整变化见 [1.4.0 发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.4.0)。
 
 ## 安装
 
@@ -53,7 +53,7 @@ TF 卡根目录/
             └── save/
 ```
 
-已有可运行的 1.2.0 缓存与存档可以继续保留，通常只需更新 `.nds`；如需为旧游戏添加视频，应从合法持有的原游戏数据转换到新目录，并保留旧存档。
+从 1.3.0 升级时，已转换且能正常运行的游戏通常只需替换 `cpymo-nds.nds`，保留原有游戏目录和存档。如需为旧游戏添加视频，应从合法持有的原游戏数据转换到新目录，并保留旧存档。
 
 ## 操作
 
@@ -71,9 +71,9 @@ TF 卡根目录/
 
 ## 兼容性、转换器和开发文档
 
-- [NDS 后端、安装与兼容边界](https://github.com/Blueteemo/CPyMO/blob/nds-v1.3.0/cpymo-backends/nds/README.md)
-- [转换助手：简体中文 / English GUI、命令行、视频编码](https://github.com/Blueteemo/CPyMO/blob/nds-v1.3.0/cpymo-tool/nds-converter/README.md)
-- [正式发行说明与已知限制](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)
+- [NDS 后端、安装与兼容边界](https://github.com/Blueteemo/CPyMO/blob/nds-v1.4.0/cpymo-backends/nds/README.md)
+- [转换助手使用说明、命令行与视频编码](https://github.com/Blueteemo/CPyMO/blob/nds-v1.4.0/cpymo-tool/nds-converter/README.md)
+- [正式发行说明与已知限制](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.4.0)
 - [旧版下载](https://github.com/Blueteemo/CPyMO/releases)
 
 Mac ARM64 包采用临时签名，未经 Apple Developer ID 签名及 Apple 公证。
@@ -89,8 +89,7 @@ Mac ARM64 包采用临时签名，未经 Apple Developer ID 签名及 Apple 公�
 本移植基于 [Strrationalism/CPyMO](https://github.com/Strrationalism/CPyMO)
 （Seng Jik 及贡献者），其基础引擎来自
 [PyMO](https://github.com/pymo/pymo)（chen_xin_ming 及贡献者）。
-本 Fork 的首页以 Nintendo DS 发行版为重点。**[1.3.0 正式发行标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.3.0)已同步到通过验收的桌面维护提交**，对应 1.3.0 基础发行包；转换器 r1 的对应源码和两端套件的校验值见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.3.0)。首发源码历史保留在提交 `989ae58762e7b56154fbf3d024a94bd5544c27d9`。
-`main` 已同步本次 NDS 发行源码；其他平台的使用与维护请参考原上游仓库。
+引擎和转换助手的 1.4.0 发行源码见 [`nds-v1.4.0` 标签](https://github.com/Blueteemo/CPyMO/tree/nds-v1.4.0)。含构建所需子模块的完整源码和附件校验值见 [发行页](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.4.0)。
 
 CPyMO 引擎及 NDS 后端按 AGPL-3.0-or-later 发行，
 独立转换器按 MIT 许可发行。第三方字库、FFmpeg 与其他依赖保留原授权和归属，

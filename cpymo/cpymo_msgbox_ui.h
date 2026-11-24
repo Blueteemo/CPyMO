@@ -12,4 +12,9 @@ error_t cpymo_msgbox_ui_enter(
 	error_t (*okcancel_callback)(struct cpymo_engine *e, void *data, bool ok),
 	void *okcancel_callback_data);
 
+#ifdef __NDS__
+error_t cpymo_msgbox_ui_enter_legacy_mo(struct cpymo_engine *,
+	error_t (*choose)(struct cpymo_engine *, void *, bool));
+#endif
+
 #endif

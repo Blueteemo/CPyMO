@@ -23,8 +23,27 @@ static void cpymo_logo() {
 	puts("");
 }
 
+#ifdef __NDS__
+static error_t cpymo_engine_version_warning(cpymo_engine *e);
+extern void nds_request_exit_to_library(void);
+
+static error_t cpymo_engine_legacy_mo_choice(cpymo_engine *e, void *data, bool proceed)
+{
+	(void)data;
+	e->nds_legacy_notice_pending = false;
+	if (!proceed) nds_request_exit_to_library();
+	else if (!cpymo_pymo_version_compatible(e->gameconfig.engineversion, cpymo_pymo_version_current))
+		cpymo_wait_callback_nextframe(&e->wait, &cpymo_engine_version_warning);
+	return CPYMO_ERR_SUCC;
+}
+#endif
+
 static error_t cpymo_engine_non_pymo_warning(cpymo_engine *e) 
 {
+#ifdef __NDS__
+	if (e->nds_legacy_notice_pending)
+		return cpymo_msgbox_ui_enter_legacy_mo(e, &cpymo_engine_legacy_mo_choice);
+#endif
 	const cpymo_localization *l = cpymo_localization_get(e);
 	return cpymo_msgbox_ui_enter(
 		e, cpymo_str_pure(l->mo2pymo_required), NULL, NULL);
@@ -192,6 +211,10 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 	cpymo_logo();
 
 	// checks
+#ifdef __NDS__
+	out->nds_legacy_notice_pending = !strcmp(out->gameconfig.scripttype, "mo") ||
+		!strcmp(out->gameconfig.scripttype, "MO");
+#endif
 	if (out->gameconfig.scripttype[0] != 'p'
 		|| out->gameconfig.scripttype[1] != 'y'
 		|| out->gameconfig.scripttype[2] != 'm'
@@ -199,6 +222,9 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 		cpymo_wait_callback_after_seconds(&out->wait, 0, &cpymo_engine_non_pymo_warning);
 	}
 
+#ifdef __NDS__
+	else
+#endif
 	if (!cpymo_pymo_version_compatible(
 			out->gameconfig.engineversion, cpymo_pymo_version_current)) {
 		cpymo_wait_callback_after_seconds(
@@ -328,6 +354,13 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 			delta_time_sec);
 		CPYMO_THROW(err);
 
+#ifdef __NDS__
+		if (cpymo_ui_enabled(engine)) {
+			*redraw = true;
+			engine->redraw = false;
+			return CPYMO_ERR_SUCC;
+		}
+#endif
 		if (!cpymo_wait_is_wating(&engine->wait)) {
 			if (engine->interpreter)
 				err = cpymo_interpreter_execute_step(

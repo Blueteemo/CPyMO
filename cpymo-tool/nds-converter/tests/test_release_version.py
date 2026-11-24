@@ -12,12 +12,12 @@ gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 
 
-def synthetic_rom(runtime='1.3.0', banner_version='1.3.0'):
+def synthetic_rom(runtime=gate.EXPECTED_VERSION, banner_version=gate.EXPECTED_VERSION):
     # Real approved background, synthetic executable/title layout; no game data.
     art = (NDS / 'assets/nds-dual-bg.rgb555').read_bytes()
     assert art[:8] == b'CPYBG12\0'
     arm9 = gate.READY + art[8:]
-    arm9 += f'CPyMO for NDS   {runtime}'.encode('ascii') + b'\0'
+    arm9 += f'v{runtime}\0'.encode('ascii')
     arm9_at = 0x400
     banner_at = (arm9_at + len(arm9) + 511) & ~511
     data = bytearray(banner_at + gate._banner_module.BANNER_BYTES)
@@ -40,7 +40,7 @@ def synthetic_rom(runtime='1.3.0', banner_version='1.3.0'):
 class ReleaseVersionTests(unittest.TestCase):
     def test_shared_version_sources_are_current(self):
         from release_info import VERSION, RELEASE
-        self.assertEqual(VERSION, '1.3.0')
+        self.assertEqual(VERSION, '1.4.0')
         self.assertEqual((NDS / 'VERSION').read_text().strip(), VERSION)
         self.assertEqual(json.loads((NDS / 'release.json').read_text())['version'], VERSION)
         self.assertEqual(RELEASE['cache_format'], 6)
@@ -48,9 +48,9 @@ class ReleaseVersionTests(unittest.TestCase):
 
     def test_gate_accepts_current_compiled_and_banner_version(self):
         result = gate.validate_rom_bytes(synthetic_rom())
-        self.assertEqual(result['compiled_runtime_version'], '1.3.0')
+        self.assertEqual(result['compiled_runtime_version'], gate.EXPECTED_VERSION)
         self.assertEqual(result['banner_crc16'], 'PASS')
-        self.assertTrue(all(t[1] == '1.3.0' for t in result['banner_titles']))
+        self.assertTrue(all(t[1] == gate.EXPECTED_VERSION for t in result['banner_titles']))
 
     def test_old_runtime_cannot_be_relabelled_with_current_banner(self):
         with self.assertRaisesRegex(ValueError, 'Compiled runtime version'):

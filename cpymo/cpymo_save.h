@@ -15,6 +15,9 @@ static inline void cpymo_save_autosave(struct cpymo_engine *e) {}
 #endif
 
 FILE * cpymo_save_open_read(struct cpymo_engine *e, unsigned short save_id);
+#ifdef __NDS__
+void cpymo_save_slot_date(const struct cpymo_engine *, unsigned short save_id, char date[24]);
+#endif
 
 typedef struct {
 	char *title;

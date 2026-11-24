@@ -43,9 +43,29 @@ def verify(nds: Path, rom: Path | None = None) -> dict:
               'border_rgb555': manifest['border_rgb555'], 'source_sha256': manifest['source_sha256']}
     if rom is not None:
         data = rom.read_bytes()
+        version = json.loads((nds / 'release.json').read_text())['version']
+        splash_header = nds / 'source/splash-art-nds.h'
+        has_horizontal_splash = splash_header.exists() and f'v{version}\0'.encode() in data
         for symbol, values in arrays.items():
+            if has_horizontal_splash and symbol == 'app_icon_splash':
+                continue
             if struct.pack('<' + str(len(values)) + 'H', *values) not in data:
                 raise ValueError('Compiled ROM is missing native resource: ' + symbol)
+        if has_horizontal_splash:
+            header = splash_header.read_text()
+            for symbol, count, char in (
+                ('nds_splash_avatar', 48 * 48, 'H'),
+                ('nds_splash_avatar_alpha', 48 * 48, 'B'),
+                ('nds_splash_wordmark', 84 * 21, 'B'),
+            ):
+                match = re.search(rf'\b{symbol}\[{count}\]\s*=\s*\{{([^}}]+)\}}', header)
+                if not match:
+                    raise ValueError('Missing horizontal splash resource: ' + symbol)
+                values = [int(item, 0) for item in match[1].split(',') if item.strip()]
+                if len(values) != count or struct.pack(f'<{count}{char}', *values) not in data:
+                    raise ValueError('Compiled ROM is missing horizontal splash resource: ' + symbol)
+            result['splash_avatar_size'] = 48
+            result['splash_wordmark_width'] = 84
         if len(data) < 0x200:
             raise ValueError('Truncated NDS header')
         offset = struct.unpack_from('<I', data, 0x68)[0]

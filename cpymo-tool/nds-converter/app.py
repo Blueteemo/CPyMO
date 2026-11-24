@@ -161,7 +161,7 @@ class App:
         for widget,source in self._ui_sources.items():
             widget.configure(text=self.tr(source))
         version_caption = self.tr('NDS 平台移植：千岚之夏  ·  基于 CPyMO / PyMO  ·  转换助手 {version}')
-        self.version_label.configure(text=version_caption.format(version=f'{VERSION}-r1'))
+        self.version_label.configure(text=version_caption.format(version=VERSION))
         self.set_status(self._status_zh)
 
     def change_language(self,_event=None):

@@ -24,7 +24,7 @@ APPROVED_ICON_RGBA_SHA256 = "a5954aa3fb04caecaf3796a314910f1e6fcc6d62d72d2b07a58
 APPROVED_ICON_ID = "approved-pymo-original-rounded-2026"
 MACOS_CONTENT_SCALE = 0.80
 APPROVED_FFMPEG_SOURCE_SHA256 = "de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f"
-VERSION = "1.3.0"
+VERSION = json.loads((Path(__file__).resolve().parents[1] / "release.json").read_text(encoding="utf8"))["version"]
 
 
 def digest(data: bytes) -> str:

@@ -41,8 +41,8 @@ def validate_rom_bytes(b: bytes) -> dict:
         raise ValueError("Invalid ARM9 ROM bounds")
     arm9 = b[offset:offset + size]
     # Check compiled ARM9 text independently of the outer filename and Banner.
-    runtime_title = f"CPyMO for NDS   {EXPECTED_VERSION}".encode("ascii")
-    if runtime_title not in arm9:
+    runtime_label = f"v{EXPECTED_VERSION}\0".encode("ascii")
+    if runtime_label not in arm9:
         raise ValueError(f"Compiled runtime version is not {EXPECTED_VERSION}")
     _, banner = _banner_module._load_banner(io.BytesIO(b))
     titles = []

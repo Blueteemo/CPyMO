@@ -44,10 +44,12 @@ static int text_glyph(unsigned mode,unsigned cp){
 }
 static unsigned text_advance(unsigned mode,int g){unsigned base=text_glyph_base(mode);if((unsigned)g>=base)return mode==2?ui_large_advances[g-base]:ui_fallback_advances[g-base];return mode?pixel_fonts[mode-1].data[g].advance:glyph_advance(g);}
 static unsigned text_row(unsigned mode,int g,int y){unsigned base=text_glyph_base(mode);if((unsigned)g>=base)return mode==2?ui_large_rows[g-base][y]:ui_fallback_rows[g-base][y];return mode?pixel_fonts[mode-1].data[g].rows[y]:glyph_row(g,y);}
-static unsigned font_nominal(unsigned mode){return mode?pixel_fonts[mode-1].nominal:13;}
+static unsigned font_nominal(unsigned mode){return mode==1?12:mode==2?16:13;}
 static unsigned font_width(unsigned mode){return mode?16:13;}
 static unsigned font_height(unsigned mode){return mode?16:14;}
-static unsigned font_baseline(unsigned mode){return mode?pixel_fonts[mode-1].baseline:11;}
+static unsigned font_baseline(unsigned mode){
+ return mode&&pixel_fonts[mode-1].data?pixel_fonts[mode-1].baseline:mode==1?13:mode==2?14:11;
+}
 static float font_scale(float size,unsigned mode){
  if(mode){/* Preserve the bitmap grid, including authored large text. */
   int integer=(int)(size*display_scale()/font_nominal(mode)+.5f);return integer<1?1:integer;

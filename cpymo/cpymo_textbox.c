@@ -1,5 +1,8 @@
 ﻿#include "cpymo_prelude.h"
 #include "cpymo_textbox.h"
+#ifdef __NDS__
+#include "../cpymo-backends/nds/source/ui-layout-nds.h"
+#endif
 #include "cpymo_engine.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -122,6 +125,10 @@ void cpymo_textbox_draw(
     if (tb->draw_cursor && e->say.msg_cursor && !e->say.auto_mode) {
         float x = tb->w + tb->x - tb->char_size;
         float y = tb->lines[tb->max_lines - 1].y - tb->char_size;
+#ifdef __NDS__
+        float prior = tb->max_lines > 1 ? tb->lines[tb->max_lines - 2].y : -1;
+        if (!nds_ui_draw_dialogue_cursor(e, x, y, prior, drawtype)) {
+#endif
         float wh = tb->char_size;
 
         float draw_w = (float)e->say.msg_cursor_w;
@@ -144,6 +151,9 @@ void cpymo_textbox_draw(
             e->say.msg_cursor,
             0, 0, e->say.msg_cursor_w, e->say.msg_cursor_h,
             1.0f, drawtype);
+#ifdef __NDS__
+        }
+#endif
     }
 
     for (size_t line_id = 0; line_id <= tb->active_line; ++line_id) {

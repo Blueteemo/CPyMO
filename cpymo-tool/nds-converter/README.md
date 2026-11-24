@@ -1,19 +1,14 @@
-# CPyMO for NDS 1.3.0 转换助手
+# CPyMO for NDS 1.4.0 转换助手
 
-## v1.3.0（维护更新）
+## 1.4.0 更新
 
-此版本沿用 1.2.0 的缓存格式与视频转换策略，并进行 **NDS 程序及配套转换器图标焕新**：采用同一张原始插画，NDS 程序使用完整方形图标，Windows/macOS 配套游戏转换器使用平滑圆角版本。macOS 同时改善图标显示比例。
+Windows 和 macOS ARM64 Starter 均内置 1.4.0 引擎，转换结果也会附带新版 `cpymo-nds.nds`。从 1.3.0 升级时，已转换且能正常运行的游戏通常只需替换 ROM，保留原有游戏目录和存档。[下载及发行说明](https://github.com/Blueteemo/CPyMO/releases/tag/nds-v1.4.0)
 
-游戏库新增 NDS 固件 16 色主题（含自动跟随固件、默认经典深蓝）、统一的选中竖线和增强的多语言主题文字层次。修订了“重新开始”后标题辅助屏的回切、START 启动与选中高亮边缘。音频输出采用保守的 +1.5dB 目标增益和峰值保护；不替代各游戏自身音量设置。
-
-
-NDS 移植：千岚之夏。独立转换助手 MIT；引擎 AGPL-3.0-or-later；字体与依赖保留各自许可。
-
-程序及配套元数据由同一份 1.3.0 源码真实构建；[当前发行说明](../../cpymo-backends/nds/RELEASE-NOTES-1.3.0.md)。
+NDS 移植由千岚之夏维护。独立转换助手采用 MIT 许可，引擎采用 AGPL-3.0-or-later，字体与依赖保留各自许可。
 
 ## 给玩家
 
-Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用通过最终验收的 ARM64 `.app` 发行包；Intel Mac 可按下文从源码运行。
+Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运行“Converter/Converter.exe”。Apple Silicon Mac 玩家使用 ARM64 `.app` 发行包，Intel Mac 可按下文从源码运行。
 免安装套件已内置 Python 运行时和 FFmpeg，普通玩家无须另行安装。打开助手后，可选择简体中文或 English（界面选择会保存）；选择游戏 ZIP 或含 gameconfig.txt 的文件夹，
 支持嵌套 ZIP 与 S60v3 / S60v5 / Android PyMO 数据（指输入数据平台，非电脑系统）。
 同包多版本优先推荐 S60v3。选择新的输出位置，开始转换，结束后阅读兼容性警告与安装必读。
@@ -34,10 +29,9 @@ Windows 玩家完整解压 Starter，双击“启动转换器.bat”，也可运
 `nds-cache/manifest.json` 及转换结果中。GUI 默认缺字显示 □ 并记录，脚本文字不改；英文界面转换完成后还会生成 `INSTALL-READ-ME.txt` 英文安装说明。
 加密/打包脚本和其他游戏引擎不支持。
 
-## 1.2 游戏视频转换
+## 游戏视频转换
 
-1.1.0 正式版不受影响。1.3.0 继承 1.2.0 的转换流程，视频默认使用 NVL1、原样保留脚本；
-1.2 提供 **NVL1**（22050 Hz PCM16）与 **NVA1**（NAR2
+转换时原样保留脚本。转换助手提供 **NVL1**（22050 Hz PCM16）与 **NVA1**（NAR2
 无损压缩音频）视频转换，在 GUI 的“游戏视频”下拉框中选择（默认 NVL1，NVA1 和跳过视频可选）。默认
 12 FPS、256×192 RGB555；保留原始画面比例，居中补黑边，不随意拉伸。
 字幕、脚本与存档策略不改；无音轨视频补零音频。
@@ -59,9 +53,6 @@ python cpymo-tool/nds-converter/convert.py convert 原游戏目录 另一新目�
 不支持的视频会在审计中继续标注为未转换。单段视频受现有 NDS 播放器
 10 分钟限制。生成缓存及主机验证通过**不等于** NTR/DSi 实机视频性能、
 跳过恢复、所有原始游戏视频的兼容性已验收。
-
-1.2 对玩家公开的可播放视频格式为 NVL1／NVA1；不要将其他研究阶段的格式当成正式支持功能。
-
 
 ## 从源码运行与构建
 

@@ -7,6 +7,7 @@
 #include "cpymo_save.h"
 #include "cpymo_localization.h"
 #include "ui-language-nds.h"
+#include "ui-layout-nds.h"
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -29,7 +30,8 @@ typedef struct {
 	cpymo_wait menu_waiter;
 
 	cpymo_key_hold touch;
-	float bg_zoom_out;
+	float panel[4];
+	int bg_band_start, bg_band_end;
 
 	bool alive;
 } cpymo_rmenu;
@@ -58,6 +60,39 @@ static error_t cpymo_rmenu_update(cpymo_engine *e, void *ui_data, float dt)
 	return CPYMO_ERR_SUCC;
 }
 
+static bool cpymo_rmenu_draw_framed_skin(const cpymo_rmenu *r)
+{
+	if (r->bg_band_end <= r->bg_band_start)
+		return false;
+
+	const float *panel = r->panel;
+	const float scale = nds_ui_scale();
+	const float art_scale = panel[2] * scale / r->bg_w;
+	const int panel_height = (int)(panel[3] * scale + .5f);
+	const int art_height = (int)(r->bg_h * art_scale + .5f);
+	if (art_height >= panel_height)
+		return false;
+
+	const int top = (int)(r->bg_band_start * art_scale + .5f);
+	const int bottom = (int)((r->bg_h - r->bg_band_end) * art_scale + .5f);
+	const int middle = panel_height - top - bottom;
+	if (top <= 0 || bottom <= 0 || middle <= 0)
+		return false;
+
+	/* Keep the title and corners at their width scale. Only the repeated
+	   middle rows gain height, continuing the straight sides of the frame. */
+	cpymo_backend_image_draw(panel[0], panel[1], panel[2], top / scale,
+		r->bg, 0, 0, r->bg_w, r->bg_band_start, 1.0f,
+		cpymo_backend_image_draw_type_ui_element_bg);
+	cpymo_backend_image_draw(panel[0], panel[1] + top / scale, panel[2], middle / scale,
+		r->bg, 0, r->bg_band_start, r->bg_w, r->bg_band_end - r->bg_band_start, 1.0f,
+		cpymo_backend_image_draw_type_ui_element_bg);
+	cpymo_backend_image_draw(panel[0], panel[1] + (top + middle) / scale, panel[2], bottom / scale,
+		r->bg, 0, r->bg_band_end, r->bg_w, r->bg_h - r->bg_band_end, 1.0f,
+		cpymo_backend_image_draw_type_ui_element_bg);
+	return true;
+}
+
 static void cpymo_rmenu_draw(const cpymo_engine *e, const void *ui_data)
 {
 	const cpymo_rmenu *r = (const cpymo_rmenu *)ui_data;
@@ -70,56 +105,33 @@ static void cpymo_rmenu_draw(const cpymo_engine *e, const void *ui_data)
 		fill_screen_enabled = false;
 	#endif
 
-	float w = (float)r->bg_w * r->bg_zoom_out;
-	float h = (float)r->bg_h * r->bg_zoom_out;
-
-	float bg_xywh[4] = {
-		((float)e->gameconfig.imagesize_w - (float)w) / 2,
-		((float)e->gameconfig.imagesize_h - (float)h) / 2 - 0.018f * (float)e->gameconfig.imagesize_h,
-		(float)w,
-		(float)h,
-	};
-
-	if (r->bg) {
-#ifdef DISABLE_IMAGE_SCALING
-		cpymo_backend_image_draw(
-			bg_xywh[0] + (bg_xywh[2] - r->bg_w) / 2,
-			bg_xywh[1] + (bg_xywh[3] - r->bg_h) / 2,
-			r->bg_w,
-			r->bg_h,
-			r->bg,
-			0,
-			0,
-			r->bg_w,
-			r->bg_h,
-			1.0f,
-			cpymo_backend_image_draw_type_ui_element_bg);
-#else
-		cpymo_backend_image_draw(
-			bg_xywh[0],
-			bg_xywh[1],
-			bg_xywh[2],
-			bg_xywh[3],
-			r->bg,
-			0,
-			0,
-			r->bg_w,
-			r->bg_h,
-			1.0f,
-			cpymo_backend_image_draw_type_ui_element_bg);
-#endif
+	const float *panel = r->panel;
+	if (r->bg && r->bg_w > 0 && r->bg_h > 0) {
+		if (!cpymo_rmenu_draw_framed_skin(r)) {
+			/* Illustrated skins retain the proportional center crop. */
+			int source_w = r->bg_w, source_h = r->bg_h;
+			if (source_w * panel[3] > source_h * panel[2])
+				source_w = (int)(source_h * panel[2] / panel[3] + .5f);
+			else
+				source_h = (int)(source_w * panel[3] / panel[2] + .5f);
+			if (source_w < 1) source_w = 1;
+			if (source_h < 1) source_h = 1;
+			cpymo_backend_image_draw(panel[0], panel[1], panel[2], panel[3], r->bg,
+				(r->bg_w - source_w) / 2, (r->bg_h - source_h) / 2,
+				source_w, source_h, 1.0f, cpymo_backend_image_draw_type_ui_element_bg);
+		}
 	}
 	else {
 		cpymo_backend_image_fill_rects(
-			bg_xywh, 1, cpymo_color_black, 0.75f,
+			panel, 1, cpymo_color_black, 0.75f,
 			cpymo_backend_image_draw_type_ui_element_bg);
 	}
 
 	/* NDS: retain the game's menu art, improve white bitmap text contrast. */
-	cpymo_backend_image_fill_rects(bg_xywh, 1, cpymo_color_black, 0.60f,
+	cpymo_backend_image_fill_rects(panel, 1, cpymo_color_black, 0.60f,
 		cpymo_backend_image_draw_type_ui_element_bg);
 
-	cpymo_select_img_draw(&r->menu, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h, false);
+	cpymo_select_img_nds_menu_draw(&r->menu);
 
 	#ifdef __3DS__
 	fill_screen_enabled = true;
@@ -197,25 +209,6 @@ static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 	return CPYMO_ERR_SUCC;
 }
 
-static inline float cpymo_rmenu_bg_zoom(
-	const cpymo_rmenu *r,
-	float font_size)
-{
-	#ifdef DISABLE_IMAGE_SCALING
-	return 1.0f;
-	#else
-	const size_t menu_items = 10;
-	const float menu_item_padding = 2.0f;
-	const float menu_padding = 16.0f;
-	const float menu_height =
-		(menu_item_padding + font_size) * menu_items + 2.0f * menu_padding;
-
-	float zoom_out = (menu_height / r->bg_h);
-	if (zoom_out < 1.0f) zoom_out = 1.0f;
-	return zoom_out;
-	#endif
-}
-
 error_t cpymo_rmenu_enter(cpymo_engine *e)
 {
 	cpymo_rmenu *rmenu = NULL;
@@ -248,21 +241,11 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 		&e->assetloader,
 		true);
 
+	rmenu->bg_band_start = rmenu->bg_band_end = 0;
 	if (err != CPYMO_ERR_SUCC) {
 		rmenu->bg = NULL;
-
-		if (strcmp(e->gameconfig.platform, "s60v3") == 0) {
-			rmenu->bg_w = 240;
-			rmenu->bg_h = 144;
-		}
-		else if (strcmp(e->gameconfig.platform, "s60v5") == 0) {
-			rmenu->bg_w = 360;
-			rmenu->bg_h = 216;
-		}
-		else {
-			rmenu->bg_w = (int)((float)e->gameconfig.imagesize_w * 0.75f);
-			rmenu->bg_h = (int)((float)e->gameconfig.imagesize_h * 0.6f);
-		}
+	} else if (!nds_ui_menu_stretch_band(rmenu->bg, &rmenu->bg_band_start, &rmenu->bg_band_end)) {
+		rmenu->bg_band_end = 0;
 	}
 
 	err = cpymo_select_img_configuare_begin(
@@ -277,7 +260,6 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 	}
 
 	const float font_size = cpymo_gameconfig_font_size(&e->gameconfig);
-	rmenu->bg_zoom_out = cpymo_rmenu_bg_zoom(rmenu, font_size);
 
 	#define RMENU_ITEM(_, TEXT, ENABLED) \
 		err = cpymo_select_img_configuare_select_text( \
@@ -310,24 +292,14 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 	RMENU_ITEM(8, nds_ui("退出到游戏库"), true);
 	RMENU_ITEM(9, l->rmenu_back_to_game, true);
 
-	float xywh[4] = {
-		((float)e->gameconfig.imagesize_w - (float)rmenu->bg_w) / 2,
-		((float)e->gameconfig.imagesize_h - (float)rmenu->bg_h) / 2,
-		(float)rmenu->bg_w,
-		(float)rmenu->bg_h,
-	};
-
-	cpymo_select_img_configuare_end_select_text(
-		&rmenu->menu,
-		&rmenu->menu_waiter,
-		e,
-		xywh[0],
-		xywh[1],
-		xywh[0] + xywh[2],
-		xywh[1] + xywh[3],
-		cpymo_color_white,
-		0,
-		false);
+	const bool large = font_size * nds_ui_scale() >= 15;
+	const int panel_top = large ? 1 : 8;
+	const int content_top = panel_top + (large ? 18 : 25);
+	const int content_bottom = 192 - panel_top - (large ? 3 : 5);
+	nds_ui_native_rect(8, panel_top, 240, 192 - 2 * panel_top, rmenu->panel);
+	cpymo_select_img_nds_menu_layout(&rmenu->menu, 8, content_top, 240,
+		content_bottom - content_top, large ? 2 : 3);
+	cpymo_select_img_configuare_end(&rmenu->menu, &rmenu->menu_waiter, e, 0);
 
 	rmenu->menu.draw_type = cpymo_backend_image_draw_type_ui_element;
 

@@ -50,6 +50,9 @@ struct cpymo_engine {
 
 	bool redraw;
 	bool ignore_next_mouse_button_flag;
+#ifdef __NDS__
+	bool nds_legacy_notice_pending;
+#endif
 
 	bool config_skip_already_read_only;
 

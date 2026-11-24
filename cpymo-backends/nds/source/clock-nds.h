@@ -26,28 +26,61 @@ static bool nds_clock_sample(void){
  }else{memcpy(nds_clock_text,"--:--",6);clock_state[10]=clock_state[11]=0;}
  return true;
 }
-static void nds_clock_paint_impl(u16* pixels,int x,int y,u16 ink,bool clear){
- /* Fixed 48x18 native-font tile. Also usable directly on non-cached VRAM:
-    minute refresh never clears the game framebuffer or republishes a panel. */
- unsigned width=0;
- for(unsigned i=0;i<5;i++){int g=ui_fallback_glyph(nds_clock_text[i]);if(g>=0)width+=ui_fallback_advances[g];}
- if(clear)for(int yy=0;yy<18;yy++)for(int xx=0;xx<48;xx++)pixels[(y+yy)*256+x+xx]=RGB15(3,5,8)|BIT(15);
- int pen=x+(48-(int)width)/2;
- for(unsigned i=0;i<5;i++){int g=ui_fallback_glyph(nds_clock_text[i]);if(g<0)continue;
-  for(unsigned yy=0;yy<16;yy++){unsigned bits=ui_fallback_rows[g][yy];
-   for(unsigned xx=0;xx<16;xx++)if((bits&(1u<<xx))&&pen+(int)xx<x+48)pixels[(y+1+yy)*256+pen+xx]=ink|BIT(15);
-  }pen+=ui_fallback_advances[g];
+typedef struct {
+ int glyphs[5],advance,left,right,top,bottom;
+} NdsClockLayout;
+
+static NdsClockLayout nds_clock_layout(void){
+ NdsClockLayout layout={.left=256,.top=16};
+ for(unsigned i=0;i<5;++i){
+  int g=layout.glyphs[i]=ui_fallback_glyph(nds_clock_text[i]);
+  if(g<0)continue;
+  for(int row=0;row<16;++row){
+   unsigned bits=ui_fallback_rows[g][row];
+   if(!bits)continue;
+   int left=layout.advance+__builtin_ctz(bits);
+   int right=layout.advance+32-__builtin_clz(bits);
+   if(left<layout.left)layout.left=left;
+   if(right>layout.right)layout.right=right;
+   if(row<layout.top)layout.top=row;
+   if(row>=layout.bottom)layout.bottom=row+1;
+  }
+  layout.advance+=ui_fallback_advances[g];
+ }
+ return layout;
+}
+static void nds_clock_draw(u16* pixels,const NdsClockLayout* layout,int pen,int top,u16 ink){
+ ink|=BIT(15);
+ for(unsigned i=0;i<5;++i){
+  int g=layout->glyphs[i];
+  if(g<0)continue;
+  for(int row=0;row<16;++row){
+   unsigned bits=ui_fallback_rows[g][row];
+   while(bits){
+    int column=pen+__builtin_ctz(bits);
+    pixels[(top+row)*256+column]=ink;
+    bits&=bits-1;
+   }
+  }
+  pen+=ui_fallback_advances[g];
  }
 }
-static void nds_clock_paint(u16* pixels,int x,int y,u16 ink){nds_clock_paint_impl(pixels,x,y,ink,true);}
+static void nds_clock_paint_impl(u16* pixels,int x,int y,u16 ink){
+ const NdsClockLayout layout=nds_clock_layout();
+ nds_clock_draw(pixels,&layout,x+(48-layout.advance)/2,y+1,ink);
+}
+static void nds_clock_paint_menu(int x,int y){
+ const NdsClockLayout layout=nds_clock_layout();
+ if(x<0||y<0||x+layout.right-layout.left>256||y+layout.bottom-layout.top>192)return;
+ nds_clock_draw(framebuffer,&layout,x-layout.left,y-layout.top,RGB15(31,31,31));
+ clock_state[5]++;
+}
 static void nds_rmenu_draw_clock(const cpymo_engine* e,const void* data){
  nds_clock_collect_menu=true;nds_clock_menu_found=false;
  nds_rmenu_original_drawer(e,data);nds_clock_collect_menu=false;nds_clock_sample();
  nds_menu_clock_visible=true;clock_state[9]=1;
- if(nds_clock_menu_found){
-  int x=nds_clock_menu_x+4,y=nds_clock_menu_y+2;
-  if(x+48<=256&&y+18<=192){nds_clock_paint_impl(framebuffer,x,y,RGB15(31,31,31),false);clock_state[5]++;}
- }
+ if(nds_clock_menu_found)
+  nds_clock_paint_menu(nds_clock_menu_x+6,nds_clock_menu_y+6);
 }
 extern error_t __real_cpymo_ui_enter(void**,cpymo_engine*,size_t,cpymo_ui_updater,cpymo_ui_drawer,cpymo_ui_deleter);
 error_t __wrap_cpymo_ui_enter(void** out,cpymo_engine* e,size_t size,cpymo_ui_updater update,cpymo_ui_drawer draw,cpymo_ui_deleter del){

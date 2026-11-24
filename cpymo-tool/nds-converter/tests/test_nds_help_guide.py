@@ -51,6 +51,7 @@ class NDSHelpGuideTests(unittest.TestCase):
                 self.assertLessEqual(int(max_x), 183)
             else:
                 self.assertLessEqual(int(max_x), 245)
+        self.assertNotIn('launcher_version_footer(', panel)
         self.assertIn('12,176,message&&*message?accent:muted,245)', panel)
 
     def test_translation_index_count_and_no_missing_new_keys(self):

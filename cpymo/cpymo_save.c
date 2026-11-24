@@ -8,6 +8,10 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#ifdef __NDS__
+#include <sys/stat.h>
+#include <time.h>
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -243,6 +247,26 @@ FILE * cpymo_save_open_read(struct cpymo_engine *e, unsigned short save_id)
 
 	return cpymo_backend_read_save(e->assetloader.gamedir, filename);
 }
+
+#ifdef __NDS__
+void cpymo_save_slot_date(const cpymo_engine *e, unsigned short save_id, char date[24])
+{
+	date[0] = '\0';
+	char name[16], path[512];
+	cpymo_save_get_filename(name, save_id);
+	int length = snprintf(path, sizeof path, "%s/save/%s", e->assetloader.gamedir, name);
+	if (length < 0 || (size_t)length >= sizeof path) return;
+	struct stat st;
+	if (stat(path, &st) != 0) return;
+	/* FAT and the DS RTC store local time. Decode it without a second timezone shift. */
+	struct tm local;
+	if ((uint64_t)st.st_mtime < 315532800ULL || (uint64_t)st.st_mtime >= 4354819200ULL ||
+		!gmtime_r(&st.st_mtime, &local)) return;
+	snprintf(date, 24, "%04u-%02u-%02u %02u:%02u", (unsigned)(local.tm_year + 1900),
+		(unsigned)local.tm_mon + 1, (unsigned)local.tm_mday,
+		(unsigned)local.tm_hour, (unsigned)local.tm_min);
+}
+#endif
 
 static error_t cpymo_save_read_string(char **str, FILE *save) 
 {

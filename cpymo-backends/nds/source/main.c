@@ -471,11 +471,171 @@ static FILE* trace_open(const char* mode);
 static void missing_glyph(unsigned cp){engine_state[20]++;FILE* file=trace_open("ab");if(file){fprintf(file,"MISSING_GLYPH U+%04X\n",cp);fclose(file);}}
 #include "ui-fallback-font.h"
 #include "pixel-font-nds.h"
+#include "ui-layout-nds.h"
 #include "clock-nds.h"
 typedef struct {float size;unsigned mode;u8 name_bounds_ready,ink_top,ink_bottom,pad;char text[];} GlyphText;
 float cpymo_backend_text_width(cpymo_str s,float size){unsigned mode=active_font_mode(),w=0,maxw=0;const char* p=s.begin;while(p<s.begin+s.len){unsigned c=decode(&p);if(c==13)continue;if(c==10){if(w>maxw)maxw=w;w=0;continue;}int g=text_glyph(mode,c);w+=g>=0?text_advance(mode,g):font_nominal(mode);}if(w>maxw)maxw=w;return maxw*(font_scale(size,mode)/display_scale());}
 error_t cpymo_backend_text_create(cpymo_backend_text *out,float *width,cpymo_str s,float size){GlyphText* p=malloc(sizeof *p+s.len+1);if(!p)return CPYMO_ERR_OUT_OF_MEM;p->size=size;p->mode=active_font_mode();p->name_bounds_ready=0;memcpy(p->text,s.begin,s.len);p->text[s.len]=0;*out=p;*width=cpymo_backend_text_width(s,size);return CPYMO_ERR_SUCC;}
 void cpymo_backend_text_free(cpymo_backend_text p){free(p);}
+float nds_ui_scale(void) { return display_scale(); }
+void nds_ui_native_rect(int x,int y,int width,int height,float rect[4])
+{
+ const float scale=display_scale();
+ rect[0]=(x-display_x()+.01f)/scale;
+ rect[1]=(y-display_y()+.01f)/scale;
+ rect[2]=width/scale;
+ rect[3]=height/scale;
+}
+
+static bool image_rows_match(const Image* image,int a,int b)
+{
+ const int width=image->pw;
+ return !memcmp(image->px+a*width,image->px+b*width,width*sizeof *image->px)
+  && (!image->mask||!memcmp(image->mask+a*width,image->mask+b*width,width));
+}
+
+bool nds_ui_menu_stretch_band(cpymo_backend_image bg,int* first,int* end)
+{
+ const Image* image=bg;
+ int middle=image->ph/2,start=middle,stop=middle+1;
+ while(start>0&&image_rows_match(image,start-1,middle))--start;
+ while(stop<image->ph&&image_rows_match(image,stop,middle))++stop;
+ /* Require a substantial flat body bounded by distinct top and bottom art.
+    Compare alpha too, so patterned transparency never qualifies. */
+ if(start==0||stop==image->ph||stop-start<4||(stop-start)*3<image->ph)return false;
+ *first=(start*image->h+image->ph-1)/image->ph;
+ *end=stop*image->h/image->ph;
+ return *first<*end;
+}
+
+error_t nds_ui_text_create(cpymo_backend_text *out, float *width,
+    cpymo_str text, float size, unsigned nominal)
+{
+ error_t err=cpymo_backend_text_create(out,width,text,size);
+ if(err||!nominal)return err;
+ GlyphText *t=*out;
+ t->mode=nominal==16?2:1;
+ unsigned advance=0;
+ const char *p=t->text;
+ while(*p){
+  int g=text_glyph(t->mode,decode(&p));
+  advance+=g>=0?text_advance(t->mode,g):font_nominal(t->mode);
+ }
+ *width=advance*font_scale(size,t->mode)/display_scale();
+ return CPYMO_ERR_SUCC;
+}
+
+/* Native pixel extents relative to the left origin and baseline. */
+void nds_ui_text_ink(cpymo_backend_text text, int bounds[4])
+{
+ memset(bounds,0,4*sizeof *bounds);
+ if(!text)return;
+ const GlyphText *t=text;
+ const unsigned mode=t->mode;
+ const float scale=font_scale(t->size,mode);
+ const int width=(int)(font_width(mode)*scale+.5f);
+ const int height=(int)(font_height(mode)*scale+.5f);
+ const int baseline=(int)(font_baseline(mode)*scale);
+ float pen=0;
+ bool first=true;
+ const char *p=t->text;
+ while(*p){
+  unsigned code=decode(&p);
+  if(code=='\n'||code=='\r')break;
+  int g=text_glyph(mode,code);
+  if(g<0)g=text_glyph(mode,'?');
+  if(g<0){pen+=font_nominal(mode)*scale; continue;}
+  for(int y=0;y<height;++y){
+   unsigned mask=text_row(mode,g,(unsigned)(y/scale));
+   for(int x=0;x<width;++x){
+    if(!(mask&(1u<<(unsigned)(x/scale))))continue;
+    int col=(int)pen+x,row=y-baseline;
+    if(first||col<bounds[0])bounds[0]=col;
+    if(first||row<bounds[1])bounds[1]=row;
+    if(first||col+1>bounds[2])bounds[2]=col+1;
+    if(first||row+1>bounds[3])bounds[3]=row+1;
+    first=false;
+   }
+  }
+  pen+=text_advance(mode,g)*scale;
+ }
+}
+
+float nds_ui_centered_baseline(cpymo_backend_text text, float y, float height)
+{
+ int ink[4];
+ nds_ui_text_ink(text,ink);
+ const float scale=display_scale(), offset=display_y();
+ int top=(int)(y*scale+offset);
+ int bottom=(int)((y+height)*scale+offset);
+ int row=top+(bottom-top-(ink[3]-ink[1]))/2-ink[1];
+ return (row-offset+.01f)/scale;
+}
+
+void nds_ui_text_at(cpymo_backend_text text, float x, float y, cpymo_color color)
+{
+ int ink[4];
+ nds_ui_text_ink(text,ink);
+ const float scale=display_scale();
+ cpymo_backend_text_draw(text,x-ink[0]/scale,y-ink[1]/scale,color,1,
+     cpymo_backend_image_draw_type_ui_element);
+}
+
+bool nds_ui_draw_dialogue_cursor(const cpymo_engine *e,float slot_x,float slot_y,
+    float previous_baseline,enum cpymo_backend_image_draw_type type)
+{
+ const Image *im=e->say.msg_cursor;
+ if(!im||im->pw<=0||im->ph<=0)return false;
+ if(!nds_dual_accept(type))return true;
+ const float scale=display_scale();
+ const float font_unit=e->gameconfig.imagesize_h*.8f/240*scale;
+ const float small=ceilf(12/font_unit)*font_unit;
+ const float shrink=fminf(scale,small/fmaxf(im->w,im->h));
+ const float dw=fmaxf(1,im->w*shrink),dh=fmaxf(1,im->h*shrink);
+ const int width=(int)dw,height=(int)dh;
+ const unsigned dx=(unsigned)(im->pw*65536.f/dw+.5f);
+ const unsigned dy=(unsigned)(im->ph*65536.f/dh+.5f);
+ int left=width,top=height,right=0,bottom=0;
+ for(int y=0;y<height;++y)for(int x=0;x<width;++x){
+  const unsigned sx=(x*dx)>>16,sy=(y*dy)>>16;
+  if(im->mask&&im->mask[sy*im->pw+sx]<4)continue;
+  if(x<left)left=x;
+  if(y<top)top=y;
+  if(x+1>right)right=x+1;
+  if(y+1>bottom)bottom=y+1;
+ }
+ if(right==0)return true;
+ const float origin_y=display_y()+
+     (nds_dual_bottom_pass&&nds_dual_is_say(type)?nds_dual_say_offset()*scale:0);
+ int box_right=(int)(e->gameconfig.imagesize_w*scale+display_x());
+ int box_bottom=(int)(e->gameconfig.imagesize_h*scale+origin_y+.001f);
+ if(box_right>256)box_right=256;
+ if(box_bottom>192)box_bottom=192;
+ int x=box_right-6-right,y=box_bottom-6-bottom;
+ int reserve_left=(int)(slot_x*scale+display_x());
+ int prior_bottom=0;
+ if(previous_baseline>=0){
+  const unsigned mode=active_font_mode();
+  const float glyph_scale=font_scale(cpymo_gameconfig_font_size(&e->gameconfig),mode);
+  prior_bottom=(int)(previous_baseline*scale+origin_y-font_baseline(mode)*glyph_scale)
+      +(int)(font_height(mode)*glyph_scale+.5f);
+ }
+ /* Keep the existing text boundaries for unusually tight game skins. */
+ if(x+left<reserve_left)x=reserve_left-left;
+ if(y+top<prior_bottom)y=prior_bottom-top;
+ if(x+right>box_right||y+bottom>box_bottom){
+  x=reserve_left;
+  y=(int)(slot_y*scale+origin_y);
+ }
+ if(x<0||y+bottom<=0||x+right>256||y+bottom>192)return false;
+ /* Draw with the screen shift already applied so split dialogue is shifted once. */
+ const float lx=(x+.01f-display_x())/scale,ly=(y+.01f-display_y())/scale;
+ if(renderer_fast)
+  image_draw_fast(lx,ly,dw/scale,dh/scale,e->say.msg_cursor,0,0,im->w,im->h,1,type);
+ else
+  image_draw_reference(lx,ly,dw/scale,dh/scale,e->say.msg_cursor,0,0,im->w,im->h,1,type);
+ return true;
+}
 // Original PyMO centers name ink in its box. The core's fixed 0.9-em
 // baseline assumes different font metrics; adapt only the live speaker name.
 // Cache bounds on first draw: no repeated glyph scan or FAT access per frame.
@@ -582,6 +742,18 @@ extern void nds_audio_suspend(void);
 extern void nds_audio_resume(void);
 static void nds_power_poll(void){sleep_state[11]++;unsigned wakes=sleep_state[3];if(!pmMainLoop())exit(0);if(wakes!=sleep_state[3])nds_aux_refresh();}
 #include "theme-nds.h"
+void nds_ui_library_notice_background(void)
+{
+ if(!nds_dual_accept(cpymo_backend_image_draw_type_ui_element_bg))return;
+ const u16 color=nds_theme_bg()|BIT(15);
+ for(unsigned i=0;i<256*192;++i)framebuffer[i]=color;
+}
+
+cpymo_color nds_ui_library_text_color(void)
+{
+ const u16 ink=nds_theme_primary();
+ return (cpymo_color){(ink&31)*255/31,((ink>>5)&31)*255/31,((ink>>10)&31)*255/31};
+}
 #include "launcher.h"
 #include "aux-screen-nds.h"
 #include "visual-capture-nds.h"
@@ -837,8 +1009,8 @@ int main(int argc,char** argv){
     Resolve the boundary before the core copies its previous input. */
  nds_touch_prepare_input((unsigned)keysHeld());
  nds_clock_poll();
- if(keysDown()&KEY_START){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
- if((keysDown()&KEY_SELECT)&&!(keysHeld()&KEY_L)){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
+ if(!engine.nds_legacy_notice_pending&&(keysDown()&KEY_START)){error_t save_err=cpymo_save_write(&engine,1);engine_state[10]=(unsigned)save_err;engine_state[12]++;if(!debug_trace)launcher_toast(save_err?"快速保存到存档1失败":"已快速保存到存档1");trace=trace_open("ab");if(trace){fprintf(trace,"SAVE slot=1 status=%d\n",save_err);fclose(trace);}}
+ if(!engine.nds_legacy_notice_pending&&(keysDown()&KEY_SELECT)&&!(keysHeld()&KEY_L)){FILE* saved=cpymo_save_open_read(&engine,1);error_t load_err=CPYMO_ERR_CAN_NOT_OPEN_FILE;if(saved){load_err=cpymo_save_load_savedata(&engine,saved);fclose(saved);}engine_state[11]=(unsigned)load_err;engine_state[13]++;if(!debug_trace)launcher_toast(load_err?"读取存档1失败或存档不存在":"已快速读取存档1");trace=trace_open("ab");if(trace){fprintf(trace,"LOAD slot=1 status=%d\n",load_err);fclose(trace);}if(saved&&load_err){engine_state[1]=(unsigned)load_err;break;}}
  unsigned now=vblank_count;u64 now_tick=tickGetCount();float dt=(float)(now_tick-prev_tick)/TICK_FREQ;prev_tick=now_tick;if(woke)sleep_state[10]=(unsigned)(dt*1000000);elapsed+=dt;bool redraw=false;
  bool saved_skip_policy=engine.config_skip_already_read_only;
  bool skip_override=false; /* L is now exclusively screen swap; skip policy comes from settings. */

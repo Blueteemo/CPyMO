@@ -1,5 +1,8 @@
 ﻿#include "cpymo_prelude.h"
 #include "cpymo_select_img.h"
+#ifdef __NDS__
+#include "../cpymo-backends/nds/source/ui-layout-nds.h"
+#endif
 #include "cpymo_localization.h"
 #include "cpymo_engine.h"
 #include "cpymo_rmenu.h"
@@ -18,6 +21,9 @@ typedef struct cpymo_select_img_selection{
 	cpymo_color text_color;
 	float x, y;
 	int w, h;
+#ifdef __NDS__
+	float nds_row_top, nds_row_bottom;
+#endif
 	bool enabled : 1;
 
 	uint64_t hash;
@@ -210,6 +216,12 @@ static bool cpymo_select_img_mouse_in_selection(cpymo_select_img *o, int sel, co
 	float x = input->mouse_x;
 	float y = input->mouse_y;
 
+#ifdef __NDS__
+	if (o->nds_menu_width > 0)
+		return s->enabled && x >= o->nds_menu_x && x < o->nds_menu_x + o->nds_menu_width &&
+			y >= s->nds_row_top && y < s->nds_row_bottom;
+#endif
+
 	if (s->image) {
 		float left = s->x - (float)s->w / 2.0f;
 		float top = s->y - (float)s->h / 2.0f;
@@ -267,6 +279,9 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 	// Trim disabled images.
 	for (size_t i = 0; i < sel->all_selections; ++i) {
 		if (!sel->selections[i].enabled) {
+#ifdef __NDS__
+			if (sel->nds_menu_width > 0) continue;
+#endif
 			if (sel->selections[i].image) {
 				if (sel->select_img_image == NULL)
 					cpymo_backend_image_free(sel->selections[i].image);
@@ -309,7 +324,8 @@ static void cpymo_select_img_move(cpymo_select_img *o, int move) {
 	while (o->current_selection < 0) o->current_selection += (int)o->all_selections;
 	while (o->current_selection >= (int)o->all_selections) o->current_selection -= (int)o->all_selections;
 
-	if (o->selections[o->current_selection].image == NULL && o->selections[o->current_selection].or_text == NULL)
+	const cpymo_select_img_selection *item = &o->selections[o->current_selection];
+	if (!item->enabled || (!item->image && !item->or_text))
 		cpymo_select_img_move(o, move);
 }
 
@@ -495,6 +511,64 @@ void cpymo_select_img_draw(const cpymo_select_img *o, int logical_screen_w, int 
 		}
 	}
 }
+
+#ifdef __NDS__
+void cpymo_select_img_nds_menu_layout(cpymo_select_img *menu, int x, int y, int width,
+	int height, int max_gap)
+{
+	int total_ink = 0;
+	for (size_t i = 0; i < menu->all_selections; ++i) {
+		int bounds[4];
+		cpymo_select_img_selection *item = &menu->selections[i];
+		nds_ui_text_ink(item->or_text, bounds);
+		item->w = bounds[2] - bounds[0];
+		item->h = bounds[3] - bounds[1];
+		total_ink += item->h;
+	}
+	int gap = (height - total_ink) / ((int)menu->all_selections - 1);
+	if (gap > max_gap) gap = max_gap;
+	if (gap < 0) gap = 0;
+	int used = total_ink + gap * ((int)menu->all_selections - 1);
+	int top = y + (height - used) / 2;
+	float rect[4];
+	nds_ui_native_rect(x, y, width, height, rect);
+	menu->nds_menu_x = rect[0];
+	menu->nds_menu_width = rect[2];
+	for (size_t i = 0; i < menu->all_selections; ++i) {
+		cpymo_select_img_selection *item = &menu->selections[i];
+		nds_ui_native_rect(x + (width - item->w) / 2, top, 0, 0, rect);
+		item->x = rect[0];
+		item->y = rect[1];
+		nds_ui_native_rect(x, top - gap / 2, width, item->h + gap, rect);
+		item->nds_row_top = rect[1];
+		item->nds_row_bottom = rect[1] + rect[3];
+		top += item->h + gap;
+	}
+}
+
+void cpymo_select_img_nds_menu_draw(const cpymo_select_img *menu)
+{
+	const float scale = nds_ui_scale();
+	for (size_t i = 0; i < menu->all_selections; ++i) {
+		const cpymo_select_img_selection *item = &menu->selections[i];
+		if (item->enabled && menu->current_selection == (int)i) {
+			float top = item->y - 1 / scale;
+			float height = (item->h + 2) / scale;
+			if (menu->sel_highlight)
+				cpymo_backend_image_draw(menu->nds_menu_x, top, menu->nds_menu_width, height,
+					menu->sel_highlight, 0, 0, menu->sel_highlight_w, menu->sel_highlight_h,
+					1, cpymo_backend_image_draw_type_ui_element);
+			else {
+				float rect[] = {menu->nds_menu_x, top, menu->nds_menu_width, height};
+				cpymo_backend_image_fill_rects(rect, 1, cpymo_color_white, .35f,
+					cpymo_backend_image_draw_type_ui_element);
+			}
+		}
+		nds_ui_text_at(item->or_text, item->x, item->y,
+			item->enabled ? cpymo_color_white : (cpymo_color){170, 170, 170});
+	}
+}
+#endif
 
 error_t cpymo_select_img_configuare_select_text(
 	cpymo_select_img *sel, cpymo_assetloader *loader, cpymo_gameconfig *gc, cpymo_hash_flags *flags,

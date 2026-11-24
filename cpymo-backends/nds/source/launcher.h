@@ -254,25 +254,88 @@ static void launcher_title(const LauncherGame* game,int x,int y,u16 color,int ma
  else if(!launcher_title_bitmap(game,x,y,color))launcher_line(game->title,x,y,color,max_x,0);
 }
 static void launcher_background(void){const u16 color=nds_theme_bg()|BIT(15);for(unsigned i=0;i<256*192;i++)framebuffer[i]=color;}
-/* C scheme: no redundant bar across the entire top of the screen. */
-static void launcher_header(const char* title){
+typedef struct {int top,bottom,right;} LauncherInk;
+static LauncherInk launcher_label_ink(const char* text,int width,unsigned mode){
+ LauncherInk ink={.top=font_height(mode)};
+ int pen=0;
+ const unsigned columns=(1u<<font_width(mode))-1;
+ for(const char* p=text;*p;){
+  int glyph=text_glyph(mode,decode(&p));
+  if(glyph<0)glyph=text_glyph(mode,'?');
+  if(glyph<0)continue;
+  int advance=text_advance(mode,glyph);
+  if(pen+advance>width)break;
+  for(int y=0;y<(int)font_height(mode);++y){
+   unsigned bits=text_row(mode,glyph,y)&columns;
+   if(!bits)continue;
+   int right=pen+32-__builtin_clz(bits);
+   if(right>ink.right)ink.right=right;
+   if(y<ink.top)ink.top=y;
+   if(y>=ink.bottom)ink.bottom=y+1;
+  }
+  pen+=advance;
+ }
+ return ink;
+}
+static void launcher_header(const char* title,int max_x,unsigned mode,int down){
+ const LauncherInk ink=launcher_label_ink(title,max_x-10,mode);
  launcher_rect(0,0,256,28,nds_theme_header());
- launcher_text(title,10,7,nds_theme_primary(),248);
+ launcher_text_mode(title,10,(28-ink.top-ink.bottom)/2+down,nds_theme_primary(),max_x,mode);
+}
+static int launcher_footer_text_y(LauncherInk ink){
+ /* Center the actual visible glyphs on the library's status row. */
+ return 183-(ink.top+ink.bottom-1)/2;
+}
+static int launcher_version_footer(unsigned mode){
+ const char* label="v" CPYMO_NDS_VERSION;
+ const LauncherInk ink=launcher_label_ink(label,246,mode);
+ const int x=246-ink.right;
+ launcher_text_mode(label,x,launcher_footer_text_y(ink),nds_theme_clock_ink(),256,mode);
+ return x-6;
+}
+static void launcher_footer_status(const char* text,u16 color,int max_x,unsigned mode){
+ const LauncherInk ink=launcher_label_ink(text,max_x-12,mode);
+ launcher_line(text,12,launcher_footer_text_y(ink),color,max_x,mode);
 }
 static void launcher_icon(int x,int y){for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++){u16 c=app_icon[yy*32+xx];if(c)launcher_rect(x+xx,y+yy,1,1,c);}}
 /* ROM-resident glyphs work before FAT or a game's font cache is available. */
-static void launcher_splash_text(const char* text,int y,bool large,u16 color){
- const char* p=text;unsigned width=0;while(*p){int g=ui_fallback_glyph(decode(&p));if(g>=0)width+=large?ui_large_advances[g]:ui_fallback_advances[g];}
- int x=(256-(int)width)/2;p=text;while(*p){int g=ui_fallback_glyph(decode(&p));if(g<0)continue;
- for(int yy=0;yy<16;yy++){unsigned bits=large?ui_large_rows[g][yy]:ui_fallback_rows[g][yy];for(int xx=0;xx<16;xx++)if(bits&(1u<<xx))launcher_rect(x+xx,y+yy,1,1,color);}
- x+=large?ui_large_advances[g]:ui_fallback_advances[g];}
+#include "splash-art-nds.h"
+static void launcher_splash_text(const char* text,u16 color){
+ int pen=0, left=256, right=0, top=16, bottom=0;
+ const char* p=text;
+ while(*p){
+  int g=ui_fallback_glyph(decode(&p));
+  if(g<0)continue;
+  for(int y=0;y<16;++y)for(int x=0;x<16;++x){
+   if(!(ui_fallback_rows[g][y]&(1u<<x)))continue;
+   if(pen+x<left)left=pen+x;
+   if(pen+x+1>right)right=pen+x+1;
+   if(y<top)top=y;
+   if(y+1>bottom)bottom=y+1;
+  }
+  pen+=ui_fallback_advances[g];
+ }
+ launcher_text_mode(text,(256-left-right)/2,(192-top-bottom)/2,color,256,1);
 }
 static void launcher_show_splash(void){
  launcher_background();
- for(unsigned y=0;y<64;y++)for(unsigned x=0;x<64;x++){u16 c=app_icon_splash[y*64+x];if(c)launcher_rect(96+x,38+y,1,1,c);}
- launcher_splash_text("CPyMO for NDS",121,true,nds_theme_primary());launcher_publish(vram);
- launcher_background();launcher_splash_text(nds_ui("正在读取游戏列表..."),88,false,nds_theme_active_index()<0?RGB15(28,29,31):nds_theme_detail());
- launcher_splash_text(nds_runtime_mode_label(),166,false,nds_theme_muted());launcher_publish(launcher_sub);
+ const unsigned left=(256-48-14-84)/2;
+ for(unsigned y=0;y<48;++y)for(unsigned x=0;x<48;++x){
+  unsigned pixel=y*48+x, dst=(72+y)*256+left+x;
+  framebuffer[dst]=blend(framebuffer[dst],nds_splash_avatar[pixel],nds_splash_avatar_alpha[pixel]);
+ }
+ const u16 wordmark_ink=nds_theme_primary()|BIT(15);
+ for(unsigned y=0;y<21;++y)for(unsigned x=0;x<84;++x){
+  unsigned dst=(88+y)*256+left+48+14+x;
+  unsigned a=nds_splash_wordmark[y*84+x];
+  /* Lift intermediate coverage while keeping the original solid and clear pixels. */
+  a+=(3*a*(32-a)+100)/200;
+  framebuffer[dst]=blend(framebuffer[dst],wordmark_ink,a);
+ }
+ launcher_publish(vram);
+ launcher_background();
+ launcher_splash_text(nds_ui("正在读取游戏列表..."),nds_theme_detail());
+ launcher_publish(launcher_sub);
  /* Both planes are complete already. No timer, key wait or extra VBlank. */
  setBrightness(3,0);splash_state[1]=1;splash_state[2]++;
 }
@@ -297,7 +360,7 @@ static bool nds_aux_clock_suppressed;
 static void nds_clock_patch_aux(bool show){
  if(debug_trace||!launcher_sub||nds_aux_hidden())return;
  for(unsigned y=96;y<114;y++)for(unsigned x=196;x<244;x++)launcher_sub[y*256+x]=nds_theme_bg()|BIT(15);
- if(show){nds_clock_paint_impl(launcher_sub,196,96,nds_theme_aux_clock_ink(),false);clock_state[7]++;}
+ if(show){nds_clock_paint_impl(launcher_sub,196,96,nds_theme_aux_clock_ink());clock_state[7]++;}
 }
 static void nds_clock_sync_aux_visibility(void){
  bool suppress=nds_menu_clock_visible;
@@ -309,7 +372,8 @@ static void launcher_play_panel(const char* message){
  if(nds_dual_active())return;
  if(nds_aux_hidden()){if(launcher_sub)dmaFillHalfWords(BIT(15),launcher_sub,256*192*2);return;}
  u16 white=nds_theme_primary(),muted=nds_theme_muted(),accent=nds_theme_accent();
- launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
+ const unsigned mode=nds_font_choices_available()?1:0;
+ launcher_background();launcher_header("CPyMO for NDS",248,mode,1);
  /* Physical touch is a native game coordinate only in classic-lower.
     Do not imply the help LCD is a universal virtual A button. D-pad
     story shortcuts use the physical controller's UP/DOWN labels.
@@ -340,7 +404,7 @@ static void launcher_play_panel(const char* message){
  launcher_text(message&&*message?nds_ui(message):nds_runtime_mode_label(),
                12,176,message&&*message?accent:muted,245);
  nds_clock_sample();nds_aux_clock_suppressed=nds_menu_clock_visible;
- if(!nds_aux_clock_suppressed)nds_clock_paint_impl(framebuffer,196,96,nds_theme_aux_clock_ink(),false);clock_state[6]++;
+ if(!nds_aux_clock_suppressed)nds_clock_paint_impl(framebuffer,196,96,nds_theme_aux_clock_ink());clock_state[6]++;
  launcher_publish(launcher_sub);
 }
 static void nds_clock_poll(void){
@@ -413,18 +477,20 @@ static void launcher_failure_hint(const char* message,int error,const char* hint
 }
 static void launcher_failure(const char* message,int error){launcher_failure_hint(message,error,"按 B 返回游戏资料库");}
 static void launcher_library_clock(u16* pixels,bool erase){
- /* Header-only minute patch: never re-read game metadata or repaint the list. */
- /* Center the time numerals on the same visible baseline as the heading.
-     Only modify this 48x18 patch, leaving the R7 list geometry unchanged. */
- if(erase)for(int y=6;y<24;y++)for(int x=200;x<248;x++)pixels[y*256+x]=nds_theme_header()|BIT(15);
- nds_clock_paint_impl(pixels,200,6,nds_theme_clock_ink(),false);
+ enum { right = 246, width = 48, height = 28 };
+ /* Clear the full patch so width changes leave no old digits behind. */
+ if(erase)for(int y=0;y<height;y++)for(int x=right-width;x<right;x++)pixels[y*256+x]=nds_theme_header()|BIT(15);
+ const NdsClockLayout layout=nds_clock_layout();
+ nds_clock_draw(pixels,&layout,right-layout.right,(height-layout.top-layout.bottom)/2,nds_theme_clock_ink());
 }
 static void launcher_draw(const char* message){
  launcher_scroll_ensure_visible();
  if(launcher_count&&launcher_games[launcher_selected].status==1&&strcmp(launcher_font_path,launcher_games[launcher_selected].path)){if(load_game_font(launcher_games[launcher_selected].path)&&load_pixel_fonts(launcher_games[launcher_selected].path)){snprintf(launcher_font_path,sizeof launcher_font_path,"%s",launcher_games[launcher_selected].path);frontend_state[2]++;}}
  u16 white=nds_theme_primary(),muted=nds_theme_muted(),accent=nds_theme_accent();
  launcher_selected_icon();
- launcher_background();launcher_header("CPyMO for NDS   " CPYMO_NDS_VERSION);
+ const unsigned mode=nds_font_choices_available()?1:0;
+ launcher_background();launcher_header("CPyMO for NDS",248,mode,1);
+ const int status_right=launcher_version_footer(mode);
  if(launcher_about){launcher_icon(12,40);launcher_text("PyMO / CPyMO",53,47,white,246);launcher_text(nds_ui("NDS 移植：千岚之夏（Blueteemo）"),12,78,white,245);launcher_text(nds_ui("引擎与后端：AGPL v3"),12,101,muted,245);launcher_text(nds_ui("转换工具：MIT"),12,124,muted,245);launcher_text(nds_ui("许可详情请见附带文档"),12,147,muted,245);}
  else if(launcher_count){LauncherGame* game=&launcher_games[launcher_selected];launcher_game_icon(game,12,39,true);launcher_text(nds_ui("游戏资料库"),74,53,accent,245);
  launcher_title(game,12,90,white,245);
@@ -432,15 +498,16 @@ static void launcher_draw(const char* message){
  const char* path=game->path;while(strlen(path)>36)path++;launcher_text(path,12,153,muted,215);
  if(!strncasecmp(game->path,"sd:/",4))launcher_text("SD",220,153,accent,248);
  else if(!strncasecmp(game->path,"fat:/",5))launcher_text("TF",220,153,accent,248);
- launcher_text(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),12,175,accent,245);}
+ launcher_footer_status(nds_ui(game->status==1?"已转换，可以启动":game->status==2?"缓存无效，请重新转换":game->status==3?"游戏配置无效":"需要先使用转换脚本"),accent,status_right,mode);}
  else {launcher_text(nds_ui("没有找到游戏"),12,58,white,245);launcher_text(nds_ui("请先转换游戏，再放入"),12,88,muted,245);launcher_text(nds_ui("/pymo/games/"),12,114,accent,245);}
- if(!launcher_count||launcher_about)launcher_text(nds_runtime_mode_label(),12,177,muted,245);launcher_publish(vram);
+ if(!launcher_count||launcher_about)launcher_footer_status(nds_runtime_mode_label(),muted,status_right,mode);
+ launcher_publish(vram);
  launcher_background();
  if(!launcher_about&&!launcher_language_menu&&!launcher_theme_menu){
-  launcher_rect(0,0,256,28,nds_theme_header());
-  launcher_line(nds_ui("选择游戏"),10,7,white,194,1);
+  launcher_header(nds_ui("选择游戏"),194,1,0);
   nds_clock_sample();launcher_library_clock(framebuffer,false);
- }else launcher_header(nds_ui(launcher_theme_menu?"主题设置":launcher_about?"关于与许可":"界面语言"));
+ }else launcher_header(nds_ui(launcher_theme_menu?"主题设置":launcher_about?"关于与许可":"界面语言"),
+  248,mode,0);
  if(launcher_theme_menu){
   for(unsigned i=0;i<2;i++){
    int x=i?131:8,w=i?117:115;
